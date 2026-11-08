@@ -83,3 +83,4 @@ Stop-Cmdb $run
 
 Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
 Write-Host 'Windows package smoke test passed.'
+exit 0   # the last native call (pg_ctl status = "not running") leaves a non-zero $LASTEXITCODE
