@@ -1,0 +1,457 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "description": "Infrastruktur CMDB with private networking: App Service (container) and Azure Database for PostgreSQL, both reachable only through private endpoints in a virtual network. Sign-in with e-mail and password; the first visitor creates the administrator account."
+  },
+  "parameters": {
+    "appName": {
+      "type": "string",
+      "defaultValue": "",
+      "maxLength": 40,
+      "metadata": {
+        "description": "Optional name of the web app (host name <name>.azurewebsites.net, resolved privately). Empty = generated automatically."
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Azure region – must be the region of the virtual network."
+      }
+    },
+    "brandName": {
+      "type": "string",
+      "defaultValue": "Infrastruktur",
+      "maxLength": 60,
+      "metadata": {
+        "description": "Shown above the app name in the header, on the login page and in e-mails."
+      }
+    },
+    "vnetNewOrExisting": {
+      "type": "string",
+      "defaultValue": "new",
+      "allowedValues": ["new", "existing"],
+      "metadata": {
+        "description": "Create a new virtual network or use an existing one."
+      }
+    },
+    "vnetName": {
+      "type": "string",
+      "defaultValue": "vnet-cmdb",
+      "metadata": {
+        "description": "Name of the virtual network."
+      }
+    },
+    "vnetResourceGroup": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().name]",
+      "metadata": {
+        "description": "Resource group of an existing virtual network (a new one is created in the deployment's resource group)."
+      }
+    },
+    "vnetAddressPrefix": {
+      "type": "string",
+      "defaultValue": "10.20.0.0/24",
+      "metadata": {
+        "description": "Address space of a new virtual network."
+      }
+    },
+    "privateEndpointSubnetName": {
+      "type": "string",
+      "defaultValue": "snet-private-endpoints",
+      "metadata": {
+        "description": "Subnet for the private endpoints of the web app and the database."
+      }
+    },
+    "privateEndpointSubnetPrefix": {
+      "type": "string",
+      "defaultValue": "10.20.0.0/27",
+      "metadata": {
+        "description": "Address range of the private endpoint subnet (new virtual network only)."
+      }
+    },
+    "appSubnetName": {
+      "type": "string",
+      "defaultValue": "snet-app",
+      "metadata": {
+        "description": "Subnet for the App Service VNet integration (outbound). Existing subnets must be empty and delegated to Microsoft.Web/serverFarms."
+      }
+    },
+    "appSubnetPrefix": {
+      "type": "string",
+      "defaultValue": "10.20.0.32/27",
+      "metadata": {
+        "description": "Address range of the App Service integration subnet (new virtual network only)."
+      }
+    },
+    "privateDnsZones": {
+      "type": "string",
+      "defaultValue": "new",
+      "allowedValues": ["new", "existing", "none"],
+      "metadata": {
+        "description": "new = create the private DNS zones and link them to the virtual network; existing = register the endpoints in existing zones (e.g. central hub); none = DNS is handled elsewhere (e.g. Azure Policy)."
+      }
+    },
+    "webDnsZoneId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Resource ID of an existing private DNS zone privatelink.azurewebsites.net (privateDnsZones = existing)."
+      }
+    },
+    "postgresDnsZoneId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Resource ID of an existing private DNS zone privatelink.postgres.database.azure.com (privateDnsZones = existing)."
+      }
+    },
+    "routeAllTraffic": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Send all outbound traffic of the web app (including the container image download from ghcr.io) through the virtual network, e.g. to a central firewall."
+      }
+    },
+    "databasePassword": {
+      "type": "securestring",
+      "defaultValue": "[concat('Cmdb-', newGuid())]",
+      "metadata": {
+        "description": "Generated automatically – leave as is."
+      }
+    },
+    "sessionSecret": {
+      "type": "securestring",
+      "defaultValue": "[concat(newGuid(), newGuid())]",
+      "metadata": {
+        "description": "Generated automatically – leave as is."
+      }
+    },
+    "settingsEncryptionKey": {
+      "type": "securestring",
+      "defaultValue": "[concat(newGuid(), newGuid())]",
+      "metadata": {
+        "description": "Generated automatically – leave as is."
+      }
+    },
+    "containerImage": {
+      "type": "string",
+      "defaultValue": "ghcr.io/alexrsntr/infrastruktur-cmdb:latest",
+      "metadata": {
+        "description": "Container image of the CMDB – leave as is."
+      }
+    }
+  },
+  "variables": {
+    "appName": "[if(empty(parameters('appName')), concat('cmdb-', uniqueString(resourceGroup().id)), toLower(parameters('appName')))]",
+    "planName": "[concat('asp-', variables('appName'))]",
+    "dbServerName": "[concat('psql-', variables('appName'))]",
+    "dbName": "cmdb",
+    "dbUser": "cmdbadmin",
+    "newVnet": "[equals(parameters('vnetNewOrExisting'), 'new')]",
+    "vnetResourceGroup": "[if(variables('newVnet'), resourceGroup().name, parameters('vnetResourceGroup'))]",
+    "vnetId": "[resourceId(variables('vnetResourceGroup'), 'Microsoft.Network/virtualNetworks', parameters('vnetName'))]",
+    "peSubnetId": "[resourceId(variables('vnetResourceGroup'), 'Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), parameters('privateEndpointSubnetName'))]",
+    "appSubnetId": "[resourceId(variables('vnetResourceGroup'), 'Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), parameters('appSubnetName'))]",
+    "newDnsZones": "[equals(parameters('privateDnsZones'), 'new')]",
+    "registerDns": "[not(equals(parameters('privateDnsZones'), 'none'))]",
+    "webZoneName": "privatelink.azurewebsites.net",
+    "postgresZoneName": "privatelink.postgres.database.azure.com",
+    "webZoneId": "[if(variables('newDnsZones'), resourceId('Microsoft.Network/privateDnsZones', variables('webZoneName')), parameters('webDnsZoneId'))]",
+    "postgresZoneId": "[if(variables('newDnsZones'), resourceId('Microsoft.Network/privateDnsZones', variables('postgresZoneName')), parameters('postgresDnsZoneId'))]",
+    "vnetLinkName": "[concat('link-', parameters('vnetName'), '-', uniqueString(variables('vnetId')))]",
+    "postgresEndpointName": "[concat('pe-', variables('dbServerName'))]",
+    "webEndpointName": "[concat('pe-', variables('appName'))]"
+  },
+  "resources": [
+    {
+      "condition": "[variables('newVnet')]",
+      "type": "Microsoft.Network/virtualNetworks",
+      "apiVersion": "2023-11-01",
+      "name": "[parameters('vnetName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": ["[parameters('vnetAddressPrefix')]"]
+        },
+        "subnets": [
+          {
+            "name": "[parameters('privateEndpointSubnetName')]",
+            "properties": {
+              "addressPrefix": "[parameters('privateEndpointSubnetPrefix')]",
+              "privateEndpointNetworkPolicies": "Disabled"
+            }
+          },
+          {
+            "name": "[parameters('appSubnetName')]",
+            "properties": {
+              "addressPrefix": "[parameters('appSubnetPrefix')]",
+              "delegations": [
+                {
+                  "name": "app-service",
+                  "properties": {
+                    "serviceName": "Microsoft.Web/serverFarms"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "condition": "[variables('newDnsZones')]",
+      "type": "Microsoft.Network/privateDnsZones",
+      "apiVersion": "2020-06-01",
+      "name": "[variables('webZoneName')]",
+      "location": "global"
+    },
+    {
+      "condition": "[variables('newDnsZones')]",
+      "type": "Microsoft.Network/privateDnsZones",
+      "apiVersion": "2020-06-01",
+      "name": "[variables('postgresZoneName')]",
+      "location": "global"
+    },
+    {
+      "condition": "[variables('newDnsZones')]",
+      "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+      "apiVersion": "2020-06-01",
+      "name": "[concat(variables('webZoneName'), '/', variables('vnetLinkName'))]",
+      "location": "global",
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/privateDnsZones', variables('webZoneName'))]",
+        "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName'))]"
+      ],
+      "properties": {
+        "registrationEnabled": false,
+        "virtualNetwork": {
+          "id": "[variables('vnetId')]"
+        }
+      }
+    },
+    {
+      "condition": "[variables('newDnsZones')]",
+      "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+      "apiVersion": "2020-06-01",
+      "name": "[concat(variables('postgresZoneName'), '/', variables('vnetLinkName'))]",
+      "location": "global",
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/privateDnsZones', variables('postgresZoneName'))]",
+        "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName'))]"
+      ],
+      "properties": {
+        "registrationEnabled": false,
+        "virtualNetwork": {
+          "id": "[variables('vnetId')]"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DBforPostgreSQL/flexibleServers",
+      "apiVersion": "2024-08-01",
+      "name": "[variables('dbServerName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard_B1ms",
+        "tier": "Burstable"
+      },
+      "properties": {
+        "version": "16",
+        "administratorLogin": "[variables('dbUser')]",
+        "administratorLoginPassword": "[parameters('databasePassword')]",
+        "storage": {
+          "storageSizeGB": 32
+        },
+        "backup": {
+          "backupRetentionDays": 7,
+          "geoRedundantBackup": "Disabled"
+        },
+        "highAvailability": {
+          "mode": "Disabled"
+        },
+        "network": {
+          "publicNetworkAccess": "Disabled"
+        },
+        "authConfig": {
+          "activeDirectoryAuth": "Disabled",
+          "passwordAuth": "Enabled"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DBforPostgreSQL/flexibleServers/databases",
+      "apiVersion": "2024-08-01",
+      "name": "[concat(variables('dbServerName'), '/', variables('dbName'))]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', variables('dbServerName'))]"
+      ],
+      "properties": {
+        "charset": "UTF8",
+        "collation": "en_US.utf8"
+      }
+    },
+    {
+      "type": "Microsoft.Network/privateEndpoints",
+      "apiVersion": "2023-11-01",
+      "name": "[variables('postgresEndpointName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers/databases', variables('dbServerName'), variables('dbName'))]",
+        "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName'))]"
+      ],
+      "properties": {
+        "subnet": {
+          "id": "[variables('peSubnetId')]"
+        },
+        "privateLinkServiceConnections": [
+          {
+            "name": "postgres",
+            "properties": {
+              "privateLinkServiceId": "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', variables('dbServerName'))]",
+              "groupIds": ["postgresqlServer"]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "condition": "[variables('registerDns')]",
+      "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+      "apiVersion": "2023-11-01",
+      "name": "[concat(variables('postgresEndpointName'), '/default')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/privateEndpoints', variables('postgresEndpointName'))]",
+        "[resourceId('Microsoft.Network/privateDnsZones/virtualNetworkLinks', variables('postgresZoneName'), variables('vnetLinkName'))]"
+      ],
+      "properties": {
+        "privateDnsZoneConfigs": [
+          {
+            "name": "postgres",
+            "properties": {
+              "privateDnsZoneId": "[variables('postgresZoneId')]"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2023-12-01",
+      "name": "[variables('planName')]",
+      "location": "[parameters('location')]",
+      "kind": "linux",
+      "sku": {
+        "name": "B1",
+        "tier": "Basic"
+      },
+      "properties": {
+        "reserved": true
+      }
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2023-12-01",
+      "name": "[variables('appName')]",
+      "location": "[parameters('location')]",
+      "kind": "app,linux,container",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/serverfarms', variables('planName'))]",
+        "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName'))]",
+        "[resourceId('Microsoft.Network/privateEndpoints', variables('postgresEndpointName'))]",
+        "[resourceId('Microsoft.Network/privateEndpoints/privateDnsZoneGroups', variables('postgresEndpointName'), 'default')]"
+      ],
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('planName'))]",
+        "httpsOnly": true,
+        "publicNetworkAccess": "Disabled",
+        "virtualNetworkSubnetId": "[variables('appSubnetId')]",
+        "vnetRouteAllEnabled": "[parameters('routeAllTraffic')]",
+        "vnetImagePullEnabled": "[parameters('routeAllTraffic')]",
+        "siteConfig": {
+          "linuxFxVersion": "[concat('DOCKER|', parameters('containerImage'))]",
+          "alwaysOn": true,
+          "healthCheckPath": "/healthz",
+          "ftpsState": "Disabled",
+          "minTlsVersion": "1.2",
+          "http20Enabled": true,
+          "vnetRouteAllEnabled": "[parameters('routeAllTraffic')]",
+          "appSettings": [
+            { "name": "WEBSITES_PORT", "value": "3000" },
+            { "name": "WEBSITES_ENABLE_APP_SERVICE_STORAGE", "value": "false" },
+            { "name": "DOCKER_REGISTRY_SERVER_URL", "value": "https://ghcr.io" },
+            { "name": "NODE_ENV", "value": "production" },
+            { "name": "AUTH_MODE", "value": "local" },
+            { "name": "APP_BASE_URL", "value": "[concat('https://', variables('appName'), '.azurewebsites.net')]" },
+            { "name": "SESSION_SECRET", "value": "[parameters('sessionSecret')]" },
+            { "name": "SETTINGS_ENCRYPTION_KEY", "value": "[parameters('settingsEncryptionKey')]" },
+            { "name": "DB_AUTH", "value": "password" },
+            { "name": "PGHOST", "value": "[reference(resourceId('Microsoft.DBforPostgreSQL/flexibleServers', variables('dbServerName')), '2024-08-01').fullyQualifiedDomainName]" },
+            { "name": "PGPORT", "value": "5432" },
+            { "name": "PGDATABASE", "value": "[variables('dbName')]" },
+            { "name": "PGUSER", "value": "[variables('dbUser')]" },
+            { "name": "PGPASSWORD", "value": "[parameters('databasePassword')]" },
+            { "name": "PGSSLMODE", "value": "require" },
+            { "name": "STORAGE_DRIVER", "value": "database" },
+            { "name": "BRAND_NAME", "value": "[parameters('brandName')]" }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Network/privateEndpoints",
+      "apiVersion": "2023-11-01",
+      "name": "[variables('webEndpointName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', variables('appName'))]",
+        "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName'))]"
+      ],
+      "properties": {
+        "subnet": {
+          "id": "[variables('peSubnetId')]"
+        },
+        "privateLinkServiceConnections": [
+          {
+            "name": "web",
+            "properties": {
+              "privateLinkServiceId": "[resourceId('Microsoft.Web/sites', variables('appName'))]",
+              "groupIds": ["sites"]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "condition": "[variables('registerDns')]",
+      "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+      "apiVersion": "2023-11-01",
+      "name": "[concat(variables('webEndpointName'), '/default')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/privateEndpoints', variables('webEndpointName'))]",
+        "[resourceId('Microsoft.Network/privateDnsZones/virtualNetworkLinks', variables('webZoneName'), variables('vnetLinkName'))]"
+      ],
+      "properties": {
+        "privateDnsZoneConfigs": [
+          {
+            "name": "web",
+            "properties": {
+              "privateDnsZoneId": "[variables('webZoneId')]"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "outputs": {
+    "cmdbUrl": {
+      "type": "string",
+      "value": "[concat('https://', variables('appName'), '.azurewebsites.net')]"
+    },
+    "note": {
+      "type": "string",
+      "value": "The CMDB is reachable only from the virtual network and connected networks (VPN, ExpressRoute, peering)."
+    }
+  }
+}

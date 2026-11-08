@@ -9,7 +9,7 @@ Wähle **einen** der drei Wege. Für Weg A und B braucht man keine IT-Kenntnisse
 | | Weg | Gut für | Anmeldung | Aufwand |
 |---|---|---|---|---|
 | A | [**Docker**](#weg-a-docker-auf-dem-eigenen-rechner-oder-server) | Ausprobieren, kleine Firmen, eigener Server | E-Mail + Passwort | ≈ 10 Min. |
-| B | [**Azure mit wenigen Klicks**](#weg-b-microsoft-azure-mit-wenigen-klicks) | in der Cloud betreiben, ohne IT-Kenntnisse | E-Mail + Passwort | ≈ 20 Min., ≈ 30 €/Monat |
+| B | [**Azure mit wenigen Klicks**](#weg-b-microsoft-azure-mit-wenigen-klicks) | in der Cloud betreiben, ohne IT-Kenntnisse | E-Mail + Passwort | ≈ 20 Min., ≈ 30–45 €/Monat |
 | C | [**Azure mit Terraform**](#2-produktivbetrieb-planen) | Firmen mit Microsoft 365 / Entra ID | Microsoft-Konto (SSO) | ≈ 1–2 Std., für die IT |
 
 Bei Weg A und B legt **die erste Person, die die CMDB öffnet, das Administratorkonto an** – also direkt nach der
@@ -46,18 +46,35 @@ Installation öffnen. Auf Microsoft-Anmeldung kann man später umstellen.
 ### Weg B: Microsoft Azure mit wenigen Klicks
 
 Voraussetzung: eine Azure-Subscription, in der man Ressourcen anlegen darf (Rolle *Mitwirkender* oder *Besitzer*).
+Es gibt zwei Varianten – eine davon wählen:
 
-1. Auf **[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Falexrsntr%2Finfrastruktur-cmdb%2Fmain%2Fazure%2Fazuredeploy.json/createUIDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Falexrsntr%2Finfrastruktur-cmdb%2Fmain%2Fazure%2FcreateUiDefinition.json)** klicken und anmelden.
-2. **Abonnement**, **Ressourcengruppe** (oder *Neu erstellen*, z. B. `cmdb`) und eine **Region** in der Nähe wählen
-   (z. B. *Germany West Central* oder *West Europe*). Optional Firmenname und Web-Adresse eintragen.
-   Passwörter und Schlüssel werden automatisch erzeugt – sonst gibt es nichts auszufüllen.
-3. Auf **Überprüfen + erstellen**, dann auf **Erstellen** klicken.
-4. Warten, bis *Ihre Bereitstellung wurde abgeschlossen* erscheint (ca. 10–15 Minuten).
-5. Links auf **Ausgaben** klicken – `cmdbUrl` ist die Adresse der CMDB. Öffnen und das Administratorkonto anlegen. Fertig!
+| Variante | Erreichbar aus | Button |
+|---|---|---|
+| **Privates Netzwerk** (empfohlen für Firmen) | nur dem Firmennetz: Web-App und Datenbank bekommen Private Endpoints in einem VNet nach Wahl | [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Falexrsntr%2Finfrastruktur-cmdb%2Fmain%2Fazure%2Fprivate%2Fazuredeploy.json/createUIDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Falexrsntr%2Finfrastruktur-cmdb%2Fmain%2Fazure%2Fprivate%2FcreateUiDefinition.json) |
+| **Öffentlich** (am einfachsten) | dem Internet (mit Anmeldung) – für alle ohne Firmennetz | [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Falexrsntr%2Finfrastruktur-cmdb%2Fmain%2Fazure%2Fazuredeploy.json/createUIDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Falexrsntr%2Finfrastruktur-cmdb%2Fmain%2Fazure%2FcreateUiDefinition.json) |
 
-Was angelegt wird: ein App Service (Linux, B1) mit dem CMDB-Container und eine Azure Database for PostgreSQL
-(Burstable B1ms, tägliche Sicherung für 7 Tage) – zusammen ca. 30 € pro Monat. **Aktualisieren:** im Azure-Portal
-die Web-App (`cmdb-…`) öffnen und auf **Neu starten** klicken. **Alles entfernen:** die Ressourcengruppe löschen.
+1. Auf den Button der gewünschten Variante klicken und anmelden.
+2. **Grundlagen:** **Abonnement**, **Ressourcengruppe** (oder *Neu erstellen*, z. B. `cmdb`) und **Region** wählen.
+   Optional Firmenname und Web-Adresse eintragen.
+3. **Networking** (nur private Variante):
+   - **Virtual network:** ein bestehendes VNet auswählen oder ein neues anlegen. Es werden nur VNets der gewählten
+     Region angezeigt.
+   - **Subnets:** eines für die *Private Endpoints* (darf geteilt sein) und eines für die *App-Service-Integration*.
+     Bei einem bestehenden VNet muss dieses leer und an `Microsoft.Web/serverFarms` delegiert sein
+     (VNet → *Subnetze* → Subnetz → *Subnetzdelegierung*).
+   - **Private DNS zones:** *Create new* bei einem VNet mit Azure-DNS; *Use existing*, wenn es zentrale Zonen gibt
+     (z. B. im Hub – dann die Ressourcen-IDs von `privatelink.azurewebsites.net` und
+     `privatelink.postgres.database.azure.com` eintragen); *None*, wenn eine Azure Policy die DNS-Einträge anlegt.
+4. Auf **Überprüfen + erstellen**, dann auf **Erstellen** klicken und warten, bis *Ihre Bereitstellung wurde
+   abgeschlossen* erscheint (ca. 15 Minuten).
+5. Links auf **Ausgaben** klicken – `cmdbUrl` ist die Adresse der CMDB. Öffnen (private Variante: aus dem Firmennetz)
+   und das Administratorkonto anlegen. Fertig!
+
+Passwörter und Schlüssel werden automatisch erzeugt. Was angelegt wird: ein App Service (Linux, B1) mit dem
+CMDB-Container und eine Azure Database for PostgreSQL (Burstable B1ms, tägliche Sicherung für 7 Tage) – zusammen
+ca. 30 € pro Monat, bei der privaten Variante zusätzlich ca. 15 € für die zwei Private Endpoints. **Aktualisieren:**
+im Azure-Portal die Web-App (`cmdb-…`) öffnen und auf **Neu starten** klicken. **Alles entfernen:** die
+Ressourcengruppe löschen (ein ausgewähltes VNet in einer anderen Ressourcengruppe bleibt unberührt).
 
 ### Weg C: Azure mit Terraform
 

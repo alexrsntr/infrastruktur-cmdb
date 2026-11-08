@@ -21,7 +21,7 @@ Pick **one** of the three ways. You do not need to know how to program for way 1
 | | Way | Good for | Sign-in | Effort |
 |---|---|---|---|---|
 | 1 | [**Docker**](#way-1-docker-on-your-own-computer-or-server) | trying it out, small companies, your own server | e-mail + password | ≈ 10 minutes |
-| 2 | [**Azure in a few clicks**](#way-2-microsoft-azure-in-a-few-clicks) | running it in the cloud without IT knowledge | e-mail + password | ≈ 20 minutes, ≈ 30 €/month |
+| 2 | [**Azure in a few clicks**](#way-2-microsoft-azure-in-a-few-clicks) | running it in the cloud without IT knowledge | e-mail + password | ≈ 20 minutes, ≈ 30–45 €/month |
 | 3 | [**Azure with Terraform**](#way-3-azure-with-terraform-for-it-teams) | companies with Microsoft 365 / Entra ID | Microsoft account (SSO) | ≈ 1–2 hours, for IT staff |
 
 With way 1 and 2 the **first person who opens the CMDB creates the administrator account**, so open it right
@@ -57,20 +57,34 @@ after the installation. You can switch to Microsoft sign-in later.
 
 ### Way 2: Microsoft Azure in a few clicks
 
-You need an Azure subscription in which you may create resources (role *Contributor* or *Owner*).
+You need an Azure subscription in which you may create resources (role *Contributor* or *Owner*). There are two
+variants – pick one:
 
-1. Click **[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Falexrsntr%2Finfrastruktur-cmdb%2Fmain%2Fazure%2Fazuredeploy.json/createUIDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Falexrsntr%2Finfrastruktur-cmdb%2Fmain%2Fazure%2FcreateUiDefinition.json)** and sign in.
-2. Choose your **subscription** and a **resource group** (or click *Create new*, e.g. `cmdb`) and a **region**
-   close to you (e.g. *Germany West Central* or *West Europe*). Optionally enter your company name and a web address.
-   Passwords and keys are generated automatically – there is nothing else to fill in.
-3. Click **Review + create**, then **Create**.
-4. Wait until *Your deployment is complete* appears (about 10–15 minutes).
-5. Click **Outputs** on the left – `cmdbUrl` is the address of your CMDB. Open it and create your
-   administrator account. Done!
+| Variant | Reachable from | Button |
+|---|---|---|
+| **Private network** (recommended for companies) | only your company network: web app and database get private endpoints in a virtual network you choose | [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Falexrsntr%2Finfrastruktur-cmdb%2Fmain%2Fazure%2Fprivate%2Fazuredeploy.json/createUIDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Falexrsntr%2Finfrastruktur-cmdb%2Fmain%2Fazure%2Fprivate%2FcreateUiDefinition.json) |
+| **Public** (simplest) | the internet (sign-in required) – for people without a company network | [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Falexrsntr%2Finfrastruktur-cmdb%2Fmain%2Fazure%2Fazuredeploy.json/createUIDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Falexrsntr%2Finfrastruktur-cmdb%2Fmain%2Fazure%2FcreateUiDefinition.json) |
 
-What you get: an App Service (Linux, B1) running the CMDB container and an Azure Database for PostgreSQL
-(Burstable B1ms, daily backups for 7 days) – about 30 € per month. **Update** to the newest version: in the
-Azure portal open the web app (`cmdb-…`) and click **Restart**. **Remove everything:** delete the resource group.
+1. Click the button of your variant and sign in.
+2. **Basics:** choose your **subscription**, a **resource group** (or *Create new*, e.g. `cmdb`) and a **region**.
+   Optionally enter your company name and a web address.
+3. **Networking** (private variant only):
+   - **Virtual network:** pick an existing one or create a new one. Only networks in the selected region are listed.
+   - **Subnets:** one for the *private endpoints* (can be shared) and one for the *App Service integration*. For an
+     existing network that one must be empty and delegated to `Microsoft.Web/serverFarms`
+     (virtual network → *Subnets* → subnet → *Subnet delegation*).
+   - **Private DNS zones:** *Create new* for a network with Azure DNS; *Use existing* if your company has central
+     zones (e.g. in a hub – enter the resource IDs of `privatelink.azurewebsites.net` and
+     `privatelink.postgres.database.azure.com`); *None* if Azure Policy creates the DNS records.
+4. Click **Review + create**, then **Create**, and wait until *Your deployment is complete* appears (about 15 minutes).
+5. Click **Outputs** on the left – `cmdbUrl` is the address of your CMDB. Open it (private variant: from your
+   company network) and create your administrator account. Done!
+
+Passwords and keys are generated automatically. What you get: an App Service (Linux, B1) running the CMDB
+container and an Azure Database for PostgreSQL (Burstable B1ms, daily backups for 7 days) – about 30 € per month,
+plus about 15 € for the two private endpoints in the private variant. **Update** to the newest version: open the
+web app (`cmdb-…`) in the Azure portal and click **Restart**. **Remove everything:** delete the resource group
+(a virtual network you selected in another resource group is not touched).
 
 ### Way 3: Azure with Terraform (for IT teams)
 

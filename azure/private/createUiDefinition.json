@@ -1,0 +1,210 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/0.1.2-preview/CreateUIDefinition.MultiVm.json#",
+  "handler": "Microsoft.Azure.CreateUIDef",
+  "version": "0.1.2-preview",
+  "parameters": {
+    "config": {
+      "basics": {
+        "description": "**Infrastruktur CMDB with private networking** – the web app and its PostgreSQL database get private endpoints in your virtual network and are not reachable from the internet. People open the CMDB from your company network (VPN, ExpressRoute or a peered network). Passwords and keys are generated automatically.",
+        "location": {
+          "label": "Region",
+          "toolTip": "Must be the region of the virtual network you want to use.",
+          "resourceTypes": [
+            "Microsoft.Web/sites",
+            "Microsoft.DBforPostgreSQL/flexibleServers",
+            "Microsoft.Network/privateEndpoints"
+          ]
+        }
+      }
+    },
+    "basics": [
+      {
+        "name": "brandName",
+        "type": "Microsoft.Common.TextBox",
+        "label": "Company name",
+        "defaultValue": "Infrastruktur",
+        "toolTip": "Shown above the app name in the header, on the login page and in e-mails.",
+        "constraints": {
+          "required": true,
+          "regex": "^.{1,60}$",
+          "validationMessage": "1 to 60 characters."
+        }
+      },
+      {
+        "name": "appName",
+        "type": "Microsoft.Common.TextBox",
+        "label": "Web address (optional)",
+        "placeholder": "e.g. cmdb-mycompany → https://cmdb-mycompany.azurewebsites.net",
+        "defaultValue": "",
+        "toolTip": "Leave empty for an automatically generated name. Must be unique worldwide: 3–40 lowercase letters, digits and hyphens. The address resolves to a private IP address in your network.",
+        "constraints": {
+          "required": false,
+          "regex": "^$|^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$",
+          "validationMessage": "3–40 lowercase letters, digits and hyphens; must not start or end with a hyphen."
+        }
+      }
+    ],
+    "steps": [
+      {
+        "name": "network",
+        "label": "Networking",
+        "subLabel": {
+          "preValidation": "Choose the virtual network",
+          "postValidation": "Done"
+        },
+        "bladeTitle": "Networking",
+        "elements": [
+          {
+            "name": "intro",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Info",
+              "text": "Choose the virtual network for the private endpoints. Only virtual networks in the region selected on Basics are listed. Two subnets are needed: one for the private endpoints of the web app and the database (can be shared with other endpoints) and one for the App Service VNet integration, through which the web app reaches the database."
+            }
+          },
+          {
+            "name": "vnet",
+            "type": "Microsoft.Network.VirtualNetworkCombo",
+            "label": {
+              "virtualNetwork": "Virtual network",
+              "subnets": "Subnets"
+            },
+            "toolTip": {
+              "virtualNetwork": "Select an existing virtual network (in this subscription and region) or create a new one.",
+              "subnets": "Private endpoints: any subnet with free addresses. App Service integration: an empty subnet of at least /28, delegated to Microsoft.Web/serverFarms."
+            },
+            "defaultValue": {
+              "name": "vnet-cmdb",
+              "addressPrefixSize": "/24"
+            },
+            "constraints": {
+              "minAddressPrefixSize": "/26"
+            },
+            "options": {
+              "hideExisting": false
+            },
+            "subnets": {
+              "peSubnet": {
+                "label": "Private endpoints",
+                "defaultValue": {
+                  "name": "snet-private-endpoints",
+                  "addressPrefixSize": "/27"
+                },
+                "constraints": {
+                  "minAddressPrefixSize": "/29",
+                  "minAddressCount": 2,
+                  "requireContiguousAddresses": false
+                }
+              },
+              "appSubnet": {
+                "label": "App Service integration",
+                "defaultValue": {
+                  "name": "snet-app",
+                  "addressPrefixSize": "/27"
+                },
+                "constraints": {
+                  "minAddressPrefixSize": "/28",
+                  "minAddressCount": 1,
+                  "requireContiguousAddresses": false
+                }
+              }
+            }
+          },
+          {
+            "name": "existingVnetHint",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[equals(steps('network').vnet.newOrExisting, 'existing')]",
+            "options": {
+              "icon": "Warning",
+              "text": "Existing virtual network: the subnet for the App Service integration must be empty and delegated to Microsoft.Web/serverFarms (virtual network → Subnets → select the subnet → Subnet delegation). You need permission to join both subnets (e.g. Network Contributor on the virtual network)."
+            }
+          },
+          {
+            "name": "dnsZones",
+            "type": "Microsoft.Common.DropDown",
+            "label": "Private DNS zones",
+            "defaultValue": "Create new zones and link them to the virtual network",
+            "toolTip": "The private endpoints need the DNS zones privatelink.azurewebsites.net and privatelink.postgres.database.azure.com so that the host names resolve to the private IP addresses.",
+            "constraints": {
+              "required": true,
+              "allowedValues": [
+                {
+                  "label": "Create new zones and link them to the virtual network",
+                  "value": "new"
+                },
+                {
+                  "label": "Use existing zones (e.g. in a central hub)",
+                  "value": "existing"
+                },
+                {
+                  "label": "None – DNS records are created by Azure Policy or manually",
+                  "value": "none"
+                }
+              ]
+            }
+          },
+          {
+            "name": "dnsHintNew",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[equals(steps('network').dnsZones, 'new')]",
+            "options": {
+              "icon": "Info",
+              "text": "Fits a virtual network that uses the Azure-provided DNS. If your network uses central DNS servers or a hub with these zones, choose 'Use existing zones' instead – otherwise the names cannot be resolved from your company network."
+            }
+          },
+          {
+            "name": "webDnsZoneId",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Resource ID of privatelink.azurewebsites.net",
+            "placeholder": "/subscriptions/…/resourceGroups/…/providers/Microsoft.Network/privateDnsZones/privatelink.azurewebsites.net",
+            "toolTip": "Azure portal → Private DNS zones → privatelink.azurewebsites.net → Properties (or JSON view) → Resource ID.",
+            "visible": "[equals(steps('network').dnsZones, 'existing')]",
+            "constraints": {
+              "required": "[equals(steps('network').dnsZones, 'existing')]",
+              "regex": "^/subscriptions/[^/]+/resource[Gg]roups/[^/]+/providers/Microsoft\\.Network/private[Dd]ns[Zz]ones/privatelink\\.azurewebsites\\.net$",
+              "validationMessage": "Enter the resource ID of the private DNS zone privatelink.azurewebsites.net."
+            },
+            "defaultValue": ""
+          },
+          {
+            "name": "postgresDnsZoneId",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Resource ID of privatelink.postgres.database.azure.com",
+            "placeholder": "/subscriptions/…/resourceGroups/…/providers/Microsoft.Network/privateDnsZones/privatelink.postgres.database.azure.com",
+            "toolTip": "Azure portal → Private DNS zones → privatelink.postgres.database.azure.com → Properties (or JSON view) → Resource ID.",
+            "visible": "[equals(steps('network').dnsZones, 'existing')]",
+            "constraints": {
+              "required": "[equals(steps('network').dnsZones, 'existing')]",
+              "regex": "^/subscriptions/[^/]+/resource[Gg]roups/[^/]+/providers/Microsoft\\.Network/private[Dd]ns[Zz]ones/privatelink\\.postgres\\.database\\.azure\\.com$",
+              "validationMessage": "Enter the resource ID of the private DNS zone privatelink.postgres.database.azure.com."
+            },
+            "defaultValue": ""
+          },
+          {
+            "name": "routeAllTraffic",
+            "type": "Microsoft.Common.CheckBox",
+            "label": "Send all outbound traffic through the virtual network (e.g. central firewall)",
+            "toolTip": "Off: only traffic to private addresses uses the virtual network. On: everything does – the firewall must then allow ghcr.io (container image) and your SMTP server."
+          }
+        ]
+      }
+    ],
+    "outputs": {
+      "location": "[location()]",
+      "brandName": "[basics('brandName')]",
+      "appName": "[basics('appName')]",
+      "vnetNewOrExisting": "[steps('network').vnet.newOrExisting]",
+      "vnetName": "[steps('network').vnet.name]",
+      "vnetResourceGroup": "[steps('network').vnet.resourceGroup]",
+      "vnetAddressPrefix": "[first(steps('network').vnet.addressPrefixes)]",
+      "privateEndpointSubnetName": "[steps('network').vnet.subnets.peSubnet.name]",
+      "privateEndpointSubnetPrefix": "[steps('network').vnet.subnets.peSubnet.addressPrefix]",
+      "appSubnetName": "[steps('network').vnet.subnets.appSubnet.name]",
+      "appSubnetPrefix": "[steps('network').vnet.subnets.appSubnet.addressPrefix]",
+      "privateDnsZones": "[steps('network').dnsZones]",
+      "webDnsZoneId": "[steps('network').webDnsZoneId]",
+      "postgresDnsZoneId": "[steps('network').postgresDnsZoneId]",
+      "routeAllTraffic": "[steps('network').routeAllTraffic]"
+    }
+  }
+}
