@@ -6,6 +6,10 @@ and troubleshooting are in the Azure runbook **[AZURE.md](AZURE.md)**.
 
 German version: **[SETUP.de.md](SETUP.de.md)**
 
+> **Just want to run it?** The simplest ways – Docker in 10 minutes or Azure in a few clicks, no IT knowledge
+> needed – are in the **[README › Installation](../README.md#installation)**. This guide is for developers and
+> for the full enterprise rollout with Terraform and Microsoft Entra ID.
+
 | Part | Goal | Time |
 |---|---|---|
 | [1. Local installation](#1-local-installation) | Try the app with demo data, develop | ≈ 10 min |

@@ -1,0 +1,118 @@
+name: Docker image
+
+# Builds the container image, tests it end to end with docker-compose.yml (first-run setup,
+# sign-in, restart) and publishes it to ghcr.io for main and version tags.
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+    paths-ignore:
+      - "docs/**"
+      - "infra/**"
+      - "**/*.md"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+  PUBLISH: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) }}
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image for the smoke test
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: cmdb:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test with docker-compose.yml
+        env:
+          CMDB_IMAGE: cmdb:test
+        run: |
+          set -euo pipefail
+          wait_ready() {
+            for i in $(seq 1 60); do
+              if curl -fsS http://localhost:8080/readyz >/dev/null 2>&1; then return 0; fi
+              sleep 2
+            done
+            echo "app did not become ready" >&2
+            return 1
+          }
+          docker compose up -d
+          wait_ready
+          curl -fsS http://localhost:8080/ | grep -q 'id="root"'
+          test "$(curl -fsS http://localhost:8080/auth/setup)" = '{"needsSetup":true}'
+
+          echo "--- first-run setup creates the administrator"
+          curl -fsS -c jar -H 'Content-Type: application/json' \
+            -d '{"display_name":"Smoke Test","email":"smoke@example.local","password":"smoke-test-password"}' \
+            http://localhost:8080/auth/setup
+          curl -fsS -b jar http://localhost:8080/api/me | grep -q '"role":"admin"'
+
+          echo "--- sign-in with password"
+          curl -fsS -c jar2 -H 'Content-Type: application/json' \
+            -d '{"email":"smoke@example.local","password":"smoke-test-password"}' \
+            http://localhost:8080/auth/local-login
+          curl -fsS -b jar2 http://localhost:8080/api/me | grep -q '"role":"admin"'
+
+          echo "--- generated secrets survive a restart (session stays valid)"
+          docker compose restart app
+          wait_ready
+          curl -fsS -b jar http://localhost:8080/api/me | grep -q '"role":"admin"'
+
+      - name: Container logs
+        if: failure()
+        run: docker compose logs
+        env:
+          CMDB_IMAGE: cmdb:test
+
+      - name: Image tags
+        id: meta
+        if: env.PUBLISH == 'true'
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=short
+
+      - name: Log in to ghcr.io
+        if: env.PUBLISH == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push (amd64 + arm64)
+        if: env.PUBLISH == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha

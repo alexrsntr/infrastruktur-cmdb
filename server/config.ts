@@ -21,8 +21,11 @@ export interface Config {
   isProduction: boolean;
   port: number;
   baseUrl: string;
+  /** Production behind HTTPS (APP_BASE_URL starts with https://): secure cookies, HSTS, upgrade-insecure-requests */
+  httpsOnly: boolean;
   sessionSecret: string;
-  authMode: 'entra' | 'dev';
+  /** entra = Microsoft Entra ID SSO · local = e-mail + password accounts · dev = persona picker (development) */
+  authMode: 'entra' | 'local' | 'dev';
   entra: {
     tenantId: string;
     clientId: string;
@@ -72,12 +75,14 @@ export function loadConfig(): Config {
   const authMode = str('AUTH_MODE', isProduction ? 'entra' : 'dev') as Config['authMode'];
   const defaultRole = str('DEFAULT_ROLE', 'viewer') as Role;
   const sessionSecret = str('SESSION_SECRET', isProduction ? '' : 'dev-only-insecure-session-secret');
+  const baseUrl = str('APP_BASE_URL', 'http://localhost:5173').replace(/\/$/, '');
 
   const config: Config = {
     env,
     isProduction,
     port: int('PORT', 3000),
-    baseUrl: str('APP_BASE_URL', 'http://localhost:5173').replace(/\/$/, ''),
+    baseUrl,
+    httpsOnly: isProduction && baseUrl.startsWith('https://'),
     sessionSecret,
     authMode,
     entra: {
@@ -129,7 +134,7 @@ export function loadConfig(): Config {
 
 function validate(c: Config) {
   const errors: string[] = [];
-  if (!['entra', 'dev'].includes(c.authMode)) errors.push(`AUTH_MODE must be "entra" or "dev" (got "${c.authMode}")`);
+  if (!['entra', 'local', 'dev'].includes(c.authMode)) errors.push(`AUTH_MODE must be "entra", "local" or "dev" (got "${c.authMode}")`);
   if (c.isProduction && c.authMode === 'dev') errors.push('AUTH_MODE=dev is not allowed when NODE_ENV=production');
   if (!c.sessionSecret || (c.isProduction && c.sessionSecret.length < 32))
     errors.push('SESSION_SECRET must be set (at least 32 characters in production)');

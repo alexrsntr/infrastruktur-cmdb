@@ -1,10 +1,77 @@
 # Setup-Anleitung
 
-Diese Anleitung führt von null zu einer laufenden Infrastruktur CMDB – zuerst zum Ausprobieren auf dem eigenen
-Rechner, dann produktiv in Microsoft Azure. Hier steht, *was in welcher Reihenfolge* zu tun ist; Hintergründe,
-Automatisierung und Fehlersuche stehen im englischen Runbook **[AZURE.md](AZURE.md)**.
+English version: **[SETUP.md](SETUP.md)** · Kurzfassung auf Englisch: [README › Installation](../README.md#installation)
 
-English version: **[SETUP.md](SETUP.md)**
+## Installation – so einfach wie möglich
+
+Wähle **einen** der drei Wege. Für Weg A und B braucht man keine IT-Kenntnisse.
+
+| | Weg | Gut für | Anmeldung | Aufwand |
+|---|---|---|---|---|
+| A | [**Docker**](#weg-a-docker-auf-dem-eigenen-rechner-oder-server) | Ausprobieren, kleine Firmen, eigener Server | E-Mail + Passwort | ≈ 10 Min. |
+| B | [**Azure mit wenigen Klicks**](#weg-b-microsoft-azure-mit-wenigen-klicks) | in der Cloud betreiben, ohne IT-Kenntnisse | E-Mail + Passwort | ≈ 20 Min., ≈ 30 €/Monat |
+| C | [**Azure mit Terraform**](#2-produktivbetrieb-planen) | Firmen mit Microsoft 365 / Entra ID | Microsoft-Konto (SSO) | ≈ 1–2 Std., für die IT |
+
+Bei Weg A und B legt **die erste Person, die die CMDB öffnet, das Administratorkonto an** – also direkt nach der
+Installation öffnen. Auf Microsoft-Anmeldung kann man später umstellen.
+
+### Weg A: Docker auf dem eigenen Rechner oder Server
+
+1. **Docker Desktop installieren:** <https://www.docker.com/products/docker-desktop/> herunterladen, installieren
+   und starten (auf einem Linux-Server: [Docker Engine](https://docs.docker.com/engine/install/)).
+2. **Ordner anlegen**, z. B. `cmdb` auf dem Desktop.
+3. **Datei herunterladen:** [`docker-compose.yml`](https://raw.githubusercontent.com/alexrsntr/infrastruktur-cmdb/main/docker-compose.yml)
+   (Rechtsklick auf den Link → *Link speichern unter …*) und in diesem Ordner speichern.
+4. **Eingabeaufforderung im Ordner öffnen:**
+   - *Windows:* Ordner im Explorer öffnen, oben in die Adresszeile klicken, `cmd` eintippen, Enter drücken.
+   - *Mac:* Programm *Terminal* öffnen, `cd ` (mit Leerzeichen) tippen, den Ordner ins Fenster ziehen, Enter drücken.
+5. **CMDB starten** – das hier eintippen und Enter drücken:
+   ```bash
+   docker compose up -d
+   ```
+   Beim ersten Mal wird alles heruntergeladen, das dauert ein paar Minuten.
+6. **<http://localhost:8080> im Browser öffnen** und das Administratorkonto anlegen. Fertig!
+
+| Was | Wie (in der Eingabeaufforderung, im selben Ordner) |
+|---|---|
+| Stoppen | `docker compose down` – die Daten bleiben erhalten |
+| Wieder starten | `docker compose up -d` |
+| Auf die neueste Version aktualisieren | `docker compose pull`, danach `docker compose up -d` |
+| Sicherung | `docker compose exec db pg_dump -U cmdb cmdb > cmdb-sicherung.sql` |
+
+> **Von anderen Rechnern aus nutzen:** Kollegen öffnen `http://<name-dieses-rechners>:8080`. In
+> `docker-compose.yml` dann `APP_BASE_URL` auf diese Adresse ändern (wird für Links in E-Mails verwendet). Die
+> Verbindung ist unverschlüsselt – nur im Firmennetz nutzen oder einen HTTPS-Reverse-Proxy davorschalten.
+
+### Weg B: Microsoft Azure mit wenigen Klicks
+
+Voraussetzung: eine Azure-Subscription, in der man Ressourcen anlegen darf (Rolle *Mitwirkender* oder *Besitzer*).
+
+1. Auf **[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Falexrsntr%2Finfrastruktur-cmdb%2Fmain%2Fazure%2Fazuredeploy.json)** klicken und anmelden.
+2. **Abonnement** wählen, unter *Ressourcengruppe* auf **Neu erstellen** klicken und einen Namen eingeben, z. B. `cmdb`.
+   Eine **Region** in der Nähe wählen (z. B. *Germany West Central* oder *West Europe*).
+3. Alles andere so lassen (die Passwörter werden automatisch erzeugt) und auf **Überprüfen + erstellen**, dann
+   auf **Erstellen** klicken.
+4. Warten, bis *Ihre Bereitstellung wurde abgeschlossen* erscheint (ca. 10–15 Minuten).
+5. Links auf **Ausgaben** klicken – `cmdbUrl` ist die Adresse der CMDB. Öffnen und das Administratorkonto anlegen. Fertig!
+
+Was angelegt wird: ein App Service (Linux, B1) mit dem CMDB-Container und eine Azure Database for PostgreSQL
+(Burstable B1ms, tägliche Sicherung für 7 Tage) – zusammen ca. 30 € pro Monat. **Aktualisieren:** im Azure-Portal
+die Web-App (`cmdb-…`) öffnen und auf **Neu starten** klicken. **Alles entfernen:** die Ressourcengruppe löschen.
+
+### Weg C: Azure mit Terraform
+
+Die Unternehmensvariante mit Microsoft-Anmeldung (Single Sign-on, Rollen aus Entra-Gruppen), ohne Passwörter
+(Managed Identities), mit Key Vault, Blob Storage, Monitoring und optional privatem Netzwerk – Schritt für Schritt
+ab [Teil 2](#2-produktivbetrieb-planen). Die Kurzfassung mit allen Befehlen für die
+[Azure Cloud Shell](https://shell.azure.com) steht im [README › Way 3](../README.md#way-3-azure-with-terraform-for-it-teams).
+
+---
+
+## Für IT-Teams und Entwickler
+
+Ab hier: Entwicklung auf dem eigenen Rechner und der vollständige Produktiv-Rollout in Azure mit Terraform.
+Hintergründe, Automatisierung und Fehlersuche stehen im englischen Runbook **[AZURE.md](AZURE.md)**.
 
 | Teil | Ziel | Dauer |
 |---|---|---|

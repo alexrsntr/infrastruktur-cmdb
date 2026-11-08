@@ -4,11 +4,107 @@
 
 A web-based CMDB for documenting **plants, buildings, floors and network/compute infrastructure**
 (switches, access points, servers, virtual machines), with **maps & floor plans**, **notes**,
-**activities**, a complete **change history**, **role-based permissions with Microsoft Entra ID SSO**
-and **exports of everything** (Excel, CSV, JSON).
+**activities**, a complete **change history**, **role-based permissions** (local accounts or
+**Microsoft Entra ID SSO**) and **exports of everything** (Excel, CSV, JSON).
 
-Built for Azure: **Azure App Service (Node.js 22)** + **Azure Database for PostgreSQL Flexible
-Server** with **managed identity** authentication (no database passwords), deployed with **Terraform**.
+Runs anywhere with **Docker**, on **Azure** with one click, or as a hardened enterprise setup on Azure with
+**Terraform** (managed identities, no passwords at all).
+
+**🇩🇪 Deutsche Anleitung: [docs/SETUP.de.md](docs/SETUP.de.md)**
+
+---
+
+## Installation
+
+Pick **one** of the three ways. You do not need to know how to program for way 1 or 2.
+
+| | Way | Good for | Sign-in | Effort |
+|---|---|---|---|---|
+| 1 | [**Docker**](#way-1-docker-on-your-own-computer-or-server) | trying it out, small companies, your own server | e-mail + password | ≈ 10 minutes |
+| 2 | [**Azure in a few clicks**](#way-2-microsoft-azure-in-a-few-clicks) | running it in the cloud without IT knowledge | e-mail + password | ≈ 20 minutes, ≈ 30 €/month |
+| 3 | [**Azure with Terraform**](#way-3-azure-with-terraform-for-it-teams) | companies with Microsoft 365 / Entra ID | Microsoft account (SSO) | ≈ 1–2 hours, for IT staff |
+
+With way 1 and 2 the **first person who opens the CMDB creates the administrator account**, so open it right
+after the installation. You can switch to Microsoft sign-in later.
+
+### Way 1: Docker on your own computer or server
+
+1. **Install Docker Desktop** from <https://www.docker.com/products/docker-desktop/> and start it
+   (on a Linux server: install [Docker Engine](https://docs.docker.com/engine/install/)).
+2. **Create a folder**, for example `cmdb` on your desktop.
+3. **Download the file** [`docker-compose.yml`](https://raw.githubusercontent.com/alexrsntr/infrastruktur-cmdb/main/docker-compose.yml)
+   (right-click the link → *Save link as…*) and save it in that folder.
+4. **Open a terminal in that folder:**
+   - *Windows:* open the folder in Explorer, click into the address bar, type `cmd` and press Enter.
+   - *Mac:* open the *Terminal* app, type `cd ` (with a space), drag the folder into the window and press Enter.
+5. **Start the CMDB** – type this and press Enter:
+   ```bash
+   docker compose up -d
+   ```
+   The first start downloads everything and takes a few minutes.
+6. **Open <http://localhost:8080>** in your browser and create your administrator account. Done!
+
+| What | How (in the terminal, in the same folder) |
+|---|---|
+| Stop | `docker compose down` – your data is kept |
+| Start again | `docker compose up -d` |
+| Update to the newest version | `docker compose pull` and then `docker compose up -d` |
+| Backup | `docker compose exec db pg_dump -U cmdb cmdb > cmdb-backup.sql` |
+
+> **Use it from other computers:** colleagues open `http://<name-of-this-computer>:8080`. Change
+> `APP_BASE_URL` in `docker-compose.yml` to that address (used for links in e-mails). The connection is not
+> encrypted – use this only in your company network, or put an HTTPS reverse proxy in front.
+
+### Way 2: Microsoft Azure in a few clicks
+
+You need an Azure subscription in which you may create resources (role *Contributor* or *Owner*).
+
+1. Click **[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Falexrsntr%2Finfrastruktur-cmdb%2Fmain%2Fazure%2Fazuredeploy.json)** and sign in.
+2. Choose your **subscription**, click **Create new** under *Resource group* and enter a name, e.g. `cmdb`.
+   Choose a **region** close to you (e.g. *Germany West Central* or *West Europe*).
+3. Leave everything else as it is (the passwords are generated automatically) and click
+   **Review + create**, then **Create**.
+4. Wait until *Your deployment is complete* appears (about 10–15 minutes).
+5. Click **Outputs** on the left – `cmdbUrl` is the address of your CMDB. Open it and create your
+   administrator account. Done!
+
+What you get: an App Service (Linux, B1) running the CMDB container and an Azure Database for PostgreSQL
+(Burstable B1ms, daily backups for 7 days) – about 30 € per month. **Update** to the newest version: in the
+Azure portal open the web app (`cmdb-…`) and click **Restart**. **Remove everything:** delete the resource group.
+
+### Way 3: Azure with Terraform (for IT teams)
+
+The enterprise setup: sign-in with **Microsoft Entra ID** (single sign-on, roles from Entra groups), no
+passwords anywhere (managed identities), Key Vault, Blob Storage for files, monitoring and optional private
+networking. All tools are already installed in the [Azure Cloud Shell](https://shell.azure.com) (choose *Bash*).
+
+```bash
+git clone https://github.com/alexrsntr/infrastruktur-cmdb.git && cd infrastruktur-cmdb
+cp infra/terraform/terraform.tfvars.example infra/terraform/terraform.tfvars
+az ad signed-in-user show --query "{object_id:id, upn:userPrincipalName}"   # your IDs for the next step
+nano infra/terraform/terraform.tfvars
+```
+
+In `terraform.tfvars` fill in at least: `subscription_id` (`az account show --query id -o tsv`), your object ID
+in `terraform_principal_object_ids`, your e-mail in `bootstrap_admins`, and `postgres_entra_admin`
+(simplest: yourself – `object_id` = your object ID, `name` = your UPN, `type = "User"`). Save with *Ctrl+O*, *Enter*, *Ctrl+X*.
+
+```bash
+terraform -chdir=infra/terraform init
+terraform -chdir=infra/terraform apply                                # type "yes"
+eval "$(terraform -chdir=infra/terraform output -raw grant_db_access_command)"
+curl -fLO https://github.com/alexrsntr/infrastruktur-cmdb/releases/latest/download/infrastruktur-cmdb-app.zip
+az webapp deploy --type zip --src-path infrastruktur-cmdb-app.zip \
+  -g "$(terraform -chdir=infra/terraform output -raw resource_group_name)" \
+  -n "$(terraform -chdir=infra/terraform output -raw web_app_name)"
+terraform -chdir=infra/terraform output -raw web_app_url              # open this address
+```
+
+Then, in the Azure portal → *Microsoft Entra ID* → *Enterprise applications* → *Infrastruktur CMDB*:
+*Permissions* → **Grant admin consent**, and *Users and groups* → **Add user/group** → choose a role for your
+colleagues. Remote Terraform state, GitHub
+Actions (automatic deployments), groups and go-live checklist: **[docs/SETUP.md](docs/SETUP.md)** and
+**[docs/AZURE.md](docs/AZURE.md)**.
 
 ---
 
@@ -27,7 +123,7 @@ Server** with **managed identity** authentication (no database passwords), deplo
 | **Notes** | Free-text notes on plants, buildings, floors and assets; pinning; author-only editing |
 | **Activities** | Maintenance, incidents, changes, installations, inspections, replacements with status, assignee and due date; overdue highlighting; global activity board |
 | **History & audit** | Field-level change history for every object (who/what/when, old → new). Global audit log (incl. logins & exports) for administrators |
-| **Permissions** | 4 roles (Admin, Editor, Operator, Viewer) from **Entra ID app roles**, plus optional **plant scoping** per user (e.g. a technician only sees plant MUC) |
+| **Permissions** | 4 roles (Admin, Editor, Operator, Viewer), managed in the app or from **Entra ID app roles**, plus optional **plant scoping** per user (e.g. a technician only sees plant MUC) |
 | **Export** | Every list exports to **Excel / CSV / JSON** with the current filters. Complete workbook (one sheet per entity & asset type), plant dossier, asset dossier, audit log, users. CSV with `;` (Excel DE) or `,`, formula-injection safe |
 | **Import** | Excel/CSV import of assets (same columns as the export) with **dry run** validation, upsert by ID or type+name, per-row error report |
 | **Warranty e-mails** | Daily digest e-mail of devices whose warranty/support ends in e.g. 90/30/7 days (and once when expired). Global recipients plus recipients per plant. Each device is reported once per stage; safe with several app instances. SMTP server configured in the app (*Administration → Settings*), password stored encrypted. Preview, "send now", test e-mail and send history |
@@ -44,9 +140,14 @@ Server** with **managed identity** authentication (no database passwords), deplo
 | Create plants (only users without plant restriction) | | | ✔ | ✔ |
 | Delete plants, user management, global audit log, settings & e-mail notifications | | | | ✔ |
 
-* Roles come from the Entra ID **app roles** `CMDB.Admin`, `CMDB.Editor`, `CMDB.Operator`, `CMDB.Viewer`
+* **Sign-in** (`AUTH_MODE`): `local` = e-mail + password accounts managed by the administrators in the app
+  (Docker and the Azure one-click setup); `entra` = Microsoft Entra ID single sign-on.
+* With Entra ID, roles come from the **app roles** `CMDB.Admin`, `CMDB.Editor`, `CMDB.Operator`, `CMDB.Viewer`
   (assigned to users or groups in *Enterprise applications*). Users without an app role get
   `DEFAULT_ROLE` and can be managed in the app.
+* Local accounts: the first visitor creates the administrator; administrators add users with an initial
+  password and can reset passwords; everyone can change their own password (user menu). Passwords are
+  stored as scrypt hashes, sign-in attempts are rate-limited.
 * **Plant scope** is managed in the app (*Administration → Users & permissions*). Empty scope = all plants.
   Scoped users only see, search, export and change objects of their plants.
 * Every permission is enforced **server side**; the UI only hides what you cannot do.
@@ -71,12 +172,9 @@ Azure Database for PostgreSQL Flexible Server (Entra-only auth)
 * `tests/` – API tests (Vitest + Supertest against a real PostgreSQL)
 * `infra/terraform/`, `scripts/`, `.github/workflows/`, `docs/AZURE.md` – Azure infrastructure (Terraform), Entra setup, CI/CD
 
-## Quick start
+## Development
 
-The [setup guide](docs/SETUP.md) walks you through a local installation (about 10 minutes) and a
-production rollout on Azure. The short version for local development:
-
-### Local development
+To work on the code (not needed to run the CMDB – see [Installation](#installation)):
 
 Prerequisites: Node.js 22+, PostgreSQL 14+ (16 recommended).
 
@@ -116,7 +214,7 @@ The most important ones for Azure:
 | `NODE_ENV` | `production` | |
 | `APP_BASE_URL` | `https://cmdb-prod.azurewebsites.net` | used for the OIDC redirect URI `…/auth/callback` |
 | `SESSION_SECRET` | Key Vault reference | ≥ 32 characters |
-| `AUTH_MODE` | `entra` | |
+| `AUTH_MODE` | `entra` | `entra` (Microsoft sign-in) or `local` (e-mail + password) |
 | `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` | | app registration |
 | `ENTRA_USE_MANAGED_IDENTITY` | `true` | secretless: managed identity as federated credential (else `ENTRA_CLIENT_SECRET`) |
 | `ENTRA_REQUIRE_APP_ROLE` | `true` | reject users without a CMDB app role |

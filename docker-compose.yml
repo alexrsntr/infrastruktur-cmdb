@@ -1,0 +1,53 @@
+# Infrastruktur CMDB with Docker
+#
+#   Start:   docker compose up -d        then open http://localhost:8080
+#   Stop:    docker compose down         (your data is kept)
+#   Update:  docker compose pull && docker compose up -d
+#
+# On the first visit you create the administrator account in the browser.
+
+name: infrastruktur-cmdb
+
+services:
+  app:
+    image: ${CMDB_IMAGE:-ghcr.io/alexrsntr/infrastruktur-cmdb:latest}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:3000"
+    environment:
+      # Address people type into the browser (used for links in e-mails)
+      APP_BASE_URL: http://localhost:8080
+      # Shown in the header, on the login page and in e-mails
+      BRAND_NAME: Infrastruktur
+      APP_NAME: IT CMDB
+      BRAND_PRIMARY_COLOR: "#2563eb"
+      # Database connection (the database below)
+      PGHOST: db
+      PGDATABASE: cmdb
+      PGUSER: cmdb
+      PGPASSWORD: cmdb
+      PGSSLMODE: disable
+    volumes:
+      - app-data:/data
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cmdb
+      POSTGRES_PASSWORD: cmdb
+      POSTGRES_DB: cmdb
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cmdb -d cmdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  app-data:
+  db-data:

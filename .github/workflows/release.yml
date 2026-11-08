@@ -1,0 +1,52 @@
+name: Release
+
+# On a version tag (v1.2.3): runs CI, builds the ready-to-deploy App Service package
+# (same as deploy.yml) and attaches it to a GitHub release, so nobody needs Node.js to deploy:
+#   https://github.com/<owner>/<repo>/releases/latest/download/infrastruktur-cmdb-app.zip
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Build
+        run: |
+          npm ci
+          npm run build
+
+      - name: Assemble App Service package
+        run: |
+          set -euo pipefail
+          mkdir -p staging
+          cp -r dist package.json package-lock.json staging/
+          cd staging
+          npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+          test -f dist/server.mjs && test -f dist/public/index.html
+          zip -qr ../infrastruktur-cmdb-app.zip dist node_modules package.json package-lock.json
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" infrastruktur-cmdb-app.zip \
+            --title "$TAG" --generate-notes --verify-tag

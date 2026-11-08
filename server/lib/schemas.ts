@@ -205,6 +205,17 @@ export const userCreateSchema = z.object({
   display_name: reqText(200),
   role: z.enum(ROLES),
   plant_scope: z.array(z.string().uuid()).max(500).default([]),
+  /** Initial password for local accounts (AUTH_MODE=local) */
+  password: z.string().min(10, 'The password must have at least 10 characters').max(200).optional(),
+});
+
+export const userPasswordSchema = z.object({
+  password: z.string().min(10, 'The password must have at least 10 characters').max(200),
+});
+
+export const ownPasswordSchema = z.object({
+  current_password: z.string().max(200),
+  new_password: z.string().min(10, 'The new password must have at least 10 characters').max(200),
 });
 
 export const rackSchema = z.object({

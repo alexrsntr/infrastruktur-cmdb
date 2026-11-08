@@ -1,0 +1,188 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "description": "Infrastruktur CMDB quick start: Azure App Service (container) + Azure Database for PostgreSQL. Sign-in with e-mail and password; the first visitor creates the administrator account."
+  },
+  "parameters": {
+    "appName": {
+      "type": "string",
+      "defaultValue": "[concat('cmdb-', uniqueString(resourceGroup().id))]",
+      "minLength": 3,
+      "maxLength": 40,
+      "metadata": {
+        "description": "Name of the web app. The CMDB will be reachable at https://<name>.azurewebsites.net (the name must be unique worldwide; lowercase letters, digits and hyphens)."
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Azure region for all resources. Default: the region of the resource group."
+      }
+    },
+    "brandName": {
+      "type": "string",
+      "defaultValue": "Infrastruktur",
+      "maxLength": 60,
+      "metadata": {
+        "description": "Shown above the app name in the header, on the login page and in e-mails, e.g. your company name."
+      }
+    },
+    "databasePassword": {
+      "type": "securestring",
+      "defaultValue": "[concat('Cmdb-', newGuid())]",
+      "metadata": {
+        "description": "Generated automatically – leave as is."
+      }
+    },
+    "sessionSecret": {
+      "type": "securestring",
+      "defaultValue": "[concat(newGuid(), newGuid())]",
+      "metadata": {
+        "description": "Generated automatically – leave as is."
+      }
+    },
+    "settingsEncryptionKey": {
+      "type": "securestring",
+      "defaultValue": "[concat(newGuid(), newGuid())]",
+      "metadata": {
+        "description": "Generated automatically – leave as is."
+      }
+    },
+    "containerImage": {
+      "type": "string",
+      "defaultValue": "ghcr.io/alexrsntr/infrastruktur-cmdb:latest",
+      "metadata": {
+        "description": "Container image of the CMDB – leave as is."
+      }
+    }
+  },
+  "variables": {
+    "appName": "[toLower(parameters('appName'))]",
+    "planName": "[concat('asp-', variables('appName'))]",
+    "dbServerName": "[concat('psql-', variables('appName'))]",
+    "dbName": "cmdb",
+    "dbUser": "cmdbadmin"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.DBforPostgreSQL/flexibleServers",
+      "apiVersion": "2024-08-01",
+      "name": "[variables('dbServerName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard_B1ms",
+        "tier": "Burstable"
+      },
+      "properties": {
+        "version": "16",
+        "administratorLogin": "[variables('dbUser')]",
+        "administratorLoginPassword": "[parameters('databasePassword')]",
+        "storage": {
+          "storageSizeGB": 32
+        },
+        "backup": {
+          "backupRetentionDays": 7,
+          "geoRedundantBackup": "Disabled"
+        },
+        "highAvailability": {
+          "mode": "Disabled"
+        },
+        "network": {
+          "publicNetworkAccess": "Enabled"
+        },
+        "authConfig": {
+          "activeDirectoryAuth": "Disabled",
+          "passwordAuth": "Enabled"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DBforPostgreSQL/flexibleServers/databases",
+      "apiVersion": "2024-08-01",
+      "name": "[concat(variables('dbServerName'), '/', variables('dbName'))]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', variables('dbServerName'))]"
+      ],
+      "properties": {
+        "charset": "UTF8",
+        "collation": "en_US.utf8"
+      }
+    },
+    {
+      "type": "Microsoft.DBforPostgreSQL/flexibleServers/firewallRules",
+      "apiVersion": "2024-08-01",
+      "name": "[concat(variables('dbServerName'), '/AllowAzureServices')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers/databases', variables('dbServerName'), variables('dbName'))]"
+      ],
+      "properties": {
+        "startIpAddress": "0.0.0.0",
+        "endIpAddress": "0.0.0.0"
+      }
+    },
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2023-12-01",
+      "name": "[variables('planName')]",
+      "location": "[parameters('location')]",
+      "kind": "linux",
+      "sku": {
+        "name": "B1",
+        "tier": "Basic"
+      },
+      "properties": {
+        "reserved": true
+      }
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2023-12-01",
+      "name": "[variables('appName')]",
+      "location": "[parameters('location')]",
+      "kind": "app,linux,container",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/serverfarms', variables('planName'))]",
+        "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers/firewallRules', variables('dbServerName'), 'AllowAzureServices')]"
+      ],
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('planName'))]",
+        "httpsOnly": true,
+        "siteConfig": {
+          "linuxFxVersion": "[concat('DOCKER|', parameters('containerImage'))]",
+          "alwaysOn": true,
+          "healthCheckPath": "/healthz",
+          "ftpsState": "Disabled",
+          "minTlsVersion": "1.2",
+          "http20Enabled": true,
+          "appSettings": [
+            { "name": "WEBSITES_PORT", "value": "3000" },
+            { "name": "WEBSITES_ENABLE_APP_SERVICE_STORAGE", "value": "false" },
+            { "name": "DOCKER_REGISTRY_SERVER_URL", "value": "https://ghcr.io" },
+            { "name": "NODE_ENV", "value": "production" },
+            { "name": "AUTH_MODE", "value": "local" },
+            { "name": "APP_BASE_URL", "value": "[concat('https://', variables('appName'), '.azurewebsites.net')]" },
+            { "name": "SESSION_SECRET", "value": "[parameters('sessionSecret')]" },
+            { "name": "SETTINGS_ENCRYPTION_KEY", "value": "[parameters('settingsEncryptionKey')]" },
+            { "name": "DB_AUTH", "value": "password" },
+            { "name": "PGHOST", "value": "[reference(resourceId('Microsoft.DBforPostgreSQL/flexibleServers', variables('dbServerName')), '2024-08-01').fullyQualifiedDomainName]" },
+            { "name": "PGPORT", "value": "5432" },
+            { "name": "PGDATABASE", "value": "[variables('dbName')]" },
+            { "name": "PGUSER", "value": "[variables('dbUser')]" },
+            { "name": "PGPASSWORD", "value": "[parameters('databasePassword')]" },
+            { "name": "PGSSLMODE", "value": "require" },
+            { "name": "STORAGE_DRIVER", "value": "database" },
+            { "name": "BRAND_NAME", "value": "[parameters('brandName')]" }
+          ]
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "cmdbUrl": {
+      "type": "string",
+      "value": "[concat('https://', reference(resourceId('Microsoft.Web/sites', variables('appName')), '2023-12-01').defaultHostName)]"
+    }
+  }
+}

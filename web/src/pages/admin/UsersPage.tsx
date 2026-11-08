@@ -71,16 +71,18 @@ interface EditValues {
   role: Role;
   plant_scope: string[];
   active: boolean;
+  new_password?: string;
 }
 
 function EditUserModal({ user, onClose }: { user: AppUser | null; onClose: () => void }) {
   const [form] = Form.useForm<EditValues>();
   const { message } = App.useApp();
-  const { me } = useSession();
+  const { me, config } = useSession();
   const plants = usePlants();
   const invalidate = useInvalidate();
   const [saving, setSaving] = useState(false);
   const role = Form.useWatch('role', form);
+  const localAccounts = config.authMode === 'local';
 
   useEffect(() => {
     if (user) form.setFieldsValue({ role: user.role, plant_scope: user.plant_scope ?? [], active: user.active });
@@ -92,7 +94,8 @@ function EditUserModal({ user, onClose }: { user: AppUser | null; onClose: () =>
     setSaving(true);
     try {
       await http.put(`/api/users/${user.id}`, { role: v.role, plant_scope: v.plant_scope ?? [], active: v.active });
-      message.success('User updated');
+      if (v.new_password) await http.put(`/api/users/${user.id}/password`, { password: v.new_password });
+      message.success(v.new_password ? 'User updated, new password set' : 'User updated');
       await invalidate();
       onClose();
     } catch (e) {
@@ -147,6 +150,20 @@ function EditUserModal({ user, onClose }: { user: AppUser | null; onClose: () =>
           >
             <Switch disabled={isSelf} />
           </Form.Item>
+          {localAccounts && !isSelf && (
+            <Form.Item
+              name="new_password"
+              label={user.has_password ? 'New password' : 'Password'}
+              rules={[{ min: 10, message: 'At least 10 characters' }]}
+              extra={
+                user.has_password
+                  ? 'Leave empty to keep the current password. Setting a new one signs the user out.'
+                  : 'This user has no password yet and cannot sign in until you set one.'
+              }
+            >
+              <Input.Password autoComplete="new-password" />
+            </Form.Item>
+          )}
         </Form>
       )}
     </Modal>
@@ -158,25 +175,28 @@ interface CreateValues {
   display_name: string;
   role: Role;
   plant_scope: string[];
+  password?: string;
 }
 
 function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [form] = Form.useForm<CreateValues>();
   const { message } = App.useApp();
+  const { config } = useSession();
   const plants = usePlants();
   const invalidate = useInvalidate();
   const [saving, setSaving] = useState(false);
+  const localAccounts = config.authMode === 'local';
 
   useEffect(() => {
-    if (open) form.setFieldsValue({ email: '', display_name: '', role: 'viewer', plant_scope: [] });
+    if (open) form.setFieldsValue({ email: '', display_name: '', role: 'viewer', plant_scope: [], password: '' });
   }, [open, form]);
 
   const submit = async () => {
     const v = await form.validateFields();
     setSaving(true);
     try {
-      await http.post('/api/users', { ...v, plant_scope: v.plant_scope ?? [] });
-      message.success('User pre-provisioned');
+      await http.post('/api/users', { ...v, plant_scope: v.plant_scope ?? [], password: localAccounts ? v.password : undefined });
+      message.success(localAccounts ? 'User created' : 'User pre-provisioned');
       await invalidate();
       onClose();
     } catch (e) {
@@ -187,10 +207,11 @@ function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void
   };
 
   return (
-    <Modal open={open} title="Pre-provision user" onCancel={onClose} onOk={submit} okText="Create" confirmLoading={saving} destroyOnHidden width={560}>
+    <Modal open={open} title={localAccounts ? 'Add user' : 'Pre-provision user'} onCancel={onClose} onOk={submit} okText="Create" confirmLoading={saving} destroyOnHidden width={560}>
       <Typography.Paragraph type="secondary">
-        Create a user before the first sign-in to assign a role and plant scope in advance. The account is linked automatically when the person signs
-        in with this e-mail address (UPN). An Entra ID app role, if assigned, takes precedence over the role set here.
+        {localAccounts
+          ? 'The person signs in with this e-mail address and the password you set here. Ask them to change it after the first sign-in (user menu → Change password).'
+          : 'Create a user before the first sign-in to assign a role and plant scope in advance. The account is linked automatically when the person signs in with this e-mail address (UPN). An Entra ID app role, if assigned, takes precedence over the role set here.'}
       </Typography.Paragraph>
       <Form form={form} layout="vertical" requiredMark="optional">
         <Form.Item name="email" label="E-mail / UPN" rules={[{ required: true, type: 'email', message: 'Enter a valid e-mail address' }]}>
@@ -199,6 +220,11 @@ function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void
         <Form.Item name="display_name" label="Display name" rules={[{ required: true, whitespace: true }]}>
           <Input />
         </Form.Item>
+        {localAccounts && (
+          <Form.Item name="password" label="Initial password" rules={[{ required: true, message: 'Enter a password' }, { min: 10, message: 'At least 10 characters' }]}>
+            <Input.Password autoComplete="new-password" />
+          </Form.Item>
+        )}
         <Form.Item name="role" label="Role" rules={[{ required: true }]}>
           <Select options={roleOptions} />
         </Form.Item>
@@ -368,7 +394,7 @@ export function UsersPage() {
               onFilter: (v, u) => u.active === v,
               render: (_, u) =>
                 u.active ? (
-                  u.oid ? <Badge status="success" text="Active" /> : <Badge status="processing" text="Pre-provisioned" />
+                  u.oid || u.has_password ? <Badge status="success" text="Active" /> : <Badge status="processing" text="Pre-provisioned" />
                 ) : (
                   <Badge status="default" text="Deactivated" />
                 ),

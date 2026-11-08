@@ -151,7 +151,9 @@ async function loadActivities(pool: Pool, user: CurrentUser, query: Record<strin
 
 async function loadUsers(pool: Pool) {
   const { rows } = await pool.query(
-    `SELECT u.*, (SELECT array_agg(p.code ORDER BY p.code) FROM plant p WHERE p.id = ANY(u.plant_scope)) AS plant_scope_codes
+    `SELECT u.id, u.oid, u.tenant_id, u.email, u.display_name, u.role, u.role_source, u.plant_scope, u.active,
+            u.last_login_at, u.created_at, u.updated_at, (u.password_hash IS NOT NULL) AS has_password,
+            (SELECT array_agg(p.code ORDER BY p.code) FROM plant p WHERE p.id = ANY(u.plant_scope)) AS plant_scope_codes
      FROM app_user u ORDER BY u.display_name`,
   );
   return rows;

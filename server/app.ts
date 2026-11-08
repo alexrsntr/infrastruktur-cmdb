@@ -61,11 +61,11 @@ export function createApp(pool: Pool, config: Config) {
           objectSrc: ["'none'"],
           frameAncestors: ["'none'"],
           formAction: ["'self'", 'https://login.microsoftonline.com'],
-          upgradeInsecureRequests: config.isProduction ? [] : null,
+          upgradeInsecureRequests: config.httpsOnly ? [] : null,
         },
       },
       crossOriginEmbedderPolicy: false,
-      strictTransportSecurity: config.isProduction ? { maxAge: 31536000, includeSubDomains: true } : false,
+      strictTransportSecurity: config.httpsOnly ? { maxAge: 31536000, includeSubDomains: true } : false,
     }),
   );
   app.use(compression());
@@ -100,7 +100,7 @@ export function createApp(pool: Pool, config: Config) {
       cookie: {
         httpOnly: true,
         sameSite: 'lax',
-        secure: config.isProduction,
+        secure: config.httpsOnly,
         maxAge: 10 * 60 * 60 * 1000, // 10 h sliding
       },
     }),

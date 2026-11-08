@@ -261,7 +261,7 @@ export interface AppConfig {
   primaryColor: string;
   mapTileUrl: string;
   mapTileAttribution: string;
-  authMode: 'entra' | 'dev';
+  authMode: 'entra' | 'local' | 'dev';
 }
 
 export interface MeResponse {
@@ -440,6 +440,8 @@ export interface AppUser {
   active: boolean;
   last_login_at: string | null;
   created_at: string;
+  /** Local account with a password (AUTH_MODE=local) */
+  has_password: boolean;
 }
 
 export interface Paged<T> {

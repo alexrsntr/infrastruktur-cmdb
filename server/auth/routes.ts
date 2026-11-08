@@ -8,7 +8,9 @@ import type { Config } from '../config';
 import { audit } from '../lib/audit';
 import { log } from '../lib/log';
 import { HttpError } from '../lib/http';
+import { z } from 'zod';
 import { ensureCsrfToken } from './context';
+import { dummyPasswordHash, hashPassword, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, verifyPassword } from './password';
 
 interface LoginIdentity {
   oid: string;
@@ -155,6 +157,7 @@ export function authRouter(pool: Pool, config: Config): Router {
   });
 
   if (config.authMode === 'entra') mountEntra(router, pool, config);
+  else if (config.authMode === 'local') mountLocal(router, pool);
   else mountDev(router, pool, config);
 
   return router;
@@ -241,6 +244,115 @@ function mountEntra(router: Router, pool: Pool, config: Config) {
       log.error('auth: callback failed', { error: (err as Error).message });
       return errorPage(res, 401, 'Sign-in failed', 'We could not complete the sign-in. Please try again.');
     }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Local accounts (AUTH_MODE=local): e-mail + password, for installations without Entra ID
+
+const localLoginSchema = z.object({
+  email: z.string().trim().toLowerCase().max(254),
+  password: z.string().max(PASSWORD_MAX_LENGTH),
+});
+
+const setupSchema = z.object({
+  display_name: z.string().trim().min(1).max(200),
+  email: z.string().trim().toLowerCase().email().max(254),
+  password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
+});
+
+/** True while no account can sign in with a password yet – the first visitor creates the administrator. */
+export async function needsSetup(pool: Pool): Promise<boolean> {
+  const { rows } = await pool.query('SELECT 1 FROM app_user WHERE password_hash IS NOT NULL LIMIT 1');
+  return rows.length === 0;
+}
+
+function mountLocal(router: Router, pool: Pool) {
+  // brute-force protection: 10 failed attempts per 15 minutes and client address
+  const loginLimiter = rateLimit({
+    windowMs: 15 * 60_000,
+    limit: 10,
+    skipSuccessfulRequests: true,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    message: { error: 'Too many sign-in attempts. Please wait 15 minutes and try again.' },
+  });
+
+  router.get('/login', (req, res) => {
+    res.redirect(`/login?returnTo=${encodeURIComponent(safeReturnTo(req.query.returnTo))}`);
+  });
+
+  router.get('/setup', async (_req, res) => {
+    res.json({ needsSetup: await needsSetup(pool) });
+  });
+
+  /** First start: create the first administrator (only possible while no password account exists). */
+  router.post('/setup', loginLimiter, async (req, res) => {
+    const parsed = setupSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: `Please enter a name, a valid e-mail address and a password with at least ${PASSWORD_MIN_LENGTH} characters.` });
+    }
+    const input = parsed.data;
+    const hash = await hashPassword(input.password);
+    const client = await pool.connect();
+    let userId: string;
+    try {
+      await client.query('BEGIN');
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', ['cmdb-local-setup']);
+      const done = await client.query('SELECT 1 FROM app_user WHERE password_hash IS NOT NULL LIMIT 1');
+      if (done.rows[0]) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ error: 'The administrator account has already been created. Please sign in.' });
+      }
+      const existing = await client.query<{ id: string }>('SELECT id FROM app_user WHERE lower(email) = $1 ORDER BY oid NULLS FIRST LIMIT 1', [input.email]);
+      const { rows } = existing.rows[0]
+        ? await client.query<{ id: string }>(
+            `UPDATE app_user SET display_name = $2, role = 'admin', role_source = 'local', active = true, plant_scope = '{}',
+                    password_hash = $3, password_changed_at = now(), last_login_at = now(), updated_at = now()
+             WHERE id = $1 RETURNING id`,
+            [existing.rows[0].id, input.display_name, hash],
+          )
+        : await client.query<{ id: string }>(
+            `INSERT INTO app_user (email, display_name, role, role_source, password_hash, password_changed_at, last_login_at)
+             VALUES ($1, $2, 'admin', 'local', $3, now(), now()) RETURNING id`,
+            [input.email, input.display_name, hash],
+          );
+      userId = rows[0].id;
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw err;
+    } finally {
+      client.release();
+    }
+    await establishSession(req, userId);
+    req.user = { id: userId, displayName: input.display_name, email: input.email, role: 'admin', roleSource: 'local', plantScope: [] };
+    await audit(pool, req, { action: 'login', entityType: 'user', entityId: userId, entityLabel: input.display_name, changes: { role: 'admin', mode: 'setup' } });
+    res.status(201).json({ ok: true });
+  });
+
+  router.post('/local-login', loginLimiter, async (req, res) => {
+    const parsed = localLoginSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Please enter your e-mail address and password.' });
+    const { email, password } = parsed.data;
+    const { rows } = await pool.query<{ id: string; display_name: string; role: Role; active: boolean; password_hash: string }>(
+      `SELECT id, display_name, role, active, password_hash FROM app_user
+       WHERE lower(email) = $1 AND password_hash IS NOT NULL ORDER BY oid NULLS FIRST LIMIT 1`,
+      [email],
+    );
+    const user = rows[0];
+    // always run the hash function so response times do not reveal which e-mail addresses exist
+    const ok = await verifyPassword(password, user?.password_hash ?? (await dummyPasswordHash()));
+    if (!user || !ok) {
+      log.warn('auth: local sign-in failed', { email });
+      return res.status(401).json({ error: 'E-mail address or password is incorrect.' });
+    }
+    if (!user.active) return res.status(403).json({ error: 'Your CMDB account has been deactivated.' });
+    await pool.query('UPDATE app_user SET last_login_at = now() WHERE id = $1', [user.id]);
+    await establishSession(req, user.id);
+    req.user = { id: user.id, displayName: user.display_name, email, role: user.role, roleSource: 'local', plantScope: [] };
+    await audit(pool, req, { action: 'login', entityType: 'user', entityId: user.id, entityLabel: user.display_name, changes: { role: user.role, mode: 'local' } });
+    res.json({ ok: true });
   });
 }
 

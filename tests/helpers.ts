@@ -7,9 +7,9 @@ import { migrate } from '../server/db/migrate';
 import { seed } from '../server/db/seed';
 import { createApp } from '../server/app';
 
-export async function setupTestApp() {
+export async function setupTestApp(opts: { authMode?: 'dev' | 'local' } = {}) {
   process.env.NODE_ENV = 'test';
-  process.env.AUTH_MODE = 'dev';
+  process.env.AUTH_MODE = opts.authMode ?? 'dev';
   process.env.DB_AUTH = 'password';
   process.env.DATABASE_URL = process.env.TEST_DATABASE_URL ?? 'postgres://cmdb:cmdb@localhost:5432/cmdb_test';
   process.env.SESSION_SECRET = 'test-secret-test-secret-test-secret-123';

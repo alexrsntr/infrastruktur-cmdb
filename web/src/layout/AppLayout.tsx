@@ -7,6 +7,7 @@ import {
   EnvironmentOutlined,
   HddOutlined,
   HomeOutlined,
+  KeyOutlined,
   LogoutOutlined,
   MenuOutlined,
   PlusOutlined,
@@ -22,6 +23,7 @@ import { usePlants } from '../lib/queries';
 import { BrandMark } from '../components/BrandMark';
 import { GlobalSearch } from '../components/GlobalSearch';
 import { useAddDevice } from '../components/AddDeviceWizard';
+import { ChangePasswordModal } from '../components/ChangePasswordModal';
 
 interface NavItem {
   key: string;
@@ -47,6 +49,7 @@ export function AppLayout() {
   const plants = usePlants();
   const { open: openAddDevice } = useAddDevice();
   const [drawer, setDrawer] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
   const wide = !!screens.lg;
   const role = ROLE_META[me.user.role];
 
@@ -86,10 +89,12 @@ export function AppLayout() {
       },
       { type: 'divider' },
       ...(adminItems.length ? [...adminItems, { type: 'divider' as const }] : []),
+      ...(config.authMode === 'local' ? [{ key: 'password', icon: <KeyOutlined />, label: 'Change password' }] : []),
       { key: 'logout', icon: <LogoutOutlined />, label: 'Sign out', danger: true },
     ],
     onClick: ({ key }) => {
       if (key === 'logout') void logout();
+      else if (key === 'password') setChangingPassword(true);
       else if (key.startsWith('/')) navigate(key);
     },
   };
@@ -157,6 +162,7 @@ export function AppLayout() {
           <Outlet />
         </div>
       </Layout.Content>
+      <ChangePasswordModal open={changingPassword} onClose={() => setChangingPassword(false)} />
     </Layout>
   );
 }
