@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router';
+import { useQuery } from '@tanstack/react-query';
 import {
   Alert,
   App,
@@ -13,6 +15,7 @@ import {
   Space,
   Switch,
   Table,
+  Tabs,
   Tag,
   Tooltip,
   Typography,
@@ -34,6 +37,8 @@ import { useSession } from '../../lib/session';
 import { PageHeader } from '../../components/PageHeader';
 import { download, exportUrl, MoreMenu } from '../../components/PageParts';
 import { RoleTag } from '../../components/Tags';
+import { EntraDirectoryTab } from './EntraDirectoryTab';
+import type { EntraSettingsDto } from '../../../../shared/entra';
 
 const PERMISSION_LABELS: Record<Permission, string> = {
   read: 'Read',
@@ -107,6 +112,7 @@ function EditUserModal({ user, onClose }: { user: AppUser | null; onClose: () =>
 
   const isSelf = user?.id === me.user.id;
   const entraManaged = user?.role_source === 'entra';
+  const groupManaged = user?.role_source === 'group';
 
   return (
     <Modal open={!!user} title={user ? `Edit ${user.display_name}` : ''} onCancel={onClose} onOk={submit} okText="Save" confirmLoading={saving} destroyOnHidden width={560}>
@@ -121,24 +127,28 @@ function EditUserModal({ user, onClose }: { user: AppUser | null; onClose: () =>
             extra={
               entraManaged
                 ? 'This role is assigned via an Entra ID app role and is updated at every sign-in. Change it in the Entra admin center (Enterprise applications → Users and groups).'
-                : role
+                : groupManaged
+                  ? `This role comes from the Entra group mapping (${user.role_detail ?? 'group'}) and is updated at every sign-in. Change the mapping on the tab “Microsoft Entra ID”.`
+                  : role
                   ? ROLE_META[role as Role]?.description
                   : undefined
             }
           >
-            <Select options={roleOptions} disabled={entraManaged || isSelf} />
+            <Select options={roleOptions} disabled={entraManaged || groupManaged || isSelf} />
           </Form.Item>
           <Form.Item
             name="plant_scope"
             label="Plant scope"
-            extra={role === 'admin' ? 'Administrators always see all plants.' : 'Leave empty to grant access to all plants.'}
+            extra={
+              role === 'admin' ? 'Administrators always see all plants.' : groupManaged ? 'Set by the Entra group mapping.' : 'Leave empty to grant access to all plants.'
+            }
           >
             <Select
               mode="multiple"
               allowClear
               optionFilterProp="label"
               placeholder="All plants"
-              disabled={role === 'admin'}
+              disabled={role === 'admin' || groupManaged}
               options={(plants.data ?? []).map((p) => ({ value: p.id, label: `${p.code} – ${p.name}` }))}
             />
           </Form.Item>
@@ -273,6 +283,15 @@ export function UsersPage() {
   const [roleFilter, setRoleFilter] = useState<Role | undefined>();
   const [editing, setEditing] = useState<AppUser | null>(null);
   const [creating, setCreating] = useState(false);
+  const [params, setParams] = useSearchParams();
+  const tab = params.get('tab') ?? 'users';
+  const entraSettings = useQuery({
+    queryKey: ['settings', 'entra'],
+    queryFn: () => http.get<EntraSettingsDto>('/api/settings/entra'),
+    enabled: allowed && me.user.role === 'admin',
+    retry: false,
+  });
+  const entraConfigured = !!entraSettings.data?.configured;
 
   const plantCodes = useMemo(() => new Map((plants.data ?? []).map((p) => [p.id, p.code])), [plants.data]);
 
@@ -288,6 +307,134 @@ export function UsersPage() {
   if (!allowed) {
     return <Result status="403" title="No access" subTitle="User management is restricted to administrators." />;
   }
+
+  const usersContent = (
+    <>
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          title="How permissions work"
+          description={
+            <>
+              With sign-in by Microsoft, the role is taken in this order at every sign-in: an <strong>Entra ID app role</strong> (CMDB.Admin, CMDB.Editor,
+              CMDB.Operator, CMDB.Viewer – assigned under <em>Enterprise applications → Users and groups</em>), otherwise a <strong>mapped Entra group</strong>{' '}
+              (tab “Microsoft Entra ID”, including its plant scope), otherwise the role set here, otherwise the default role. Accounts with e-mail and
+              password are managed only here. The <strong>plant scope</strong> is managed here (except for group-managed users) – an empty scope means
+              access to all plants.
+            </>
+          }
+        />
+
+        <Card style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+            <Input.Search allowClear size="large" placeholder="Search name or e-mail" value={search} onChange={(e) => setSearch(e.target.value)} style={{ width: 320 }} />
+            <Select allowClear size="large" placeholder="All roles" style={{ width: 200 }} value={roleFilter} onChange={setRoleFilter} options={roleOptions} />
+            <div style={{ flex: 1 }} />
+            <Typography.Text type="secondary" style={{ alignSelf: 'center' }}>
+              {filtered.length} of {users.data?.length ?? 0} users
+            </Typography.Text>
+          </div>
+          <Table<AppUser>
+            rowKey="id"
+            loading={users.isLoading}
+            dataSource={filtered}
+            pagination={{ pageSize: 50, hideOnSinglePage: true }}
+            scroll={{ x: 900 }}
+            columns={[
+              {
+                title: 'User',
+                key: 'user',
+                sorter: (a, b) => a.display_name.localeCompare(b.display_name),
+                render: (_, u) => (
+                  <div>
+                    <Typography.Text strong>{u.display_name}</Typography.Text>
+                    {u.id === me.user.id && <Tag style={{ marginLeft: 6 }}>you</Tag>}
+                    <div>
+                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                        {u.email ?? '–'}
+                      </Typography.Text>
+                    </div>
+                  </div>
+                ),
+              },
+              {
+                title: 'Role',
+                key: 'role',
+                width: 220,
+                sorter: (a, b) => ROLES.indexOf(a.role) - ROLES.indexOf(b.role),
+                render: (_, u) => (
+                  <Space size={4}>
+                    <RoleTag role={u.role} />
+                    {u.role_source === 'entra' ? (
+                      <Tooltip title="Assigned via Entra ID app role">
+                        <Tag color="blue" variant="filled">
+                          Entra ID
+                        </Tag>
+                      </Tooltip>
+                    ) : u.role_source === 'group' ? (
+                      <Tooltip title={`From the Entra group mapping: ${u.role_detail ?? ''}`}>
+                        <Tag color="geekblue" variant="filled">
+                          Entra group
+                        </Tag>
+                      </Tooltip>
+                    ) : (
+                      <Tag variant="filled">local</Tag>
+                    )}
+                  </Space>
+                ),
+              },
+              {
+                title: 'Plant scope',
+                key: 'scope',
+                width: 220,
+                render: (_, u) => (u.role === 'admin' ? <Typography.Text type="secondary">All plants</Typography.Text> : <PlantScopeTags scope={u.plant_scope} plantCodes={plantCodes} />),
+              },
+              {
+                title: 'Status',
+                key: 'active',
+                width: 130,
+                filters: [
+                  { text: 'Active', value: true },
+                  { text: 'Deactivated', value: false },
+                ],
+                onFilter: (v, u) => u.active === v,
+                render: (_, u) =>
+                  u.active ? (
+                    u.oid || u.has_password ? <Badge status="success" text="Active" /> : <Badge status="processing" text="Pre-provisioned" />
+                  ) : (
+                    <Badge status="default" text="Deactivated" />
+                  ),
+              },
+              {
+                title: 'Last sign-in',
+                dataIndex: 'last_login_at',
+                width: 150,
+                sorter: (a, b) => (a.last_login_at ?? '').localeCompare(b.last_login_at ?? ''),
+                render: (v: string | null) =>
+                  v ? (
+                    <Tooltip title={fmtDateTime(v)}>
+                      <span>{fromNow(v)}</span>
+                    </Tooltip>
+                  ) : (
+                    <span className="muted">never</span>
+                  ),
+              },
+              {
+                title: '',
+                key: 'actions',
+                width: 60,
+                render: (_, u) => <Button type="text" icon={<EditOutlined />} onClick={() => setEditing(u)} aria-label="Edit user" />,
+              },
+            ]}
+          />
+        </Card>
+
+        <Card title="Role permissions">
+          <PermissionMatrix />
+        </Card>
+    </>
+  );
 
   return (
     <div>
@@ -310,122 +457,23 @@ export function UsersPage() {
         }
       />
 
-      <Alert
-        type="info"
-        showIcon
-        style={{ marginBottom: 16 }}
-        title="How permissions work"
-        description={
-          <>
-            Roles normally come from <strong>Entra ID app roles</strong> (CMDB.Admin, CMDB.Editor, CMDB.Operator, CMDB.Viewer), assigned in the Entra
-            admin center under <em>Enterprise applications → Users and groups</em>, and are refreshed at every sign-in. Users without an app role
-            receive the default role and can be managed here. The <strong>plant scope</strong> is always managed here – an empty scope means access
-            to all plants.
-          </>
-        }
-      />
-
-      <Card style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-          <Input.Search allowClear size="large" placeholder="Search name or e-mail" value={search} onChange={(e) => setSearch(e.target.value)} style={{ width: 320 }} />
-          <Select allowClear size="large" placeholder="All roles" style={{ width: 200 }} value={roleFilter} onChange={setRoleFilter} options={roleOptions} />
-          <div style={{ flex: 1 }} />
-          <Typography.Text type="secondary" style={{ alignSelf: 'center' }}>
-            {filtered.length} of {users.data?.length ?? 0} users
-          </Typography.Text>
-        </div>
-        <Table<AppUser>
-          rowKey="id"
-          loading={users.isLoading}
-          dataSource={filtered}
-          pagination={{ pageSize: 50, hideOnSinglePage: true }}
-          scroll={{ x: 900 }}
-          columns={[
-            {
-              title: 'User',
-              key: 'user',
-              sorter: (a, b) => a.display_name.localeCompare(b.display_name),
-              render: (_, u) => (
-                <div>
-                  <Typography.Text strong>{u.display_name}</Typography.Text>
-                  {u.id === me.user.id && <Tag style={{ marginLeft: 6 }}>you</Tag>}
-                  <div>
-                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                      {u.email ?? '–'}
-                    </Typography.Text>
-                  </div>
-                </div>
-              ),
-            },
-            {
-              title: 'Role',
-              key: 'role',
-              width: 220,
-              sorter: (a, b) => ROLES.indexOf(a.role) - ROLES.indexOf(b.role),
-              render: (_, u) => (
-                <Space size={4}>
-                  <RoleTag role={u.role} />
-                  {u.role_source === 'entra' ? (
-                    <Tooltip title="Assigned via Entra ID app role">
-                      <Tag color="blue" variant="filled">
-                        Entra ID
-                      </Tag>
-                    </Tooltip>
-                  ) : (
-                    <Tag variant="filled">local</Tag>
-                  )}
-                </Space>
-              ),
-            },
-            {
-              title: 'Plant scope',
-              key: 'scope',
-              width: 220,
-              render: (_, u) => (u.role === 'admin' ? <Typography.Text type="secondary">All plants</Typography.Text> : <PlantScopeTags scope={u.plant_scope} plantCodes={plantCodes} />),
-            },
-            {
-              title: 'Status',
-              key: 'active',
-              width: 130,
-              filters: [
-                { text: 'Active', value: true },
-                { text: 'Deactivated', value: false },
-              ],
-              onFilter: (v, u) => u.active === v,
-              render: (_, u) =>
-                u.active ? (
-                  u.oid || u.has_password ? <Badge status="success" text="Active" /> : <Badge status="processing" text="Pre-provisioned" />
-                ) : (
-                  <Badge status="default" text="Deactivated" />
-                ),
-            },
-            {
-              title: 'Last sign-in',
-              dataIndex: 'last_login_at',
-              width: 150,
-              sorter: (a, b) => (a.last_login_at ?? '').localeCompare(b.last_login_at ?? ''),
-              render: (v: string | null) =>
-                v ? (
-                  <Tooltip title={fmtDateTime(v)}>
-                    <span>{fromNow(v)}</span>
-                  </Tooltip>
-                ) : (
-                  <span className="muted">never</span>
-                ),
-            },
-            {
-              title: '',
-              key: 'actions',
-              width: 60,
-              render: (_, u) => <Button type="text" icon={<EditOutlined />} onClick={() => setEditing(u)} aria-label="Edit user" />,
-            },
+      {entraConfigured ? (
+        <Tabs
+          activeKey={tab}
+          onChange={(key) => {
+            const next = new URLSearchParams(params);
+            if (key === 'users') next.delete('tab');
+            else next.set('tab', key);
+            setParams(next, { replace: true });
+          }}
+          items={[
+            { key: 'users', label: 'CMDB users', children: usersContent },
+            { key: 'entra', label: 'Microsoft Entra ID', children: <EntraDirectoryTab /> },
           ]}
         />
-      </Card>
-
-      <Card title="Role permissions">
-        <PermissionMatrix />
-      </Card>
+      ) : (
+        usersContent
+      )}
 
       <EditUserModal user={editing} onClose={() => setEditing(null)} />
       <CreateUserModal open={creating} onClose={() => setCreating(false)} />

@@ -21,7 +21,7 @@ const AADSTS: Record<string, { error: string; hint?: string }> = {
   '90002': { error: 'Tenant not found.', hint: 'Check the tenant ID (Directory ID in the overview of Microsoft Entra ID).' },
   '900023': { error: 'The tenant ID is not valid.', hint: 'Use the tenant ID (a GUID) from the overview of Microsoft Entra ID.' },
   '700016': { error: 'The application (client ID) was not found in this tenant.', hint: 'Check the Application (client) ID of the app registration and that it belongs to this tenant.' },
-  '7000215': { error: 'The client secret is not valid.', hint: 'Enter the secret *Value* (not the Secret ID) of the app registration, or create a new secret.' },
+  '7000215': { error: 'The client secret is not valid.', hint: 'Enter the secret’s “Value” (not the “Secret ID”) of the app registration, or create a new secret.' },
   '7000222': { error: 'The client secret has expired.', hint: 'Create a new client secret in the app registration (Certificates & secrets) and save it here.' },
   '700213': { error: 'The federated credential does not match the managed identity.', hint: 'Check issuer, subject (object ID of the managed identity) and audience api://AzureADTokenExchange of the federated credential.' },
   '700211': { error: 'The federated credential issuer is not accepted.', hint: 'Issuer must be https://login.microsoftonline.com/<tenant-id>/v2.0.' },

@@ -43,7 +43,26 @@ export function LoginPage({ config }: { config?: AppConfig }) {
           </div>
         </Space>
         {config?.authMode === 'local' ? (
-          <LocalLogin returnTo={returnTo} />
+          config.entraLogin ? (
+            <>
+              <Typography.Paragraph type="secondary">
+                Configuration management for plants, buildings and IT infrastructure. Sign in with your corporate account.
+              </Typography.Paragraph>
+              <Button type="primary" size="large" block icon={<WindowsFilled />} href={`/auth/login?returnTo=${rt}`}>
+                Sign in with Microsoft
+              </Button>
+              {config.localLogin !== 'off' && (
+                <>
+                  <Divider plain style={{ margin: '20px 0 12px' }}>
+                    {config.localLogin === 'admins' ? 'Administrators: e-mail and password' : 'or with e-mail and password'}
+                  </Divider>
+                  <LocalLogin returnTo={returnTo} compact />
+                </>
+              )}
+            </>
+          ) : (
+            <LocalLogin returnTo={returnTo} />
+          )
         ) : config?.authMode !== 'dev' ? (
           <>
             <Typography.Paragraph type="secondary">
@@ -55,8 +74,13 @@ export function LoginPage({ config }: { config?: AppConfig }) {
           </>
         ) : (
           <>
+            {config.entraLogin && (
+              <Button type="primary" size="large" block icon={<WindowsFilled />} href={`/auth/login?returnTo=${rt}`} style={{ marginBottom: 12 }}>
+                Sign in with Microsoft
+              </Button>
+            )}
             <Tag color="orange" style={{ marginBottom: 12 }}>
-              Development mode – Entra ID SSO is disabled
+              Development mode{config.entraLogin ? '' : ' – Entra ID SSO is disabled'}
             </Tag>
             <Divider plain style={{ margin: '8px 0 16px' }}>
               Sign in as
@@ -86,7 +110,7 @@ function safeTarget(returnTo: string) {
 }
 
 /** AUTH_MODE=local: e-mail + password, or – on the very first start – creating the administrator account. */
-function LocalLogin({ returnTo }: { returnTo: string }) {
+function LocalLogin({ returnTo, compact = false }: { returnTo: string; compact?: boolean }) {
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -167,9 +191,11 @@ function LocalLogin({ returnTo }: { returnTo: string }) {
 
   return (
     <>
-      <Typography.Paragraph type="secondary">
-        Configuration management for plants, buildings and IT infrastructure. Sign in with your e-mail address and password.
-      </Typography.Paragraph>
+      {!compact && (
+        <Typography.Paragraph type="secondary">
+          Configuration management for plants, buildings and IT infrastructure. Sign in with your e-mail address and password.
+        </Typography.Paragraph>
+      )}
       {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
       <Form layout="vertical" requiredMark={false} onFinish={(v: { email: string; password: string }) => send('/auth/local-login', v)}>
         <Form.Item name="email" label="E-mail address" rules={[{ required: true, message: 'Enter your e-mail address' }]}>
@@ -178,7 +204,7 @@ function LocalLogin({ returnTo }: { returnTo: string }) {
         <Form.Item name="password" label="Password" rules={[{ required: true, message: 'Enter your password' }]}>
           <Input.Password prefix={<LockOutlined />} size="large" autoComplete="current-password" />
         </Form.Item>
-        <Button type="primary" size="large" block htmlType="submit" loading={busy} icon={<LoginOutlined />}>
+        <Button type={compact ? 'default' : 'primary'} size="large" block htmlType="submit" loading={busy} icon={<LoginOutlined />}>
           Sign in
         </Button>
       </Form>
