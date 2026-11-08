@@ -67,7 +67,7 @@ function useTimezones() {
     try {
       return Intl.supportedValuesOf('timeZone').map((z) => ({ value: z, label: z }));
     } catch {
-      return ['Europe/Berlin', 'Europe/Budapest', 'America/New_York', 'Asia/Shanghai'].map((z) => ({ value: z, label: z }));
+      return ['UTC', 'Europe/London', 'Europe/Berlin', 'America/New_York', 'Asia/Singapore'].map((z) => ({ value: z, label: z }));
     }
   }, []);
 }

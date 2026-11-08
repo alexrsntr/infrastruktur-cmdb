@@ -366,7 +366,7 @@ describe('dashboard & search', () => {
   it('searches across plants, buildings and assets', async () => {
     const res = await editor.get('/api/search?q=esx01').expect(200);
     expect(res.body[0]).toMatchObject({ kind: 'asset', assetType: 'server' });
-    const p = await editor.get('/api/search?q=Kecsk').expect(200);
+    const p = await editor.get('/api/search?q=Prag').expect(200);
     expect(p.body[0].kind).toBe('plant');
   });
 });

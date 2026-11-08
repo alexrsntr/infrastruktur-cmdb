@@ -48,25 +48,16 @@ import { AssetTypeTag, WarrantyDate } from '../../components/Tags';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const TIMEZONES = [
-  'Europe/Berlin',
-  'Europe/Budapest',
-  'Europe/Vienna',
-  'Europe/Zurich',
-  'Europe/Paris',
-  'Europe/Madrid',
-  'Europe/Istanbul',
-  'America/New_York',
-  'America/Chicago',
-  'America/Mexico_City',
-  'America/Sao_Paulo',
-  'Asia/Shanghai',
-  'Asia/Kolkata',
-  'Asia/Tokyo',
-  'Asia/Seoul',
-  'Africa/Johannesburg',
-  'UTC',
-];
+const FALLBACK_TIMEZONES = ['UTC', 'Europe/London', 'Europe/Berlin', 'America/New_York', 'America/Los_Angeles', 'Asia/Singapore', 'Asia/Tokyo', 'Australia/Sydney'];
+
+/** All IANA time zones the browser knows (falls back to a short list in very old browsers). */
+const TIMEZONES: string[] = (() => {
+  try {
+    return ['UTC', ...Intl.supportedValuesOf('timeZone').filter((z) => z !== 'UTC')];
+  } catch {
+    return FALLBACK_TIMEZONES;
+  }
+})();
 
 const RUN_STATUS: Record<NotificationRun['status'], { color: string; label: string }> = {
   ok: { color: 'success', label: 'Sent' },

@@ -267,7 +267,7 @@ describe('warranty notifications', () => {
   });
 
   it('rolls back when sending fails so the devices are retried', async () => {
-    await setWarranty('kec-esx02', 5);
+    await setWarranty('prg-esx02', 5);
     const before = await logCount();
     await admin.put('/api/settings/email', smtpSettings({ port: await freePort() })).expect(200);
     const res = await admin.post('/api/notifications/warranty/run').expect(200);
@@ -278,7 +278,7 @@ describe('warranty notifications', () => {
     await admin.put('/api/settings/email', smtpSettings()).expect(200);
     const retry = await admin.post('/api/notifications/warranty/run').expect(200);
     expect(retry.body.run).toMatchObject({ status: 'ok', items: 1 });
-    expect(inbox.some((m) => m.text.includes('kec-esx02'))).toBe(true);
+    expect(inbox.some((m) => m.text.includes('prg-esx02'))).toBe(true);
   });
 
   it('skips when disabled and lists runs and sent notifications', async () => {
