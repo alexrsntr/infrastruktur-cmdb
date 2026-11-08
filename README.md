@@ -59,11 +59,11 @@ after the installation. You can switch to Microsoft sign-in later.
 
 You need an Azure subscription in which you may create resources (role *Contributor* or *Owner*).
 
-1. Click **[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Falexrsntr%2Finfrastruktur-cmdb%2Fmain%2Fazure%2Fazuredeploy.json)** and sign in.
-2. Choose your **subscription**, click **Create new** under *Resource group* and enter a name, e.g. `cmdb`.
-   Choose a **region** close to you (e.g. *Germany West Central* or *West Europe*).
-3. Leave everything else as it is (the passwords are generated automatically) and click
-   **Review + create**, then **Create**.
+1. Click **[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Falexrsntr%2Finfrastruktur-cmdb%2Fmain%2Fazure%2Fazuredeploy.json/createUIDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Falexrsntr%2Finfrastruktur-cmdb%2Fmain%2Fazure%2FcreateUiDefinition.json)** and sign in.
+2. Choose your **subscription** and a **resource group** (or click *Create new*, e.g. `cmdb`) and a **region**
+   close to you (e.g. *Germany West Central* or *West Europe*). Optionally enter your company name and a web address.
+   Passwords and keys are generated automatically – there is nothing else to fill in.
+3. Click **Review + create**, then **Create**.
 4. Wait until *Your deployment is complete* appears (about 10–15 minutes).
 5. Click **Outputs** on the left – `cmdbUrl` is the address of your CMDB. Open it and create your
    administrator account. Done!

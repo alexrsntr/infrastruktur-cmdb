@@ -47,11 +47,11 @@ Installation öffnen. Auf Microsoft-Anmeldung kann man später umstellen.
 
 Voraussetzung: eine Azure-Subscription, in der man Ressourcen anlegen darf (Rolle *Mitwirkender* oder *Besitzer*).
 
-1. Auf **[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Falexrsntr%2Finfrastruktur-cmdb%2Fmain%2Fazure%2Fazuredeploy.json)** klicken und anmelden.
-2. **Abonnement** wählen, unter *Ressourcengruppe* auf **Neu erstellen** klicken und einen Namen eingeben, z. B. `cmdb`.
-   Eine **Region** in der Nähe wählen (z. B. *Germany West Central* oder *West Europe*).
-3. Alles andere so lassen (die Passwörter werden automatisch erzeugt) und auf **Überprüfen + erstellen**, dann
-   auf **Erstellen** klicken.
+1. Auf **[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Falexrsntr%2Finfrastruktur-cmdb%2Fmain%2Fazure%2Fazuredeploy.json/createUIDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Falexrsntr%2Finfrastruktur-cmdb%2Fmain%2Fazure%2FcreateUiDefinition.json)** klicken und anmelden.
+2. **Abonnement**, **Ressourcengruppe** (oder *Neu erstellen*, z. B. `cmdb`) und eine **Region** in der Nähe wählen
+   (z. B. *Germany West Central* oder *West Europe*). Optional Firmenname und Web-Adresse eintragen.
+   Passwörter und Schlüssel werden automatisch erzeugt – sonst gibt es nichts auszufüllen.
+3. Auf **Überprüfen + erstellen**, dann auf **Erstellen** klicken.
 4. Warten, bis *Ihre Bereitstellung wurde abgeschlossen* erscheint (ca. 10–15 Minuten).
 5. Links auf **Ausgaben** klicken – `cmdbUrl` ist die Adresse der CMDB. Öffnen und das Administratorkonto anlegen. Fertig!
 

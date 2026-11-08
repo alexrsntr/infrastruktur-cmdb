@@ -1,0 +1,61 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/0.1.2-preview/CreateUIDefinition.MultiVm.json#",
+  "handler": "Microsoft.Azure.CreateUIDef",
+  "version": "0.1.2-preview",
+  "parameters": {
+    "config": {
+      "basics": {
+        "description": "**Infrastruktur CMDB** – IT configuration management database for sites, buildings, racks and network/compute infrastructure. Creates a web app and a PostgreSQL database (about 30 € per month). Passwords and keys are generated automatically.",
+        "location": {
+          "label": "Region",
+          "toolTip": "Azure region for the CMDB, ideally close to your users.",
+          "resourceTypes": [
+            "Microsoft.Web/sites",
+            "Microsoft.DBforPostgreSQL/flexibleServers"
+          ]
+        }
+      }
+    },
+    "basics": [
+      {
+        "name": "brandName",
+        "type": "Microsoft.Common.TextBox",
+        "label": "Company name",
+        "defaultValue": "Infrastruktur",
+        "toolTip": "Shown above the app name in the header, on the login page and in e-mails.",
+        "constraints": {
+          "required": true,
+          "regex": "^.{1,60}$",
+          "validationMessage": "1 to 60 characters."
+        }
+      },
+      {
+        "name": "appName",
+        "type": "Microsoft.Common.TextBox",
+        "label": "Web address (optional)",
+        "placeholder": "e.g. cmdb-mycompany → https://cmdb-mycompany.azurewebsites.net",
+        "defaultValue": "",
+        "toolTip": "Leave empty for an automatically generated address. Must be unique worldwide: 3–40 lowercase letters, digits and hyphens.",
+        "constraints": {
+          "required": false,
+          "regex": "^$|^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$",
+          "validationMessage": "3–40 lowercase letters, digits and hyphens; must not start or end with a hyphen."
+        }
+      },
+      {
+        "name": "nextSteps",
+        "type": "Microsoft.Common.InfoBox",
+        "options": {
+          "icon": "Info",
+          "text": "After the deployment (about 10–15 minutes) click Outputs and open the address shown as cmdbUrl. The first person who opens it creates the administrator account – so open it right away."
+        }
+      }
+    ],
+    "steps": [],
+    "outputs": {
+      "location": "[location()]",
+      "brandName": "[basics('brandName')]",
+      "appName": "[basics('appName')]"
+    }
+  }
+}

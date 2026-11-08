@@ -7,11 +7,10 @@
   "parameters": {
     "appName": {
       "type": "string",
-      "defaultValue": "[concat('cmdb-', uniqueString(resourceGroup().id))]",
-      "minLength": 3,
+      "defaultValue": "",
       "maxLength": 40,
       "metadata": {
-        "description": "Name of the web app. The CMDB will be reachable at https://<name>.azurewebsites.net (the name must be unique worldwide; lowercase letters, digits and hyphens)."
+        "description": "Optional name of the web app: the CMDB will be reachable at https://<name>.azurewebsites.net (unique worldwide; lowercase letters, digits and hyphens). Empty = generated automatically."
       }
     },
     "location": {
@@ -59,7 +58,7 @@
     }
   },
   "variables": {
-    "appName": "[toLower(parameters('appName'))]",
+    "appName": "[if(empty(parameters('appName')), concat('cmdb-', uniqueString(resourceGroup().id)), toLower(parameters('appName')))]",
     "planName": "[concat('asp-', variables('appName'))]",
     "dbServerName": "[concat('psql-', variables('appName'))]",
     "dbName": "cmdb",
