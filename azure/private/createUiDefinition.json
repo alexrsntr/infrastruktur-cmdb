@@ -59,7 +59,7 @@
             "type": "Microsoft.Common.InfoBox",
             "options": {
               "icon": "Info",
-              "text": "Choose the virtual network for the private endpoints. Only virtual networks in the region selected on Basics are listed. Two subnets are needed: one for the private endpoints of the web app and the database (can be shared with other endpoints) and one for the App Service VNet integration, through which the web app reaches the database."
+              "text": "Choose the virtual network for the private endpoints. Only virtual networks in the region selected on Basics are listed. The web app additionally needs its own small subnet for the App Service VNet integration (Azure requires it to be empty and delegated to Microsoft.Web/serverFarms) – this deployment can create it for you."
             }
           },
           {
@@ -71,7 +71,7 @@
             },
             "toolTip": {
               "virtualNetwork": "Select an existing virtual network (in this subscription and region) or create a new one.",
-              "subnets": "Private endpoints: any subnet with free addresses. App Service integration: an empty subnet of at least /28, delegated to Microsoft.Web/serverFarms."
+              "subnets": "Subnet for the private endpoints of the web app and the database – an existing subnet with free addresses can be shared with other resources."
             },
             "defaultValue": {
               "name": "vnet-cmdb",
@@ -95,28 +95,72 @@
                   "minAddressCount": 2,
                   "requireContiguousAddresses": false
                 }
-              },
-              "appSubnet": {
-                "label": "App Service integration",
-                "defaultValue": {
-                  "name": "snet-app",
-                  "addressPrefixSize": "/27"
-                },
-                "constraints": {
-                  "minAddressPrefixSize": "/28",
-                  "minAddressCount": 1,
-                  "requireContiguousAddresses": false
-                }
               }
             }
           },
           {
-            "name": "existingVnetHint",
-            "type": "Microsoft.Common.InfoBox",
+            "name": "appSubnetMode",
+            "type": "Microsoft.Common.OptionsGroup",
+            "label": "App Service integration subnet",
+            "defaultValue": "Create a new subnet",
+            "toolTip": "Dedicated subnet through which the web app reaches the database. Azure does not allow private endpoints or other resources in it.",
             "visible": "[equals(steps('network').vnet.newOrExisting, 'existing')]",
+            "constraints": {
+              "allowedValues": [
+                {
+                  "label": "Create a new subnet",
+                  "value": "new"
+                },
+                {
+                  "label": "Use an existing delegated subnet",
+                  "value": "existing"
+                }
+              ],
+              "required": true
+            }
+          },
+          {
+            "name": "appSubnetName",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Integration subnet name",
+            "defaultValue": "snet-cmdb-app-integration",
+            "toolTip": "New subnet: a name that does not exist in the virtual network yet. Existing subnet: its exact name.",
+            "constraints": {
+              "required": true,
+              "regex": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,78}[A-Za-z0-9_]$",
+              "validationMessage": "2–80 characters: letters, digits, underscores, periods and hyphens."
+            }
+          },
+          {
+            "name": "appSubnetPrefix",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Address range of the new subnet",
+            "defaultValue": "",
+            "placeholder": "e.g. 10.210.156.0/28",
+            "toolTip": "A free range inside the address space of the virtual network that does not overlap any existing subnet. At least /28 (16 addresses); /27 leaves room to scale out.",
+            "visible": "[or(equals(steps('network').vnet.newOrExisting, 'new'), equals(steps('network').appSubnetMode, 'new'))]",
+            "constraints": {
+              "required": "[or(equals(steps('network').vnet.newOrExisting, 'new'), equals(steps('network').appSubnetMode, 'new'))]",
+              "regex": "^(25[0-5]|2[0-4]\\d|1?\\d?\\d)(\\.(25[0-5]|2[0-4]\\d|1?\\d?\\d)){3}/(2[4-8])$",
+              "validationMessage": "Enter an address range in CIDR notation between /24 and /28, e.g. 10.210.156.0/28."
+            }
+          },
+          {
+            "name": "newSubnetHint",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[and(equals(steps('network').vnet.newOrExisting, 'existing'), equals(steps('network').appSubnetMode, 'new'))]",
+            "options": {
+              "icon": "Info",
+              "text": "The subnet is created in the selected virtual network with the delegation to Microsoft.Web/serverFarms and a network security group. You need permission to create subnets in that virtual network (e.g. Network Contributor). If your network requires a route table on every subnet, attach it afterwards."
+            }
+          },
+          {
+            "name": "existingSubnetHint",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[and(equals(steps('network').vnet.newOrExisting, 'existing'), equals(steps('network').appSubnetMode, 'existing'))]",
             "options": {
               "icon": "Warning",
-              "text": "Existing virtual network: the subnet for the App Service integration must be empty and delegated to Microsoft.Web/serverFarms (virtual network → Subnets → select the subnet → Subnet delegation). You need permission to join both subnets (e.g. Network Contributor on the virtual network)."
+              "text": "The existing subnet must be empty and delegated to Microsoft.Web/serverFarms (virtual network → Subnets → select the subnet → Subnet delegation)."
             }
           },
           {
@@ -199,8 +243,9 @@
       "vnetAddressPrefix": "[first(steps('network').vnet.addressPrefixes)]",
       "privateEndpointSubnetName": "[steps('network').vnet.subnets.peSubnet.name]",
       "privateEndpointSubnetPrefix": "[steps('network').vnet.subnets.peSubnet.addressPrefix]",
-      "appSubnetName": "[steps('network').vnet.subnets.appSubnet.name]",
-      "appSubnetPrefix": "[steps('network').vnet.subnets.appSubnet.addressPrefix]",
+      "appSubnetMode": "[if(equals(steps('network').vnet.newOrExisting, 'new'), 'new', steps('network').appSubnetMode)]",
+      "appSubnetName": "[steps('network').appSubnetName]",
+      "appSubnetPrefix": "[steps('network').appSubnetPrefix]",
       "privateDnsZones": "[steps('network').dnsZones]",
       "webDnsZoneId": "[steps('network').webDnsZoneId]",
       "postgresDnsZoneId": "[steps('network').postgresDnsZoneId]",

@@ -70,9 +70,11 @@ variants – pick one:
    Optionally enter your company name and a web address.
 3. **Networking** (private variant only):
    - **Virtual network:** pick an existing one or create a new one. Only networks in the selected region are listed.
-   - **Subnets:** one for the *private endpoints* (can be shared) and one for the *App Service integration*. For an
-     existing network that one must be empty and delegated to `Microsoft.Web/serverFarms`
-     (virtual network → *Subnets* → subnet → *Subnet delegation*).
+   - **Private endpoints:** pick a subnet with free addresses – it can be shared with other resources.
+   - **App Service integration subnet:** Azure requires a separate, empty subnet through which the web app reaches
+     the database. Leave *Create a new subnet* selected and enter a free address range inside the network, e.g.
+     `10.210.156.0/28` – the deployment creates it (delegated to `Microsoft.Web/serverFarms`, with a network
+     security group). Alternatively choose an existing empty, delegated subnet.
    - **Private DNS zones:** *Create new* for a network with Azure DNS; *Use existing* if your company has central
      zones (e.g. in a hub – enter the resource IDs of `privatelink.azurewebsites.net` and
      `privatelink.postgres.database.azure.com`); *None* if Azure Policy creates the DNS records.

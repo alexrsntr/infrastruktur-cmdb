@@ -59,9 +59,11 @@ Es gibt zwei Varianten – eine davon wählen:
 3. **Networking** (nur private Variante):
    - **Virtual network:** ein bestehendes VNet auswählen oder ein neues anlegen. Es werden nur VNets der gewählten
      Region angezeigt.
-   - **Subnets:** eines für die *Private Endpoints* (darf geteilt sein) und eines für die *App-Service-Integration*.
-     Bei einem bestehenden VNet muss dieses leer und an `Microsoft.Web/serverFarms` delegiert sein
-     (VNet → *Subnetze* → Subnetz → *Subnetzdelegierung*).
+   - **Private endpoints:** ein Subnetz mit freien Adressen wählen – es darf mit anderen Ressourcen geteilt sein.
+   - **App Service integration subnet:** Azure verlangt dafür ein eigenes, leeres Subnetz, über das die Web-App die
+     Datenbank erreicht. *Create a new subnet* ausgewählt lassen und einen freien Adressbereich im VNet eintragen,
+     z. B. `10.210.156.0/28` – die Bereitstellung legt es an (delegiert an `Microsoft.Web/serverFarms`, mit
+     Netzwerksicherheitsgruppe). Alternativ ein vorhandenes leeres, delegiertes Subnetz auswählen.
    - **Private DNS zones:** *Create new* bei einem VNet mit Azure-DNS; *Use existing*, wenn es zentrale Zonen gibt
      (z. B. im Hub – dann die Ressourcen-IDs von `privatelink.azurewebsites.net` und
      `privatelink.postgres.database.azure.com` eintragen); *None*, wenn eine Azure Policy die DNS-Einträge anlegt.

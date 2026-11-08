@@ -31,7 +31,10 @@
     "vnetNewOrExisting": {
       "type": "string",
       "defaultValue": "new",
-      "allowedValues": ["new", "existing"],
+      "allowedValues": [
+        "new",
+        "existing"
+      ],
       "metadata": {
         "description": "Create a new virtual network or use an existing one."
       }
@@ -71,24 +74,39 @@
         "description": "Address range of the private endpoint subnet (new virtual network only)."
       }
     },
+    "appSubnetMode": {
+      "type": "string",
+      "defaultValue": "new",
+      "allowedValues": [
+        "new",
+        "existing"
+      ],
+      "metadata": {
+        "description": "new = create the App Service integration subnet (delegated, with a network security group) in the virtual network; existing = use an existing empty subnet delegated to Microsoft.Web/serverFarms."
+      }
+    },
     "appSubnetName": {
       "type": "string",
-      "defaultValue": "snet-app",
+      "defaultValue": "snet-cmdb-app-integration",
       "metadata": {
-        "description": "Subnet for the App Service VNet integration (outbound). Existing subnets must be empty and delegated to Microsoft.Web/serverFarms."
+        "description": "Name of the App Service integration subnet (outbound traffic of the web app). A new subnet must not exist yet."
       }
     },
     "appSubnetPrefix": {
       "type": "string",
       "defaultValue": "10.20.0.32/27",
       "metadata": {
-        "description": "Address range of the App Service integration subnet (new virtual network only)."
+        "description": "Address range of a new App Service integration subnet: free, inside the address space of the virtual network, /24 to /28."
       }
     },
     "privateDnsZones": {
       "type": "string",
       "defaultValue": "new",
-      "allowedValues": ["new", "existing", "none"],
+      "allowedValues": [
+        "new",
+        "existing",
+        "none"
+      ],
       "metadata": {
         "description": "new = create the private DNS zones and link them to the virtual network; existing = register the endpoints in existing zones (e.g. central hub); none = DNS is handled elsewhere (e.g. Azure Policy)."
       }
@@ -162,9 +180,23 @@
     "postgresZoneId": "[if(variables('newDnsZones'), resourceId('Microsoft.Network/privateDnsZones', variables('postgresZoneName')), parameters('postgresDnsZoneId'))]",
     "vnetLinkName": "[concat('link-', parameters('vnetName'), '-', uniqueString(variables('vnetId')))]",
     "postgresEndpointName": "[concat('pe-', variables('dbServerName'))]",
-    "webEndpointName": "[concat('pe-', variables('appName'))]"
+    "webEndpointName": "[concat('pe-', variables('appName'))]",
+    "createAppSubnetInExistingVnet": "[and(not(variables('newVnet')), equals(parameters('appSubnetMode'), 'new'))]",
+    "createNsg": "[or(variables('newVnet'), variables('createAppSubnetInExistingVnet'))]",
+    "nsgName": "[concat('nsg-', variables('appName'), '-integration')]",
+    "appSubnetDeploymentName": "[concat('cmdb-app-subnet-', uniqueString(variables('appSubnetId')))]"
   },
   "resources": [
+    {
+      "condition": "[variables('createNsg')]",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2023-11-01",
+      "name": "[variables('nsgName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "securityRules": []
+      }
+    },
     {
       "condition": "[variables('newVnet')]",
       "type": "Microsoft.Network/virtualNetworks",
@@ -173,7 +205,9 @@
       "location": "[parameters('location')]",
       "properties": {
         "addressSpace": {
-          "addressPrefixes": ["[parameters('vnetAddressPrefix')]"]
+          "addressPrefixes": [
+            "[parameters('vnetAddressPrefix')]"
+          ]
         },
         "subnets": [
           {
@@ -194,10 +228,85 @@
                     "serviceName": "Microsoft.Web/serverFarms"
                   }
                 }
-              ]
+              ],
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgName'))]"
+              }
             }
           }
         ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgName'))]"
+      ]
+    },
+    {
+      "condition": "[variables('createAppSubnetInExistingVnet')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[variables('appSubnetDeploymentName')]",
+      "resourceGroup": "[variables('vnetResourceGroup')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgName'))]"
+      ],
+      "properties": {
+        "mode": "Incremental",
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "parameters": {
+          "vnetName": {
+            "value": "[parameters('vnetName')]"
+          },
+          "subnetName": {
+            "value": "[parameters('appSubnetName')]"
+          },
+          "addressPrefix": {
+            "value": "[parameters('appSubnetPrefix')]"
+          },
+          "nsgId": {
+            "value": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgName'))]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "parameters": {
+            "vnetName": {
+              "type": "string"
+            },
+            "subnetName": {
+              "type": "string"
+            },
+            "addressPrefix": {
+              "type": "string"
+            },
+            "nsgId": {
+              "type": "string"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Network/virtualNetworks/subnets",
+              "apiVersion": "2023-11-01",
+              "name": "[concat(parameters('vnetName'), '/', parameters('subnetName'))]",
+              "properties": {
+                "addressPrefix": "[parameters('addressPrefix')]",
+                "networkSecurityGroup": {
+                  "id": "[parameters('nsgId')]"
+                },
+                "delegations": [
+                  {
+                    "name": "app-service",
+                    "properties": {
+                      "serviceName": "Microsoft.Web/serverFarms"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
       }
     },
     {
@@ -310,7 +419,9 @@
             "name": "postgres",
             "properties": {
               "privateLinkServiceId": "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', variables('dbServerName'))]",
-              "groupIds": ["postgresqlServer"]
+              "groupIds": [
+                "postgresqlServer"
+              ]
             }
           }
         ]
@@ -359,6 +470,7 @@
       "dependsOn": [
         "[resourceId('Microsoft.Web/serverfarms', variables('planName'))]",
         "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName'))]",
+        "[variables('appSubnetDeploymentName')]",
         "[resourceId('Microsoft.Network/privateEndpoints', variables('postgresEndpointName'))]",
         "[resourceId('Microsoft.Network/privateEndpoints/privateDnsZoneGroups', variables('postgresEndpointName'), 'default')]"
       ],
@@ -378,23 +490,74 @@
           "http20Enabled": true,
           "vnetRouteAllEnabled": "[parameters('routeAllTraffic')]",
           "appSettings": [
-            { "name": "WEBSITES_PORT", "value": "3000" },
-            { "name": "WEBSITES_ENABLE_APP_SERVICE_STORAGE", "value": "false" },
-            { "name": "DOCKER_REGISTRY_SERVER_URL", "value": "https://ghcr.io" },
-            { "name": "NODE_ENV", "value": "production" },
-            { "name": "AUTH_MODE", "value": "local" },
-            { "name": "APP_BASE_URL", "value": "[concat('https://', variables('appName'), '.azurewebsites.net')]" },
-            { "name": "SESSION_SECRET", "value": "[parameters('sessionSecret')]" },
-            { "name": "SETTINGS_ENCRYPTION_KEY", "value": "[parameters('settingsEncryptionKey')]" },
-            { "name": "DB_AUTH", "value": "password" },
-            { "name": "PGHOST", "value": "[reference(resourceId('Microsoft.DBforPostgreSQL/flexibleServers', variables('dbServerName')), '2024-08-01').fullyQualifiedDomainName]" },
-            { "name": "PGPORT", "value": "5432" },
-            { "name": "PGDATABASE", "value": "[variables('dbName')]" },
-            { "name": "PGUSER", "value": "[variables('dbUser')]" },
-            { "name": "PGPASSWORD", "value": "[parameters('databasePassword')]" },
-            { "name": "PGSSLMODE", "value": "require" },
-            { "name": "STORAGE_DRIVER", "value": "database" },
-            { "name": "BRAND_NAME", "value": "[parameters('brandName')]" }
+            {
+              "name": "WEBSITES_PORT",
+              "value": "3000"
+            },
+            {
+              "name": "WEBSITES_ENABLE_APP_SERVICE_STORAGE",
+              "value": "false"
+            },
+            {
+              "name": "DOCKER_REGISTRY_SERVER_URL",
+              "value": "https://ghcr.io"
+            },
+            {
+              "name": "NODE_ENV",
+              "value": "production"
+            },
+            {
+              "name": "AUTH_MODE",
+              "value": "local"
+            },
+            {
+              "name": "APP_BASE_URL",
+              "value": "[concat('https://', variables('appName'), '.azurewebsites.net')]"
+            },
+            {
+              "name": "SESSION_SECRET",
+              "value": "[parameters('sessionSecret')]"
+            },
+            {
+              "name": "SETTINGS_ENCRYPTION_KEY",
+              "value": "[parameters('settingsEncryptionKey')]"
+            },
+            {
+              "name": "DB_AUTH",
+              "value": "password"
+            },
+            {
+              "name": "PGHOST",
+              "value": "[reference(resourceId('Microsoft.DBforPostgreSQL/flexibleServers', variables('dbServerName')), '2024-08-01').fullyQualifiedDomainName]"
+            },
+            {
+              "name": "PGPORT",
+              "value": "5432"
+            },
+            {
+              "name": "PGDATABASE",
+              "value": "[variables('dbName')]"
+            },
+            {
+              "name": "PGUSER",
+              "value": "[variables('dbUser')]"
+            },
+            {
+              "name": "PGPASSWORD",
+              "value": "[parameters('databasePassword')]"
+            },
+            {
+              "name": "PGSSLMODE",
+              "value": "require"
+            },
+            {
+              "name": "STORAGE_DRIVER",
+              "value": "database"
+            },
+            {
+              "name": "BRAND_NAME",
+              "value": "[parameters('brandName')]"
+            }
           ]
         }
       }
@@ -417,7 +580,9 @@
             "name": "web",
             "properties": {
               "privateLinkServiceId": "[resourceId('Microsoft.Web/sites', variables('appName'))]",
-              "groupIds": ["sites"]
+              "groupIds": [
+                "sites"
+              ]
             }
           }
         ]
