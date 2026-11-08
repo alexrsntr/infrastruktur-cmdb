@@ -1,0 +1,172 @@
+name: Terraform
+
+# Infrastructure in infra/terraform (remote state: backend.tf, inputs: terraform.tfvars).
+#   pull request -> fmt/validate + speculative plan (job summary)
+#   main         -> fmt/validate + plan, then apply after approval (environment "production")
+#
+# Required secrets (repository or environment level):
+#   TF_AZURE_CLIENT_ID       client ID of the Terraform app registration (OIDC federated credentials for
+#                            repo:<org>/<repo>:ref:refs/heads/main, :environment:production and :pull_request)
+#   TF_PLAN_AZURE_CLIENT_ID  optional read-only identity used for pull request plans (recommended)
+#   AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+
+on:
+  pull_request:
+    paths:
+      - "infra/terraform/**"
+      - ".github/workflows/terraform.yml"
+  push:
+    branches: [main]
+    paths:
+      - "infra/terraform/**"
+      - ".github/workflows/terraform.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || 'production' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  TF_VERSION: "1.17.1"
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  ARM_USE_OIDC: "true" # azurerm + azuread providers and the azurerm backend
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+defaults:
+  run:
+    working-directory: infra/terraform
+
+jobs:
+  validate:
+    name: fmt & validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: terraform fmt
+        run: terraform fmt -check -recursive -diff
+
+      - name: terraform init (no backend)
+        run: terraform init -backend=false
+
+      - name: terraform validate
+        run: terraform validate -no-color
+
+  plan:
+    name: Plan
+    needs: validate
+    # Secrets / OIDC are not available to fork or Dependabot pull requests.
+    # Skipped until Azure is set up: set the repository variable TERRAFORM_ENABLED=true (see docs/AZURE.md).
+    if: >-
+      vars.TERRAFORM_ENABLED == 'true' &&
+      (github.event_name != 'pull_request' ||
+      (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      # Pull requests use the read-only identity when configured (PR code is not reviewed yet).
+      ARM_CLIENT_ID: ${{ (github.event_name == 'pull_request' && secrets.TF_PLAN_AZURE_CLIENT_ID) || secrets.TF_AZURE_CLIENT_ID }}
+      LOCK_FLAG: ${{ github.event_name == 'pull_request' && '-lock=false' || '' }}
+    outputs:
+      exitcode: ${{ steps.plan.outputs.exitcode }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: terraform init
+        run: |
+          test -f backend.tf || { echo "::error::infra/terraform/backend.tf is missing (copy backend.tf.example, see docs/AZURE.md)"; exit 1; }
+          test -f terraform.tfvars || { echo "::error::infra/terraform/terraform.tfvars is missing (copy terraform.tfvars.example)"; exit 1; }
+          terraform init
+
+      - name: terraform plan
+        id: plan
+        run: |
+          set +e
+          terraform plan -detailed-exitcode -no-color -out=tfplan $LOCK_FLAG
+          ec=$?
+          set -e
+          echo "exitcode=$ec" >> "$GITHUB_OUTPUT"
+          [ "$ec" -ne 1 ]
+
+      - name: Plan summary
+        if: steps.plan.outcome == 'success'
+        env:
+          EXITCODE: ${{ steps.plan.outputs.exitcode }}
+        run: |
+          terraform show -no-color tfplan > plan.txt
+          {
+            echo "### Terraform plan (${GITHUB_EVENT_NAME}, ${GITHUB_SHA::7})"
+            if [ "$EXITCODE" = "0" ]; then
+              echo "No changes – infrastructure matches the configuration."
+            else
+              echo "**$(grep -E '^Plan:' plan.txt || echo 'Changes detected')**"
+              if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
+                echo
+                echo "Review this plan before approving the **apply** job (environment \`production\`)."
+              fi
+            fi
+            echo
+            echo "<details><summary>Full plan output</summary>"
+            echo
+            echo '```'
+            head -c 900000 plan.txt
+            echo '```'
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  apply:
+    name: Apply
+    needs: plan
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && needs.plan.outputs.exitcode == '2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production # configure required reviewers on this environment
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ARM_CLIENT_ID: ${{ secrets.TF_AZURE_CLIENT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: terraform init
+        run: terraform init
+
+      # Plan files contain secrets, so they are not passed between jobs as artifacts:
+      # the approved commit is planned again here and exactly that plan is applied.
+      - name: terraform plan
+        run: |
+          terraform plan -no-color -out=tfplan
+          {
+            echo "### Applied plan (${GITHUB_SHA::7})"
+            echo '```'
+            terraform show -no-color tfplan | grep -E '^\s*# |^Plan:' | head -c 200000
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: terraform apply
+        run: terraform apply -no-color tfplan

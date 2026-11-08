@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_call: # reused by deploy.yml as a gate before deploying
+
+permissions:
+  contents: read
+
+concurrency:
+  # github.workflow differs when called from deploy.yml, so the runs never block each other
+  group: ${{ github.workflow }}-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    name: Typecheck, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: cmdb
+          POSTGRES_PASSWORD: cmdb
+          POSTGRES_DB: cmdb_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cmdb -d cmdb_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      # The tests drop and re-create schema "public" of this database.
+      TEST_DATABASE_URL: postgres://cmdb:cmdb@localhost:5432/cmdb_test
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build

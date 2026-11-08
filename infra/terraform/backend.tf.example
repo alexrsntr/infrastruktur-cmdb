@@ -1,0 +1,19 @@
+# Remote state in Azure Blob Storage with Entra ID (no storage account keys).
+#
+# Copy to backend.tf, fill in the names from the bootstrap step (docs/AZURE.md) and
+# commit it – it contains no secrets. Every principal that runs Terraform needs
+# "Storage Blob Data Contributor" on the container (read-only plan identities:
+# "Storage Blob Data Reader" + `terraform plan -lock=false`).
+#
+# Authentication: Azure CLI locally; in GitHub Actions ARM_USE_OIDC=true plus
+# ARM_CLIENT_ID / ARM_TENANT_ID / ARM_SUBSCRIPTION_ID (see .github/workflows/terraform.yml).
+
+terraform {
+  backend "azurerm" {
+    resource_group_name  = "rg-infracmdb-tfstate"
+    storage_account_name = "stinfracmdbtfstate001" # globally unique, 3-24 lowercase letters/digits
+    container_name       = "tfstate"
+    key                  = "infrastruktur-cmdb/prod.tfstate"
+    use_azuread_auth     = true
+  }
+}

@@ -1,0 +1,18 @@
+# Local Terraform working data (providers, modules, backend config)
+.terraform/
+# State is remote (backend.tf); never commit local state or plan files – they contain secrets
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+plan.txt
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+# terraform.tfvars and backend.tf contain no secrets and are meant to be committed.
+# .terraform.lock.hcl pins provider versions/checksums and must be committed.

@@ -1,0 +1,150 @@
+name: Deploy
+
+# Builds the app once and zip-deploys it to Azure App Service (run-from-package).
+# Infrastructure and app settings are managed by Terraform (terraform.yml), not here.
+#
+# Required (environment "production" or repository level):
+#   secrets  AZURE_CLIENT_ID        client ID of the deployment app registration (OIDC, "Website Contributor")
+#            AZURE_TENANT_ID
+#            AZURE_SUBSCRIPTION_ID
+#   vars     AZURE_WEBAPP_NAME      terraform output github_variables
+#            AZURE_RESOURCE_GROUP
+#            AZURE_WEBAPP_URL       optional, e.g. custom domain (default: webapp-url of the deploy step)
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "infra/**"
+      - "docs/**"
+      - "**/*.md"
+      - ".github/workflows/terraform.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    name: Build package
+    needs: ci
+    # Skipped until the target web app is configured (repository variable AZURE_WEBAPP_NAME, see docs/AZURE.md)
+    if: vars.AZURE_WEBAPP_NAME != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Assemble deployment package
+        # Runtime needs only dist/ (server bundle + SPA) and the production dependencies
+        # (the frontend libraries are bundled by Vite, the server bundle keeps deps external).
+        run: |
+          set -euo pipefail
+          mkdir -p staging
+          cp -r dist package.json package-lock.json staging/
+          cd staging
+          npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+          test -f dist/server.mjs && test -f dist/public/index.html
+          zip -qr ../deploy.zip dist node_modules package.json package-lock.json
+          cd ..
+          echo "Package size: $(du -h deploy.zip | cut -f1)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-package
+          path: deploy.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  deploy:
+    name: Deploy to App Service
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: ${{ vars.AZURE_WEBAPP_URL || steps.deploy.outputs.webapp-url }}
+    permissions:
+      id-token: write # OIDC token for azure/login
+      contents: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: app-package
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy
+        id: deploy
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          resource-group-name: ${{ vars.AZURE_RESOURCE_GROUP }}
+          package: deploy.zip
+
+      - name: Smoke test
+        env:
+          BASE_URL: ${{ vars.AZURE_WEBAPP_URL || steps.deploy.outputs.webapp-url }}
+        run: |
+          set -uo pipefail
+          base="${BASE_URL%/}"
+          probe() { # <path> <attempts>
+            local code
+            for i in $(seq 1 "$2"); do
+              code=$(curl -s -o /tmp/probe.out -w '%{http_code}' --max-time 10 "$base$1" || true)
+              if [ "$code" = "200" ]; then echo "$1 -> 200 $(cat /tmp/probe.out)"; return 0; fi
+              echo "$1 attempt $i/$2: HTTP $code – retrying in 10 s"
+              sleep 10
+            done
+            echo "::error::$base$1 did not return 200 (last: HTTP $code, body: $(head -c 300 /tmp/probe.out 2>/dev/null))"
+            return 1
+          }
+          probe /healthz 30   # process is up (startup includes DB migrations)
+          probe /readyz 6     # database reachable with the managed identity
+
+      - name: Check Key Vault references
+        # An unresolved reference is passed to the app as the literal "@Microsoft.KeyVault(...)"
+        # string, which would silently become the session secret. Fail loudly instead.
+        env:
+          APP: ${{ vars.AZURE_WEBAPP_NAME }}
+          RG: ${{ vars.AZURE_RESOURCE_GROUP }}
+        run: |
+          set -euo pipefail
+          sub=$(az account show --query id -o tsv)
+          refs=$(az rest --method get \
+            --url "/subscriptions/$sub/resourceGroups/$RG/providers/Microsoft.Web/sites/$APP/config/configreferences/appsettings?api-version=2024-04-01" \
+            --query "value[].{setting:name, status:properties.status, details:properties.details}" -o json)
+          echo "$refs" | jq -r '.[] | "\(.setting): \(.status)"'
+          bad=$(echo "$refs" | jq '[.[] | select(.status != "Resolved")] | length')
+          if [ "$bad" != "0" ]; then
+            echo "$refs" | jq -r '.[] | select(.status != "Resolved") | "::error::Key Vault reference \(.setting): \(.status) – \(.details // "")"'
+            echo "Fix the cause (identity/role/secret), then restart the app: az webapp restart -g $RG -n $APP"
+            exit 1
+          fi

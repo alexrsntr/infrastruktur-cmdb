@@ -1,0 +1,408 @@
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Alert,
+  App,
+  Badge,
+  Button,
+  Card,
+  Form,
+  Input,
+  Modal,
+  Result,
+  Select,
+  Space,
+  Switch,
+  Table,
+  Tag,
+  Tooltip,
+  Typography,
+} from 'antd';
+import { CheckOutlined, EditOutlined, UserAddOutlined, FileExcelOutlined } from '@ant-design/icons';
+import {
+  PERMISSIONS,
+  ROLES,
+  ROLE_META,
+  ROLE_PERMISSIONS,
+  type AppUser,
+  type Permission,
+  type Role,
+} from '../../../../shared/model';
+import { errorText, http } from '../../lib/api';
+import { fmtDateTime, fromNow } from '../../lib/format';
+import { useInvalidate, usePlants, useUsers } from '../../lib/queries';
+import { useSession } from '../../lib/session';
+import { PageHeader } from '../../components/PageHeader';
+import { download, exportUrl, MoreMenu } from '../../components/PageParts';
+import { RoleTag } from '../../components/Tags';
+
+const PERMISSION_LABELS: Record<Permission, string> = {
+  read: 'Read',
+  export: 'Export',
+  'note.write': 'Write notes',
+  'activity.write': 'Manage activities',
+  'asset.status': 'Change asset status',
+  'asset.write': 'Create / edit assets',
+  'asset.delete': 'Delete assets',
+  'location.write': 'Manage locations & floor plans',
+  'location.delete': 'Delete plants',
+  import: 'Import',
+  'audit.read': 'Audit log',
+  'user.manage': 'User management',
+  'settings.manage': 'Settings & e-mail notifications',
+  'attachment.write': 'Upload files & photos',
+};
+
+const roleOptions = ROLES.map((r) => ({ value: r, label: ROLE_META[r].label }));
+
+function PlantScopeTags({ scope, plantCodes }: { scope: string[]; plantCodes: Map<string, string> }) {
+  if (!scope.length) return <Typography.Text type="secondary">All plants</Typography.Text>;
+  return (
+    <Space size={[4, 4]} wrap>
+      {scope.map((id) => (
+        <Tag key={id} color="gold" style={{ marginInlineEnd: 0 }}>
+          {plantCodes.get(id) ?? 'unknown'}
+        </Tag>
+      ))}
+    </Space>
+  );
+}
+
+interface EditValues {
+  role: Role;
+  plant_scope: string[];
+  active: boolean;
+}
+
+function EditUserModal({ user, onClose }: { user: AppUser | null; onClose: () => void }) {
+  const [form] = Form.useForm<EditValues>();
+  const { message } = App.useApp();
+  const { me } = useSession();
+  const plants = usePlants();
+  const invalidate = useInvalidate();
+  const [saving, setSaving] = useState(false);
+  const role = Form.useWatch('role', form);
+
+  useEffect(() => {
+    if (user) form.setFieldsValue({ role: user.role, plant_scope: user.plant_scope ?? [], active: user.active });
+  }, [user, form]);
+
+  const submit = async () => {
+    if (!user) return;
+    const v = await form.validateFields();
+    setSaving(true);
+    try {
+      await http.put(`/api/users/${user.id}`, { role: v.role, plant_scope: v.plant_scope ?? [], active: v.active });
+      message.success('User updated');
+      await invalidate();
+      onClose();
+    } catch (e) {
+      message.error(errorText(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const isSelf = user?.id === me.user.id;
+  const entraManaged = user?.role_source === 'entra';
+
+  return (
+    <Modal open={!!user} title={user ? `Edit ${user.display_name}` : ''} onCancel={onClose} onOk={submit} okText="Save" confirmLoading={saving} destroyOnHidden width={560}>
+      {user && (
+        <Form form={form} layout="vertical">
+          <Typography.Paragraph type="secondary" style={{ marginTop: -4 }}>
+            {user.email ?? 'no e-mail'} {user.oid ? '' : '· not signed in yet'}
+          </Typography.Paragraph>
+          <Form.Item
+            name="role"
+            label="Role"
+            extra={
+              entraManaged
+                ? 'This role is assigned via an Entra ID app role and is updated at every sign-in. Change it in the Entra admin center (Enterprise applications → Users and groups).'
+                : role
+                  ? ROLE_META[role as Role]?.description
+                  : undefined
+            }
+          >
+            <Select options={roleOptions} disabled={entraManaged || isSelf} />
+          </Form.Item>
+          <Form.Item
+            name="plant_scope"
+            label="Plant scope"
+            extra={role === 'admin' ? 'Administrators always see all plants.' : 'Leave empty to grant access to all plants.'}
+          >
+            <Select
+              mode="multiple"
+              allowClear
+              optionFilterProp="label"
+              placeholder="All plants"
+              disabled={role === 'admin'}
+              options={(plants.data ?? []).map((p) => ({ value: p.id, label: `${p.code} – ${p.name}` }))}
+            />
+          </Form.Item>
+          <Form.Item
+            name="active"
+            label="Active"
+            valuePropName="checked"
+            extra={isSelf ? 'You cannot deactivate yourself.' : 'Deactivated users are signed out immediately and cannot sign in.'}
+          >
+            <Switch disabled={isSelf} />
+          </Form.Item>
+        </Form>
+      )}
+    </Modal>
+  );
+}
+
+interface CreateValues {
+  email: string;
+  display_name: string;
+  role: Role;
+  plant_scope: string[];
+}
+
+function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [form] = Form.useForm<CreateValues>();
+  const { message } = App.useApp();
+  const plants = usePlants();
+  const invalidate = useInvalidate();
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) form.setFieldsValue({ email: '', display_name: '', role: 'viewer', plant_scope: [] });
+  }, [open, form]);
+
+  const submit = async () => {
+    const v = await form.validateFields();
+    setSaving(true);
+    try {
+      await http.post('/api/users', { ...v, plant_scope: v.plant_scope ?? [] });
+      message.success('User pre-provisioned');
+      await invalidate();
+      onClose();
+    } catch (e) {
+      message.error(errorText(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal open={open} title="Pre-provision user" onCancel={onClose} onOk={submit} okText="Create" confirmLoading={saving} destroyOnHidden width={560}>
+      <Typography.Paragraph type="secondary">
+        Create a user before the first sign-in to assign a role and plant scope in advance. The account is linked automatically when the person signs
+        in with this e-mail address (UPN). An Entra ID app role, if assigned, takes precedence over the role set here.
+      </Typography.Paragraph>
+      <Form form={form} layout="vertical" requiredMark="optional">
+        <Form.Item name="email" label="E-mail / UPN" rules={[{ required: true, type: 'email', message: 'Enter a valid e-mail address' }]}>
+          <Input placeholder="firstname.lastname@company.com" />
+        </Form.Item>
+        <Form.Item name="display_name" label="Display name" rules={[{ required: true, whitespace: true }]}>
+          <Input />
+        </Form.Item>
+        <Form.Item name="role" label="Role" rules={[{ required: true }]}>
+          <Select options={roleOptions} />
+        </Form.Item>
+        <Form.Item name="plant_scope" label="Plant scope" extra="Leave empty to grant access to all plants.">
+          <Select
+            mode="multiple"
+            allowClear
+            optionFilterProp="label"
+            placeholder="All plants"
+            options={(plants.data ?? []).map((p) => ({ value: p.id, label: `${p.code} – ${p.name}` }))}
+          />
+        </Form.Item>
+      </Form>
+    </Modal>
+  );
+}
+
+function PermissionMatrix() {
+  const rows = PERMISSIONS.map((p) => ({ key: p, permission: p }));
+  return (
+    <Table
+      pagination={false}
+      dataSource={rows}
+      scroll={{ x: 560 }}
+      columns={[
+        { title: 'Permission', dataIndex: 'permission', render: (p: Permission) => PERMISSION_LABELS[p] },
+        ...ROLES.map((r) => ({
+          title: <RoleTag role={r} />,
+          key: r,
+          width: 120,
+          align: 'center' as const,
+          render: (_: unknown, row: { permission: Permission }) =>
+            ROLE_PERMISSIONS[r].includes(row.permission) ? <CheckOutlined style={{ color: '#389e0d' }} /> : <span className="muted">–</span>,
+        })),
+      ]}
+    />
+  );
+}
+
+export function UsersPage() {
+  const { can, me } = useSession();
+  const allowed = can('user.manage');
+  const users = useUsers(allowed);
+  const plants = usePlants();
+  const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState<Role | undefined>();
+  const [editing, setEditing] = useState<AppUser | null>(null);
+  const [creating, setCreating] = useState(false);
+
+  const plantCodes = useMemo(() => new Map((plants.data ?? []).map((p) => [p.id, p.code])), [plants.data]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return (users.data ?? []).filter(
+      (u) =>
+        (!roleFilter || u.role === roleFilter) &&
+        (!q || u.display_name.toLowerCase().includes(q) || (u.email ?? '').toLowerCase().includes(q)),
+    );
+  }, [users.data, search, roleFilter]);
+
+  if (!allowed) {
+    return <Result status="403" title="No access" subTitle="User management is restricted to administrators." />;
+  }
+
+  return (
+    <div>
+      <PageHeader
+        title="Users & permissions"
+        subtitle="Roles, plant scope and account status of everyone who has signed in to the CMDB."
+        crumbs={[{ title: 'Administration' }, { title: 'Users & permissions' }]}
+        extra={
+          <>
+            <Button type="primary" size="large" icon={<UserAddOutlined />} onClick={() => setCreating(true)}>
+              Add user
+            </Button>
+            <MoreMenu
+              items={[
+                { key: 'xlsx', icon: <FileExcelOutlined />, label: 'Export users (Excel)', onClick: () => download(exportUrl('users', 'xlsx')) },
+                { key: 'csv', icon: <FileExcelOutlined />, label: 'Export users (CSV)', onClick: () => download(exportUrl('users', 'csv')) },
+              ]}
+            />
+          </>
+        }
+      />
+
+      <Alert
+        type="info"
+        showIcon
+        style={{ marginBottom: 16 }}
+        title="How permissions work"
+        description={
+          <>
+            Roles normally come from <strong>Entra ID app roles</strong> (CMDB.Admin, CMDB.Editor, CMDB.Operator, CMDB.Viewer), assigned in the Entra
+            admin center under <em>Enterprise applications → Users and groups</em>, and are refreshed at every sign-in. Users without an app role
+            receive the default role and can be managed here. The <strong>plant scope</strong> is always managed here – an empty scope means access
+            to all plants.
+          </>
+        }
+      />
+
+      <Card style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+          <Input.Search allowClear size="large" placeholder="Search name or e-mail" value={search} onChange={(e) => setSearch(e.target.value)} style={{ width: 320 }} />
+          <Select allowClear size="large" placeholder="All roles" style={{ width: 200 }} value={roleFilter} onChange={setRoleFilter} options={roleOptions} />
+          <div style={{ flex: 1 }} />
+          <Typography.Text type="secondary" style={{ alignSelf: 'center' }}>
+            {filtered.length} of {users.data?.length ?? 0} users
+          </Typography.Text>
+        </div>
+        <Table<AppUser>
+          rowKey="id"
+          loading={users.isLoading}
+          dataSource={filtered}
+          pagination={{ pageSize: 50, hideOnSinglePage: true }}
+          scroll={{ x: 900 }}
+          columns={[
+            {
+              title: 'User',
+              key: 'user',
+              sorter: (a, b) => a.display_name.localeCompare(b.display_name),
+              render: (_, u) => (
+                <div>
+                  <Typography.Text strong>{u.display_name}</Typography.Text>
+                  {u.id === me.user.id && <Tag style={{ marginLeft: 6 }}>you</Tag>}
+                  <div>
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      {u.email ?? '–'}
+                    </Typography.Text>
+                  </div>
+                </div>
+              ),
+            },
+            {
+              title: 'Role',
+              key: 'role',
+              width: 220,
+              sorter: (a, b) => ROLES.indexOf(a.role) - ROLES.indexOf(b.role),
+              render: (_, u) => (
+                <Space size={4}>
+                  <RoleTag role={u.role} />
+                  {u.role_source === 'entra' ? (
+                    <Tooltip title="Assigned via Entra ID app role">
+                      <Tag color="blue" variant="filled">
+                        Entra ID
+                      </Tag>
+                    </Tooltip>
+                  ) : (
+                    <Tag variant="filled">local</Tag>
+                  )}
+                </Space>
+              ),
+            },
+            {
+              title: 'Plant scope',
+              key: 'scope',
+              width: 220,
+              render: (_, u) => (u.role === 'admin' ? <Typography.Text type="secondary">All plants</Typography.Text> : <PlantScopeTags scope={u.plant_scope} plantCodes={plantCodes} />),
+            },
+            {
+              title: 'Status',
+              key: 'active',
+              width: 130,
+              filters: [
+                { text: 'Active', value: true },
+                { text: 'Deactivated', value: false },
+              ],
+              onFilter: (v, u) => u.active === v,
+              render: (_, u) =>
+                u.active ? (
+                  u.oid ? <Badge status="success" text="Active" /> : <Badge status="processing" text="Pre-provisioned" />
+                ) : (
+                  <Badge status="default" text="Deactivated" />
+                ),
+            },
+            {
+              title: 'Last sign-in',
+              dataIndex: 'last_login_at',
+              width: 150,
+              sorter: (a, b) => (a.last_login_at ?? '').localeCompare(b.last_login_at ?? ''),
+              render: (v: string | null) =>
+                v ? (
+                  <Tooltip title={fmtDateTime(v)}>
+                    <span>{fromNow(v)}</span>
+                  </Tooltip>
+                ) : (
+                  <span className="muted">never</span>
+                ),
+            },
+            {
+              title: '',
+              key: 'actions',
+              width: 60,
+              render: (_, u) => <Button type="text" icon={<EditOutlined />} onClick={() => setEditing(u)} aria-label="Edit user" />,
+            },
+          ]}
+        />
+      </Card>
+
+      <Card title="Role permissions">
+        <PermissionMatrix />
+      </Card>
+
+      <EditUserModal user={editing} onClose={() => setEditing(null)} />
+      <CreateUserModal open={creating} onClose={() => setCreating(false)} />
+    </div>
+  );
+}
