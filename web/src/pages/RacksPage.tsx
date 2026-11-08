@@ -61,7 +61,7 @@ export function RacksPage() {
 
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={24} sm={8}>
-          <StatTile icon={<HddOutlined />} value={racks.isLoading ? '–' : totals.racks} label="Racks" color="#3d4652" />
+          <StatTile icon={<HddOutlined />} value={racks.isLoading ? '–' : totals.racks} label="Racks" color="#5b6b7c" />
         </Col>
         <Col xs={12} sm={8}>
           <StatTile icon={<VerticalAlignMiddleOutlined />} value={racks.isLoading ? '–' : `${totals.free} U`} label="Free space" color="#1e9e5a" />

@@ -28,6 +28,7 @@ import { useAddDevice } from '../components/AddDeviceWizard';
 import { ApiError, errorText, http } from '../lib/api';
 import { useInvalidate, usePlans, usePlant, useRacks } from '../lib/queries';
 import { useSession } from '../lib/session';
+import { tintBg, tintFg } from '../lib/palette';
 
 interface DatacenterSummary {
   id: string;
@@ -52,7 +53,7 @@ function BuildingCard({ b, racks, onOpen }: { b: Building; racks: number; onOpen
   return (
     <Card hoverable onClick={onOpen} styles={{ body: { padding: 18 } }} style={{ height: '100%' }}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-        <span className="stat-icon" style={{ background: '#127a7a18', color: '#127a7a', width: 46, height: 46, fontSize: 20 }}>
+        <span className="stat-icon" style={{ background: tintBg('#127a7a'), color: tintFg('#127a7a'), width: 46, height: 46, fontSize: 20 }}>
           <ClusterOutlined />
         </span>
         <div style={{ minWidth: 0 }}>
@@ -60,7 +61,7 @@ function BuildingCard({ b, racks, onOpen }: { b: Building; racks: number; onOpen
           <Typography.Text type="secondary">{b.code}</Typography.Text>
         </div>
       </div>
-      <div style={{ display: 'flex', gap: 18, marginTop: 14, color: '#4a5a6c', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 18, marginTop: 14, color: 'var(--cmdb-text-2)', flexWrap: 'wrap' }}>
         <span>
           <strong>{b.asset_count ?? 0}</strong> {plural(b.asset_count ?? 0, 'device')}
         </span>
@@ -183,7 +184,7 @@ export function PlantPage() {
                   <Col key={dc.id} xs={24} md={12}>
                     <Card hoverable onClick={() => navigate(`/datacenters/${dc.id}`)} styles={{ body: { padding: 18 } }} style={{ height: '100%' }}>
                       <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 10 }}>
-                        <span className="stat-icon" style={{ background: '#6b35b518', color: '#6b35b5', width: 46, height: 46, fontSize: 20 }}>
+                        <span className="stat-icon" style={{ background: tintBg('#6b35b5'), color: tintFg('#6b35b5'), width: 46, height: 46, fontSize: 20 }}>
                           <DatabaseOutlined />
                         </span>
                         <div>
@@ -192,7 +193,7 @@ export function PlantPage() {
                         </div>
                       </div>
                       {dc.sites.map((s) => (
-                        <div key={s.id} style={{ color: '#4a5a6c' }}>
+                        <div key={s.id} style={{ color: 'var(--cmdb-text-2)' }}>
                           <strong>{s.name}</strong> · {s.building_name}
                           {s.room ? ` · ${s.room}` : ''}
                         </div>
@@ -239,7 +240,7 @@ export function PlantPage() {
         title={label}
         crumbs={[{ title: 'Plants', to: '/plants' }, { title: p.code }]}
         icon={
-          <span className="stat-icon" style={{ background: '#2563eb18', color: '#2563eb', width: 60, height: 60, fontSize: 28 }}>
+          <span className="stat-icon" style={{ background: tintBg('#2563eb'), color: tintFg('#2563eb'), width: 60, height: 60, fontSize: 28 }}>
             <BankOutlined />
           </span>
         }

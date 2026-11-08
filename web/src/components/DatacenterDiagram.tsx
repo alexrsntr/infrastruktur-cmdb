@@ -21,6 +21,7 @@ const REL_STYLE: Record<RelationType, { color: string; dash?: string }> = {
   redundant_with: { color: '#1668dc', dash: '7 5' },
   depends_on: { color: '#722ed1', dash: '2 4' },
   runs_on: { color: '#8c99a6' },
+  powered_by: { color: '#c41d7f', dash: '1 4' },
 };
 
 interface Path {
@@ -319,7 +320,7 @@ export function DatacenterDiagram({ dc }: { dc: DatacenterDetail }) {
               const active = connActive(p.conn);
               return (
                 <g key={p.id} opacity={hoverConn || hoverDevice ? (active ? 1 : 0.18) : p.cross ? 0.95 : 0.6}>
-                  <path d={p.d} fill="none" stroke="#ffffff" strokeWidth={active ? 7 : 5} />
+                  <path d={p.d} fill="none" style={{ stroke: 'var(--cmdb-surface)' }} strokeWidth={active ? 7 : 5} />
                   <path d={p.d} fill="none" stroke={st.color} strokeWidth={active ? 3.5 : 2.5} strokeDasharray={st.dash} />
                   <path
                     d={p.d}
@@ -355,43 +356,43 @@ export function DatacenterDiagram({ dc }: { dc: DatacenterDetail }) {
         .dc-diagram.narrow { flex-direction: column; gap: 16px; }
         .dc-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; z-index: 1; }
         .dc-dot { flex: 0 0 auto; width: 9px; height: 9px; border-radius: 50%; }
-        .dc-site { position: relative; z-index: 0; flex: 1 1 0; min-width: 0; background: #f6f8fa; border: 1px solid #dfe4ea; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
-        .dc-site.witness { flex: 0 0 230px; margin-left: 24px; background: #fafbfc; border-style: dashed; }
+        .dc-site { position: relative; z-index: 0; flex: 1 1 0; min-width: 0; background: var(--cmdb-surface-2); border: 1px solid var(--cmdb-border); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+        .dc-site.witness { flex: 0 0 230px; margin-left: 24px; background: var(--cmdb-surface-2); border-style: dashed; }
         .dc-diagram.narrow .dc-site.witness { flex: 1 1 auto; margin-left: 0; }
-        .dc-site-head { display: flex; flex-direction: column; gap: 2px; padding: 2px 4px 6px; border-bottom: 1px solid #e3e8ee; }
-        .dc-site-name { font-size: 19px; font-weight: 700; color: #14202e; }
+        .dc-site-head { display: flex; flex-direction: column; gap: 2px; padding: 2px 4px 6px; border-bottom: 1px solid var(--cmdb-border); }
+        .dc-site-name { font-size: 19px; font-weight: 700; color: var(--cmdb-text); }
         .dc-site-building { font-size: 15px; font-weight: 600; }
-        .dc-site-room { font-size: 14px; color: #4a5a6c; }
-        .dc-site-counts { font-size: 13px; color: #6b7a8b; margin-top: 2px; }
-        .dc-rack { background: #fff; border: 1px solid #dfe4ea; border-radius: 10px; overflow: hidden; }
+        .dc-site-room { font-size: 14px; color: var(--cmdb-text-2); }
+        .dc-site-counts { font-size: 13px; color: var(--cmdb-muted); margin-top: 2px; }
+        .dc-rack { background: var(--cmdb-surface); border: 1px solid var(--cmdb-border); border-radius: 10px; overflow: hidden; }
         .dc-rack-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 9px 12px; background: #2f3740; }
         .dc-rack-name { color: #fff !important; font-weight: 700; font-size: 15px; }
         .dc-rack-name.muted { color: #cfd6de !important; }
         .dc-rack-usage { display: inline-flex; align-items: center; gap: 8px; color: #cfd6de; font-size: 12.5px; white-space: nowrap; }
         .dc-rack-bar { display: inline-block; width: 54px; height: 6px; background: #4a5561; border-radius: 3px; overflow: hidden; }
         .dc-rack-bar span { display: block; height: 100%; background: #69b1ff; }
-        .dc-device { position: relative; display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-top: 1px solid #edf0f3; transition: background .12s; }
+        .dc-device { position: relative; display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-top: 1px solid var(--cmdb-border-soft); transition: background .12s; }
         .dc-rack-head + .dc-device { border-top: 0; }
-        .dc-device.hl { background: #e8f2ff; }
-        .dc-device.empty { color: #8c99a6; font-size: 14px; }
+        .dc-device.hl { background: var(--cmdb-primary-soft); }
+        .dc-device.empty { color: var(--cmdb-muted); font-size: 14px; }
         .dc-type { flex: 0 0 auto; width: 6px; align-self: stretch; border-radius: 3px; }
         .dc-device-name { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .dc-device-sub { display: block; color: #6b7a8b; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .dc-device-u { font-family: 'Cascadia Mono', Consolas, monospace; font-size: 12px; color: #6b7a8b; background: #f2f4f7; border-radius: 4px; padding: 1px 6px; }
+        .dc-device-sub { display: block; color: var(--cmdb-muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dc-device-u { font-family: 'Cascadia Mono', Consolas, monospace; font-size: 12px; color: var(--cmdb-muted); background: var(--cmdb-surface-3); border-radius: 4px; padding: 1px 6px; }
         .dc-band { position: relative; z-index: 2; flex: 0 0 210px; align-self: stretch; display: flex; flex-direction: column; justify-content: center; gap: 18px; padding: 16px 0; pointer-events: none; }
         .dc-band > * { pointer-events: auto; }
         .dc-diagram.narrow .dc-band { flex: 1 1 auto; padding: 0; }
-        .dc-band-title { align-self: center; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #6b7a8b; background: #fff; padding: 1px 8px; border-radius: 6px; }
-        .dc-band-foot { align-self: center; text-align: center; font-size: 13px; color: #6b7a8b; padding: 1px 8px; background: #fff; border-radius: 6px; }
+        .dc-band-title { align-self: center; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--cmdb-muted); background: var(--cmdb-surface); padding: 1px 8px; border-radius: 6px; }
+        .dc-band-foot { align-self: center; text-align: center; font-size: 13px; color: var(--cmdb-muted); padding: 1px 8px; background: var(--cmdb-surface); border-radius: 6px; }
         .dc-link { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: default; }
-        .dc-link-label { font-weight: 700; font-size: 14px; color: #14202e; text-align: center; padding: 1px 8px; background: #fff; border-radius: 6px; }
+        .dc-link-label { font-weight: 700; font-size: 14px; color: var(--cmdb-text); text-align: center; padding: 1px 8px; background: var(--cmdb-surface); border-radius: 6px; }
         .dc-link-bar { width: 100%; height: 7px; border-radius: 4px; box-shadow: 0 1px 0 rgba(0,0,0,.1); }
-        .dc-link-sub { font-size: 12.5px; color: #4a5a6c; text-align: center; padding: 1px 8px; background: #fff; border-radius: 6px; }
-        .dc-port { font-size: 11.5px; font-family: 'Cascadia Mono', Consolas, monospace; fill: #14202e; paint-order: stroke; stroke: #ffffff; stroke-width: 3px; }
+        .dc-link-sub { font-size: 12.5px; color: var(--cmdb-text-2); text-align: center; padding: 1px 8px; background: var(--cmdb-surface); border-radius: 6px; }
+        .dc-port { font-size: 11.5px; font-family: 'Cascadia Mono', Consolas, monospace; fill: var(--cmdb-text); paint-order: stroke; stroke: var(--cmdb-surface); stroke-width: 3px; }
         .dc-clusters { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
-        .dc-cluster { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px; background: #f6f8fa; border: 1px solid #dfe4ea; font-size: 15px; }
-        .dc-cluster.stretched { background: #f6f0ff; border-color: #d3adf7; color: #391085; }
-        .dc-legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13.5px; color: #4a5a6c; align-items: center; }
+        .dc-cluster { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px; background: var(--cmdb-surface-2); border: 1px solid var(--cmdb-border); font-size: 15px; }
+        .dc-cluster.stretched { background: color-mix(in srgb, #722ed1 var(--cmdb-tint-bg), var(--cmdb-surface)); border-color: color-mix(in srgb, #722ed1 40%, var(--cmdb-border)); color: color-mix(in srgb, #391085 var(--cmdb-tint-fg), var(--cmdb-text)); }
+        .dc-legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13.5px; color: var(--cmdb-text-2); align-items: center; }
         .dc-legend span { display: inline-flex; align-items: center; gap: 6px; }
       `}</style>
     </div>

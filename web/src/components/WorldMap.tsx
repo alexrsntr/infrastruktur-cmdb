@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router';
 import L from 'leaflet';
-import { MapContainer, Marker, Popup, TileLayer, Tooltip, useMap } from 'react-leaflet';
+import { MapContainer, Marker, Popup, Tooltip, useMap } from 'react-leaflet';
 import { Space, Tag, Typography } from 'antd';
 import { ASSET_TYPES, ASSET_TYPE_KEYS, type Building, type Plant } from '../../../shared/model';
-import { useSession } from '../lib/session';
+import { BaseLayer, OFFLINE_MAX_ZOOM, useHasTileServer } from './BaseMap';
 
 export function escapeHtml(s: unknown): string {
   return String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -113,16 +113,16 @@ export function WorldMap({
   selectedId?: string;
   onSelect?: (id: string) => void;
 }) {
-  const { config } = useSession();
+  const tiles = useHasTileServer();
   const located = useMemo(() => plants.filter(hasCoords), [plants]);
   const points = useMemo(() => located.map((p) => [p.latitude!, p.longitude!] as L.LatLngTuple), [located]);
   const markers = useRef(new Map<string, L.Marker>());
 
   return (
     <div className="map-container" style={{ height }}>
-      <MapContainer center={DEFAULT_CENTER} zoom={DEFAULT_ZOOM} minZoom={2} worldCopyJump style={{ height: '100%', width: '100%' }}>
-        <TileLayer url={config.mapTileUrl} attribution={config.mapTileAttribution} />
-        <FitToPoints points={points} singleZoom={8} />
+      <MapContainer center={DEFAULT_CENTER} zoom={DEFAULT_ZOOM} minZoom={2} maxZoom={tiles ? 19 : OFFLINE_MAX_ZOOM} worldCopyJump className="world-map" style={{ height: '100%', width: '100%' }}>
+        <BaseLayer />
+        <FitToPoints points={points} singleZoom={tiles ? 8 : 5} maxZoom={tiles ? 12 : 6} />
         <InvalidateOnResize />
         <SelectionController plants={located} selectedId={selectedId} markers={markers} />
         {located.map((p) => (
@@ -148,7 +148,7 @@ export function WorldMap({
 
 /** Small map of one plant with its buildings (buildings without coordinates are skipped). */
 export function SiteMap({ plant, buildings, height = 260 }: { plant: Plant; buildings: Building[]; height?: number | string }) {
-  const { config } = useSession();
+  const tiles = useHasTileServer();
   const located = buildings.filter(hasCoords);
   const points: L.LatLngTuple[] = located.length
     ? located.map((b) => [b.latitude!, b.longitude!])
@@ -166,9 +166,9 @@ export function SiteMap({ plant, buildings, height = 260 }: { plant: Plant; buil
 
   return (
     <div className="map-container" style={{ height }}>
-      <MapContainer center={points[0]} zoom={15} style={{ height: '100%', width: '100%' }} scrollWheelZoom={false}>
-        <TileLayer url={config.mapTileUrl} attribution={config.mapTileAttribution} />
-        <FitToPoints points={points} singleZoom={15} maxZoom={17} />
+      <MapContainer center={points[0]} zoom={tiles ? 15 : 6} maxZoom={tiles ? 19 : OFFLINE_MAX_ZOOM} className="world-map" style={{ height: '100%', width: '100%' }} scrollWheelZoom={false}>
+        <BaseLayer />
+        <FitToPoints points={points} singleZoom={tiles ? 15 : 6} maxZoom={tiles ? 17 : OFFLINE_MAX_ZOOM} />
         <InvalidateOnResize />
         {located.length
           ? located.map((b) => (

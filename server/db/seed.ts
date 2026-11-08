@@ -120,7 +120,6 @@ export async function seed(pool: Pool, opts: { force?: boolean } = {}) {
       await addItem(rackSrv, 'patch_panel', 'Copper panel servers (24× RJ45)', 42);
       await addItem(rackSrv, 'cable_management', 'Cable management', 41);
       await addItem(rackSrv, 'shelf', 'KVM console', 30);
-      await addItem(rackSrv, 'ups', 'UPS 6 kVA (APC Smart-UPS)', 1, 4);
       const floorShort = (n: string) => (n === 'Ground floor' ? 'EG' : n === '1st floor' ? '1OG' : 'HALL');
 
       const insertAsset = async (a: Record<string, unknown>) => {
@@ -277,6 +276,24 @@ export async function seed(pool: Pool, opts: { force?: boolean } = {}) {
         );
         counts.activities++;
       }
+
+      // ---- UPS at the bottom of the server rack; core switch and hosts are powered by it.
+      // Own random sequence, so all other demo values stay the same.
+      const urand = rng(5000 + pi);
+      const ups = await insertAsset({
+        type: 'ups', name: `${code}-ups01`, status: 'active', criticality: 'critical',
+        plant_id: plant.id, building_id: dcFloor.buildingId, floor_id: dcFloor.id, ...pointIn(DATACENTER_LAYOUT[0], urand),
+        room: 'Server room', rack_id: rackSrv, rack_u: 1, rack_height_u: 4, manufacturer: 'APC', model: 'Smart-UPS SRT 6000 RM',
+        serial_number: `AS${Math.floor(urand() * 1e9)}`, asset_tag: `IT-${p.code}-1500`, ip_address: `${net}.1.5`, mac_address: mac(urand),
+        owner: 'Datacenter Team', cost_center: `${4000 + pi}`, purchase_date: dateOffset(-1100), warranty_end: dateOffset(120 + urand() * 600), tags: ['power'],
+        attributes: {
+          form_factor: 'Rack', topology: 'Online (double conversion)', capacity_va: 6000, capacity_w: 6000, phases: '1-phase',
+          runtime_min: 14 + Math.round(urand() * 12), battery_type: 'VRLA', battery_installed: dateOffset(-1100), battery_replace_due: dateOffset(-1100 + 4 * 365),
+          outlets: '6x C13, 4x C19', network_card: 'NMC 3, SNMP v3', firmware: '15.3',
+        },
+      });
+      await relate(core.id, ups.id, 'powered_by');
+      for (const h of hosts) await relate(h.id, ups.id, 'powered_by');
     }
 
     // ---- demo site plan for the headquarters (only with the database storage driver)

@@ -87,7 +87,7 @@ export function AboutCard({ title = 'About', rows, extra, empty = 'No details ye
       )}
       <style>{`
         .about-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px 24px; }
-        .about-label { font-size: 13px; color: #7b8a9b; margin-bottom: 2px; }
+        .about-label { font-size: 13px; color: var(--cmdb-muted); margin-bottom: 2px; }
         .about-value { font-size: 15.5px; word-break: break-word; white-space: pre-wrap; }
       `}</style>
     </Card>

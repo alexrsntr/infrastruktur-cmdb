@@ -145,6 +145,18 @@ export function cleanAttributes(type: AssetType, attrs: Record<string, unknown>)
       case 'boolean':
         out[field.key] = typeof raw === 'boolean' ? raw : ['true', '1', 'yes', 'ja', 'x'].includes(String(raw).toLowerCase());
         break;
+      case 'date': {
+        // stored as YYYY-MM-DD; accepts ISO dates, DD.MM.YYYY (German Excel) and Date objects (Excel import)
+        if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
+          out[field.key] = raw.toISOString().slice(0, 10);
+          break;
+        }
+        const s = String(raw).trim();
+        const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        const de = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+        out[field.key] = iso ? `${iso[1]}-${iso[2]}-${iso[3]}` : de ? `${de[3]}-${de[2].padStart(2, '0')}-${de[1].padStart(2, '0')}` : s.slice(0, 500);
+        break;
+      }
       default:
         out[field.key] = String(raw).trim().slice(0, 500);
     }

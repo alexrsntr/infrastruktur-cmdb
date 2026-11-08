@@ -182,8 +182,8 @@ export function RackLegend() {
     <span style={{ display: 'inline-block', width: 14, height: 10, borderRadius: 2, background: bg, marginRight: 6, verticalAlign: 'middle', border: '1px solid rgba(0,0,0,.2)', ...extra }} />
   );
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, fontSize: 12.5, color: '#4a5a6c' }}>
-      {(['switch', 'access_point', 'server'] as const).map((t) => (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, fontSize: 12.5, color: 'var(--cmdb-text-2)' }}>
+      {(['switch', 'access_point', 'server', 'ups'] as const).map((t) => (
         <span key={t}>
           {sw('#fbfcfd', { borderLeft: `4px solid ${ASSET_TYPES[t].color}` })}
           {ASSET_TYPES[t].label}
@@ -191,7 +191,7 @@ export function RackLegend() {
       ))}
       <span>{sw(ITEM_STYLE.patch_panel.bg)}Patch panel</span>
       <span>{sw(ITEM_STYLE.cable_management.bg)}Cable mgmt.</span>
-      <span>{sw(ITEM_STYLE.ups.bg)}UPS</span>
+      <span>{sw(ITEM_STYLE.ups.bg)}UPS (rack item)</span>
       <span>{sw('#1f262d')}Free</span>
     </div>
   );

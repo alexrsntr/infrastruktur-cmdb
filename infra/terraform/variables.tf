@@ -212,15 +212,15 @@ variable "bootstrap_admins" {
 }
 
 variable "map_tile_url" {
-  description = "Leaflet tile URL template. Review the OpenStreetMap tile usage policy before production use (docs/AZURE.md)."
+  description = "Optional tile server (Leaflet URL template, e.g. an internal tile server or Azure Maps). Empty = built-in world map without external requests."
   type        = string
-  default     = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+  default     = ""
 }
 
 variable "map_tile_attribution" {
-  description = "Attribution HTML for the map tiles; must match the tile provider."
+  description = "Attribution HTML for the map tiles (only with map_tile_url); must match the tile provider."
   type        = string
-  default     = "&copy; OpenStreetMap contributors"
+  default     = ""
 }
 
 variable "extra_app_settings" {

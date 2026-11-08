@@ -452,7 +452,7 @@ export function ChangeList({ changes, action }: { changes: AuditEntry['changes']
           <Typography.Text type="secondary">{fieldLabel(k)}: </Typography.Text>
           {isDiff ? (
             <>
-              <span style={{ textDecoration: 'line-through', color: '#8c96a3' }}>{renderValue((v as { from: unknown }).from)}</span>
+              <span style={{ textDecoration: 'line-through', color: 'var(--cmdb-muted)' }}>{renderValue((v as { from: unknown }).from)}</span>
               {' → '}
               <strong>{renderValue((v as { to: unknown }).to)}</strong>
             </>

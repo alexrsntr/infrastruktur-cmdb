@@ -47,7 +47,7 @@ describe('racks', () => {
     const res = await viewer.get(`/api/racks?buildingId=${dc.id}`).expect(200);
     expect(res.body.map((r: { name: string }) => r.name)).toEqual(['R01', 'R02']);
     const r02 = res.body.find((r: { name: string }) => r.name === 'R02');
-    expect(r02).toMatchObject({ height_u: 42, plant_code: 'MUC', asset_count: 4 });
+    expect(r02).toMatchObject({ height_u: 42, plant_code: 'MUC', asset_count: 5 }); // 4 hosts + UPS
     expect(r02.used_u).toBe(4 * 2 + 1 + 1 + 1 + 4); // 4 hosts × 2U + panel + cable mgmt + KVM shelf + UPS 4U
   });
 

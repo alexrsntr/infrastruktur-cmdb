@@ -64,6 +64,6 @@ postgres_firewall_rules = {
 # postgres_delegated_subnet_id = "/subscriptions/.../subnets/snet-postgres"
 # postgres_private_dns_zone_id = "/subscriptions/.../privateDnsZones/infracmdb.private.postgres.database.azure.com"
 
-# --- Maps ----------------------------------------------------------------------
+# --- Maps (optional; default: built-in world map without external requests) -----
 # map_tile_url         = "https://tiles.yourdomain.com/{z}/{x}/{y}.png"
-# map_tile_attribution = "&copy; OpenStreetMap contributors"
+# map_tile_attribution = "&copy; Your map provider"

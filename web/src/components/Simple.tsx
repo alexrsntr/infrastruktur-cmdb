@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { ASSET_STATUS_META, ASSET_TYPES, type AssetStatus, type AssetType } from '../../../shared/model';
 import { STATUS } from '../theme';
 import { ASSET_TYPE_ICONS } from './icons';
+import { tintBg, tintFg } from '../lib/palette';
 
 export function StatTile({
   icon,
@@ -23,7 +24,7 @@ export function StatTile({
 }) {
   const body = (
     <>
-      <span className="stat-icon" style={{ background: `${color}18`, color }}>
+      <span className="stat-icon" style={{ background: tintBg(color), color: tintFg(color) }}>
         {icon}
       </span>
       <span style={{ minWidth: 0 }}>

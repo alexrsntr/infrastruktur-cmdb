@@ -26,6 +26,7 @@ import {
   CloudUploadOutlined,
   CodeOutlined,
   DatabaseOutlined,
+  ThunderboltOutlined,
   FileExcelOutlined,
   FileSearchOutlined,
   InboxOutlined,
@@ -70,6 +71,7 @@ const TYPE_ICONS: Record<AssetType, React.ReactNode> = {
   switch: <ApartmentOutlined />,
   access_point: <WifiOutlined />,
   server: <DatabaseOutlined />,
+  ups: <ThunderboltOutlined />,
   vm: <CloudServerOutlined />,
 };
 
@@ -89,7 +91,7 @@ function DatasetGrid({ cards }: { cards: DatasetCard[] }) {
                     borderRadius: 6,
                     display: 'grid',
                     placeItems: 'center',
-                    background: '#eef4fb',
+                    background: 'var(--cmdb-primary-soft)',
                     color: 'var(--ant-color-primary, #2563eb)',
                     fontSize: 18,
                   }}
@@ -269,6 +271,7 @@ const EXAMPLES: Record<AssetType, Record<string, string>> = {
   switch: { Name: 'muc-b01-sw10', Model: 'Catalyst 9300-48P', Manufacturer: 'Cisco', 'IP address': '10.10.0.50', Ports: '48', PoE: 'yes', Layer: 'L2', 'Network role': 'Access' },
   access_point: { Name: 'muc-ap-200', Model: 'MR46', Manufacturer: 'Cisco Meraki', 'IP address': '10.10.20.200', 'Wi-Fi standard': 'Wi-Fi 6 (ax)', Mounting: 'Ceiling' },
   server: { Name: 'muc-esx10', Model: 'PowerEdge R760', Manufacturer: 'Dell', 'IP address': '10.10.1.50', 'RAM (GB)': '512', Hypervisor: 'VMware ESXi', 'Form factor': 'Rack' },
+  ups: { Name: 'muc-ups02', Model: 'Smart-UPS SRT 6000', Manufacturer: 'APC', 'IP address': '10.10.1.20', 'Form factor': 'Rack', 'Capacity (VA)': '6000', 'Real power (W)': '6000', Phases: '1-phase', 'Battery replacement due': '30.06.2028' },
   vm: { Name: 'muc-app10', 'IP address': '10.10.5.50', 'OS / firmware': 'Windows Server 2022', vCPU: '4', 'RAM (GB)': '16', Environment: 'Production', 'Backup enabled': 'yes' },
 };
 

@@ -46,7 +46,7 @@ export function BarList({ items, color = 'var(--ant-color-primary, #2563eb)', un
           </Tooltip>
         );
       })}
-      <style>{`.barlist-row:hover { background: #f2f7fd; }`}</style>
+      <style>{`.barlist-row:hover { background: var(--cmdb-hover); }`}</style>
     </div>
   );
 }

@@ -24,6 +24,7 @@ import { BrandMark } from '../components/BrandMark';
 import { GlobalSearch } from '../components/GlobalSearch';
 import { useAddDevice } from '../components/AddDeviceWizard';
 import { ChangePasswordModal } from '../components/ChangePasswordModal';
+import { ColorModeSwitch } from '../components/ColorModeSwitch';
 
 interface NavItem {
   key: string;
@@ -140,6 +141,7 @@ export function AppLayout() {
             </Tag>
           </Tooltip>
         )}
+        <ColorModeSwitch className="header-icon-btn" />
         <Dropdown menu={userMenu} placement="bottomRight" trigger={['click']}>
           <Button type="text" className="header-user" aria-label="User menu">
             <Avatar size={34} icon={<UserOutlined />} style={{ background: '#2f8fd8' }} />

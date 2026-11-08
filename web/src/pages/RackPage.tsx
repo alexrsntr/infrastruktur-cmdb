@@ -13,6 +13,7 @@ import { journalTabs } from '../components/Journal';
 import { RackElevation, RackLegend, type RackSelection } from '../components/RackElevation';
 import { MountModal, RackFormModal } from '../components/RackForms';
 import { StatusDot, TypeIcon } from '../components/Simple';
+import { tintBg, tintFg } from '../lib/palette';
 
 interface ContentRow {
   key: string;
@@ -26,7 +27,7 @@ interface ContentRow {
 
 function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', gap: 12, padding: '6px 0', borderBottom: '1px solid #f0f2f5' }}>
+    <div style={{ display: 'flex', gap: 12, padding: '6px 0', borderBottom: '1px solid var(--cmdb-border-soft)' }}>
       <span className="muted" style={{ width: 90, flex: 'none' }}>
         {label}
       </span>
@@ -224,7 +225,7 @@ export function RackPage() {
         ]}
         title={`Rack ${r.name}`}
         icon={
-          <span className="stat-icon" style={{ background: '#3d465218', color: '#3d4652', width: 60, height: 60, fontSize: 28 }}>
+          <span className="stat-icon" style={{ background: tintBg('#5b6b7c'), color: tintFg('#5b6b7c'), width: 60, height: 60, fontSize: 28 }}>
             <HddOutlined />
           </span>
         }

@@ -121,7 +121,7 @@ export function PlansGallery({ plantId, entityType, entityId }: { plantId: strin
                 <Card
                   hoverable
                   cover={
-                    <div style={{ height: 170, background: '#f3f5f8', overflow: 'hidden', display: 'grid', placeItems: 'center' }}>
+                    <div style={{ height: 170, background: 'var(--cmdb-surface-3)', overflow: 'hidden', display: 'grid', placeItems: 'center' }}>
                       <img src={`/api/attachments/${p.id}/file?v=${encodeURIComponent(p.updated_at)}`} alt={p.title ?? p.file_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
                     </div>
                   }

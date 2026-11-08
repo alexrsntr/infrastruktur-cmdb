@@ -155,6 +155,28 @@ export const ASSET_TYPES = {
       { key: 'oob_ip', label: 'iDRAC / iLO IP', type: 'text' },
     ],
   },
+  ups: {
+    label: 'UPS',
+    plural: 'UPS',
+    slug: 'ups',
+    physical: true,
+    color: '#c41d7f',
+    fields: [
+      // the first six fields are offered when adding a device
+      { key: 'form_factor', label: 'Form factor', type: 'select', options: ['Rack', 'Tower', 'Wall / DIN rail'] },
+      { key: 'capacity_va', label: 'Capacity', type: 'number', unit: 'VA' },
+      { key: 'capacity_w', label: 'Real power', type: 'number', unit: 'W' },
+      { key: 'battery_replace_due', label: 'Battery replacement due', type: 'date' },
+      { key: 'runtime_min', label: 'Runtime at current load', type: 'number', unit: 'min' },
+      { key: 'phases', label: 'Phases', type: 'select', options: ['1-phase', '3-phase'] },
+      { key: 'topology', label: 'Topology', type: 'select', options: ['Online (double conversion)', 'Line-interactive', 'Offline / standby'] },
+      { key: 'battery_type', label: 'Battery type', type: 'text', placeholder: 'e.g. VRLA, Li-ion' },
+      { key: 'battery_installed', label: 'Batteries installed', type: 'date' },
+      { key: 'outlets', label: 'Outlets', type: 'text', placeholder: 'e.g. 6x C13, 2x C19' },
+      { key: 'network_card', label: 'Network management card', type: 'text', placeholder: 'e.g. NMC 3, SNMP v3' },
+      { key: 'firmware', label: 'Firmware', type: 'text' },
+    ],
+  },
   vm: {
     label: 'Virtual Machine',
     plural: 'Virtual Machines',
@@ -178,6 +200,12 @@ export const ASSET_TYPE_KEYS = Object.keys(ASSET_TYPES) as AssetType[];
 
 export function assetTypeBySlug(slug: string | undefined): AssetType | undefined {
   return ASSET_TYPE_KEYS.find((k) => ASSET_TYPES[k].slug === slug);
+}
+
+/** Type name inside a sentence: "switch", "access point" – acronyms such as "UPS" stay upper case. */
+export function assetTypeNoun(type: AssetType): string {
+  const { label } = ASSET_TYPES[type];
+  return label === label.toUpperCase() ? label : label.toLowerCase();
 }
 
 export function assetTypeFields(type: AssetType): readonly FieldDef[] {
@@ -213,6 +241,7 @@ export const RELATION_TYPES = {
   connected_to: { label: 'Connected to', inverse: 'Connected to' },
   depends_on: { label: 'Depends on', inverse: 'Required by' },
   redundant_with: { label: 'Redundant with', inverse: 'Redundant with' },
+  powered_by: { label: 'Powered by', inverse: 'Powers' },
 } as const;
 export type RelationType = keyof typeof RELATION_TYPES;
 export const RELATION_TYPE_KEYS = Object.keys(RELATION_TYPES) as RelationType[];

@@ -7,6 +7,7 @@ import type { AppConfig, MeResponse, Permission } from '../../shared/model';
 import { ApiError, http, setCsrfToken } from './lib/api';
 import { SessionContext, type SessionValue } from './lib/session';
 import { buildTheme } from './theme';
+import { ColorModeProvider, useColorModeState } from './lib/colorMode';
 import { AppLayout } from './layout/AppLayout';
 import { AddDeviceProvider } from './components/AddDeviceWizard';
 import { LoginPage } from './pages/LoginPage';
@@ -46,7 +47,8 @@ function useBootstrap() {
 export function Root() {
   const { config, me } = useBootstrap();
   const location = useLocation();
-  const theme = useMemo(() => buildTheme(config.data?.primaryColor ?? '#2563eb'), [config.data?.primaryColor]);
+  const colorMode = useColorModeState();
+  const theme = useMemo(() => buildTheme(config.data?.primaryColor ?? '#2563eb', colorMode.mode), [config.data?.primaryColor, colorMode.mode]);
 
   useEffect(() => {
     if (config.data) document.title = `${config.data.appName} · ${config.data.brandName}`;
@@ -120,8 +122,10 @@ export function Root() {
   }
 
   return (
-    <ConfigProvider theme={theme} locale={enGB}>
-      <AntApp>{content}</AntApp>
-    </ConfigProvider>
+    <ColorModeProvider value={colorMode}>
+      <ConfigProvider theme={theme} locale={enGB}>
+        <AntApp>{content}</AntApp>
+      </ConfigProvider>
+    </ColorModeProvider>
   );
 }

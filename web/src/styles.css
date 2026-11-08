@@ -1,3 +1,54 @@
+/* ---------- colour scheme (light / dark) ----------
+   Components use these variables (or the Ant Design tokens) instead of fixed colours.
+   The active scheme is set on <html data-theme="light|dark"> by App.tsx. */
+:root {
+  color-scheme: light;
+  --cmdb-bg: #f2f4f7;
+  --cmdb-surface: #ffffff;
+  --cmdb-surface-2: #f6f8fa;
+  --cmdb-surface-3: #eef1f4;
+  --cmdb-hover: #eef4fb;
+  --cmdb-text: #14202e;
+  --cmdb-text-2: #4a5a6c;
+  --cmdb-muted: #7b8a9b;
+  --cmdb-border: #dfe4ea;
+  --cmdb-border-soft: #edf0f3;
+  --cmdb-border-strong: #cfd6de;
+  --cmdb-primary-soft: #e8effd;
+  --cmdb-header: #0b1f33;
+  --cmdb-header-2: #12304d;
+  --cmdb-shadow: rgba(0, 50, 100, 0.08);
+  --cmdb-map-water: #d9e6f2;
+  --cmdb-map-land: #f7f7f2;
+  --cmdb-map-border: #b4bfca;
+  --cmdb-tint-bg: 14%;
+  --cmdb-tint-fg: 100%;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --cmdb-bg: #0e1319;
+  --cmdb-surface: #161d26;
+  --cmdb-surface-2: #1b2430;
+  --cmdb-surface-3: #222c39;
+  --cmdb-hover: #1f2b3a;
+  --cmdb-text: #e5eaf0;
+  --cmdb-text-2: #a7b4c3;
+  --cmdb-muted: #7f8c9b;
+  --cmdb-border: #2a3441;
+  --cmdb-border-soft: #232c38;
+  --cmdb-border-strong: #364252;
+  --cmdb-primary-soft: rgba(59, 130, 246, 0.18);
+  --cmdb-header: #0a1017;
+  --cmdb-header-2: #121c28;
+  --cmdb-shadow: rgba(0, 0, 0, 0.35);
+  --cmdb-map-water: #0f1b28;
+  --cmdb-map-land: #24303d;
+  --cmdb-map-border: #3e4c5d;
+  --cmdb-tint-bg: 22%;
+  --cmdb-tint-fg: 55%;
+}
+
 html,
 body,
 #root {
@@ -6,7 +57,8 @@ body,
 }
 
 body {
-  background: #f2f4f7;
+  background: var(--cmdb-bg);
+  color: var(--cmdb-text);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -20,6 +72,7 @@ body {
   align-items: center;
   gap: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  background: var(--cmdb-header) !important;
 }
 
 .brand {
@@ -89,7 +142,7 @@ body {
 }
 
 .top-nav-item.vertical {
-  color: #14202e;
+  color: var(--cmdb-text);
   height: 52px;
   border: none;
   border-radius: 10px;
@@ -97,8 +150,8 @@ body {
 }
 
 .top-nav-item.vertical.active {
-  background: #e8f1fb;
-  color: #2563eb;
+  background: var(--cmdb-primary-soft);
+  color: var(--ant-color-primary, #2563eb);
 }
 
 .header-search {
@@ -162,13 +215,13 @@ body {
 
 .page-subtitle {
   font-size: 15.5px;
-  color: #4a5a6c;
+  color: var(--cmdb-text-2);
   margin-top: 4px;
   max-width: 900px;
 }
 
 .muted {
-  color: #7b8a9b;
+  color: var(--cmdb-muted);
 }
 
 .mono {
@@ -187,8 +240,8 @@ body {
   align-items: center;
   gap: 16px;
   padding: 20px 22px;
-  background: #fff;
-  border: 1px solid #dfe4ea;
+  background: var(--cmdb-surface);
+  border: 1px solid var(--cmdb-border);
   border-radius: 12px;
   color: inherit;
   text-decoration: none;
@@ -198,8 +251,8 @@ body {
 
 a.stat-tile:hover,
 button.stat-tile:hover {
-  border-color: #8fb6e0;
-  box-shadow: 0 4px 14px rgba(0, 50, 100, 0.08);
+  border-color: color-mix(in srgb, var(--ant-color-primary, #2563eb) 45%, var(--cmdb-border));
+  box-shadow: 0 4px 14px var(--cmdb-shadow);
 }
 
 button.stat-tile {
@@ -211,7 +264,7 @@ button.stat-tile {
 
 .stat-tile.active {
   border-color: var(--ant-color-primary, #2563eb);
-  box-shadow: 0 0 0 2px rgba(0, 79, 159, 0.15);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ant-color-primary, #2563eb) 20%, transparent);
 }
 
 .stat-icon {
@@ -233,7 +286,7 @@ button.stat-tile {
 
 .stat-label {
   font-size: 14.5px;
-  color: #4a5a6c;
+  color: var(--cmdb-text-2);
   margin-top: 2px;
 }
 
@@ -296,7 +349,7 @@ button.stat-tile {
   grid-template-columns: 40px 1fr;
   gap: 14px;
   padding: 14px 0;
-  border-bottom: 1px solid #edf0f3;
+  border-bottom: 1px solid var(--cmdb-border-soft);
 }
 
 .timeline-item:last-child {
@@ -317,8 +370,40 @@ button.stat-tile {
   width: 100%;
   border-radius: 10px;
   overflow: hidden;
-  border: 1px solid #dfe4ea;
-  background: #f7f9fb;
+  border: 1px solid var(--cmdb-border);
+  background: var(--cmdb-map-water);
+}
+
+/* built-in world map (BaseMap.tsx) */
+.leaflet-container.world-map {
+  background: var(--cmdb-map-water);
+}
+
+.cmdb-country {
+  fill: var(--cmdb-map-land);
+  stroke: var(--cmdb-map-border);
+}
+
+.leaflet-container .leaflet-control-attribution {
+  background: color-mix(in srgb, var(--cmdb-surface) 80%, transparent);
+  color: var(--cmdb-muted);
+}
+
+.leaflet-container .leaflet-control-attribution a {
+  color: var(--cmdb-text-2);
+}
+
+.leaflet-bar a,
+.leaflet-bar a:hover {
+  background: var(--cmdb-surface);
+  color: var(--cmdb-text);
+  border-bottom-color: var(--cmdb-border);
+}
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: var(--cmdb-surface);
+  color: var(--cmdb-text);
 }
 
 .leaflet-container {
@@ -368,7 +453,7 @@ button.stat-tile {
   height: 28px;
   padding: 0 8px;
   border-radius: 14px;
-  background: #0b1f33;
+  background: var(--cmdb-header);
   color: #fff;
   font-size: 12.5px;
   font-weight: 600;

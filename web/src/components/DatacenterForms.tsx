@@ -218,7 +218,7 @@ export function DatacenterFormModal({
           <Input.TextArea autoSize={{ minRows: 2, maxRows: 5 }} placeholder="e.g. how the rooms are connected, which systems run where" />
         </Form.Item>
       </Form>
-      <style>{`.dcf-site { background: #f6f8fa; border: 1px solid #dfe4ea; border-radius: 10px; padding: 12px 14px; }`}</style>
+      <style>{`.dcf-site { background: var(--cmdb-surface-2); border: 1px solid var(--cmdb-border); border-radius: 10px; padding: 12px 14px; }`}</style>
     </Modal>
   );
 }

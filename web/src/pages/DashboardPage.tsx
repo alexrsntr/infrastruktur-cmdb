@@ -10,6 +10,7 @@ import { PageHeader } from '../components/PageHeader';
 import { StatTile, TypeIcon } from '../components/Simple';
 import { ASSET_TYPE_ICONS } from '../components/icons';
 import { EntityLink, RecentActivityFeed } from '../components/ActivityLog';
+import { tintBg, tintFg } from '../lib/palette';
 
 function greeting() {
   const h = dayjs().hour();
@@ -106,7 +107,7 @@ export function DashboardPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     {data.byPlant.slice(0, 8).map((p) => (
                       <Link key={p.plant_id} to={`/plants/${p.plant_id}`} className="plant-row">
-                        <span className="stat-icon" style={{ width: 40, height: 40, fontSize: 18, background: '#2563eb14', color: '#2563eb' }}>
+                        <span className="stat-icon" style={{ width: 40, height: 40, fontSize: 18, background: tintBg('#2563eb'), color: tintFg('#2563eb') }}>
                           <BankOutlined />
                         </span>
                         <span style={{ flex: 1, minWidth: 0 }}>
@@ -117,7 +118,7 @@ export function DashboardPage() {
                     ))}
                   </div>
                   <style>{`.plant-row { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 10px; color: inherit; }
-                    .plant-row:hover { background: #eef4fb; }`}</style>
+                    .plant-row:hover { background: var(--cmdb-hover); }`}</style>
                 </Card>
               </div>
             </Col>

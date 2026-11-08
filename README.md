@@ -3,7 +3,7 @@
 **Open-source IT Configuration Management Database for sites, buildings and network/compute infrastructure.**
 
 A web-based CMDB for documenting **plants, buildings, floors and network/compute infrastructure**
-(switches, access points, servers, virtual machines), with **maps & floor plans**, **notes**,
+(switches, access points, servers, UPS, virtual machines), with **maps & floor plans**, **notes**,
 **activities**, a complete **change history**, **role-based permissions** (local accounts or
 **Microsoft Entra ID SSO**) and **exports of everything** (Excel, CSV, JSON).
 
@@ -143,12 +143,12 @@ Actions (automatic deployments), groups and go-live checklist: **[docs/SETUP.md]
 | Area | What you get |
 |---|---|
 | **Navigation** | Sidebar tree *Plants → Buildings*, plus inventory views *All assets / Switches / Access Points / Servers / VMs*, global search (hostname, IP, serial, MAC, plant …) |
-| **Maps** | World map of all plants (OpenStreetMap or any tile server) · per-floor **floor plans** (PNG/JPEG/WebP upload) with drag-and-drop placement of assets, type filter, legend, print view |
+| **Maps** | Built-in world map of all plants (no external map service; optionally your own tile server) · per-floor **floor plans** (PNG/JPEG/WebP upload) with drag-and-drop placement of assets, type filter, legend, print view |
 | **Site plans & pictures** | Upload pictures of a plant (site plan, aerial photo, hall or office photos) and place **access points, switches and other devices, buildings and text labels** on them by click & drag. Every image in *Files* can be turned into such a plan; the device page lists the pictures it is shown on |
-| **Infrastructure** | Switches, APs, servers, VMs with common master data (IP, MAC, FQDN, serial, model, owner, cost center, warranty …) and type-specific fields (ports/PoE/VLAN, SSIDs/Wi-Fi standard, CPU/RAM/hypervisor, vCPU/RAM/environment). Extensible type registry in `shared/model.ts` |
+| **Infrastructure** | Switches, APs, servers, **UPS** (emergency power: capacity, runtime, battery replacement date), VMs with common master data (IP, MAC, FQDN, serial, model, owner, cost center, warranty …) and type-specific fields (ports/PoE/VLAN, SSIDs/Wi-Fi standard, CPU/RAM/hypervisor, vCPU/RAM/environment). Extensible type registry in `shared/model.ts` |
 | **Racks** | Racks and wall cabinets per building (height in U, numbering direction). **Front view** with devices at their units, plus patch panels, cable management, UPS, PDUs and shelves. Click a free unit to mount a device, click a device to move/unmount it; collision check (no two things in the same U). Building tab with all racks side by side, rack list with free capacity, rack export incl. unit-by-unit elevation |
 | **Data centers (stretched)** | Group server rooms into data centers. A **stretched** data center spans two buildings (site A / site B, optional witness): the diagram shows both rooms side by side with their racks and devices, the fibre/WAN links between the rooms, the device connections across the sites (e.g. core switch A ↔ core switch B with ports) and clusters whose hosts run in both rooms. Racks are assigned automatically by building and room; export as Excel/CSV/JSON |
-| **Relations** | Uplink, runs on, connected to, depends on, redundant with – including port documentation (e.g. AP `eth0` → switch `Gi1/0/12`, VM → ESX host) |
+| **Relations** | Uplink, runs on, connected to, depends on, redundant with, **powered by** (device → UPS) – including port documentation (e.g. AP `eth0` → switch `Gi1/0/12`, VM → ESX host) |
 | **Attachments** | Files on plants, buildings, floors, racks and devices: photos (gallery with preview), data sheets, contracts, configuration backups. Pictures can be marked as **plan** to place devices on them. Type detection from the file content, executables/scripts/web pages blocked, plant scope enforced, files served with safe headers. Download all files of an object or a plant as **ZIP**. Stored in **Azure Blob Storage** (managed identity, versioning + soft delete) or the database for development |
 | **Notes** | Free-text notes on plants, buildings, floors and assets; pinning; author-only editing |
 | **Activities** | Maintenance, incidents, changes, installations, inspections, replacements with status, assignee and due date; overdue highlighting; global activity board |
@@ -158,6 +158,7 @@ Actions (automatic deployments), groups and go-live checklist: **[docs/SETUP.md]
 | **Import** | Excel/CSV import of assets (same columns as the export) with **dry run** validation, upsert by ID or type+name, per-row error report |
 | **Warranty e-mails** | Daily digest e-mail of devices whose warranty/support ends in e.g. 90/30/7 days (and once when expired). Global recipients plus recipients per plant. Each device is reported once per stage; safe with several app instances. SMTP server configured in the app (*Administration → Settings*), password stored encrypted. Preview, "send now", test e-mail and send history |
 | **Dashboard** | KPIs, assets per type/plant/lifecycle status, warranty expiring in 90 days, upcoming activities, recent changes |
+| **Appearance** | **Light and dark mode** (or follow the operating system) – switch with the sun/moon button in the header |
 
 ## Roles & permissions
 

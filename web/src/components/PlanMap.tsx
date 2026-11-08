@@ -13,7 +13,7 @@ import { useBuildings, useInvalidate } from '../lib/queries';
 import { useSession } from '../lib/session';
 import { AssetStatusTag, AssetTypeTag } from './Tags';
 
-const SHORT: Record<AssetType, string> = { switch: 'SW', access_point: 'AP', server: 'SRV', vm: 'VM' };
+const SHORT: Record<AssetType, string> = { switch: 'SW', access_point: 'AP', server: 'SRV', ups: 'UPS', vm: 'VM' };
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 

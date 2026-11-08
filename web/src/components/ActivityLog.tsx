@@ -28,6 +28,7 @@ import {
 import { errorText, http } from '../lib/api';
 import { DATE_FORMAT, fieldLabel, fmtDate, fmtDateTime, fromNow } from '../lib/format';
 import { useInvalidate } from '../lib/queries';
+import { tintBg, tintFg } from '../lib/palette';
 import { useSession } from '../lib/session';
 
 type EntryKind = 'note' | ActivityKind;
@@ -172,7 +173,7 @@ export function ActivityLog({ entityType, entityId, compact = false }: { entityT
   return (
     <div>
       {showComposer && (
-        <div style={{ background: '#f6f8fa', border: '1px solid #dfe4ea', borderRadius: 12, padding: 16, marginBottom: 20 }}>
+        <div style={{ background: 'var(--cmdb-surface-2)', border: '1px solid var(--cmdb-border)', borderRadius: 12, padding: 16, marginBottom: 20 }}>
           <Segmented
             value={kind}
             onChange={(v) => setKind(v as EntryKind)}
@@ -254,7 +255,7 @@ export function ActivityLog({ entityType, entityId, compact = false }: { entityT
             const mine = item.user_id === me.user.id;
             return (
               <div className="timeline-item" key={`${item.kind}:${item.id}`}>
-                <span className="timeline-icon" style={{ background: style.bg, color: style.fg }}>
+                <span className="timeline-icon" style={{ background: tintBg(style.fg), color: tintFg(style.fg) }}>
                   {style.icon}
                 </span>
                 <div style={{ minWidth: 0 }}>
@@ -301,7 +302,7 @@ export function ActivityLog({ entityType, entityId, compact = false }: { entityT
                     </div>
                   )}
                   {lines.length > 0 && (
-                    <div style={{ marginTop: 2, color: '#4a5a6c', fontSize: 14 }}>
+                    <div style={{ marginTop: 2, color: 'var(--cmdb-text-2)', fontSize: 14 }}>
                       {lines.slice(0, 5).map((l) => (
                         <div key={l}>{l}</div>
                       ))}
@@ -358,7 +359,7 @@ export function RecentActivityFeed({ limit = 15 }: { limit?: number }) {
               : `${ACTION_TEXT[item.action ?? ''] ?? item.action}${item.action === 'update' ? ' ' + changeLines(item).slice(0, 2).join('; ') : ''}`;
         return (
           <div className="timeline-item" key={`${item.kind}:${item.id}`} style={{ padding: '12px 0' }}>
-            <span className="timeline-icon" style={{ background: style.bg, color: style.fg }}>
+            <span className="timeline-icon" style={{ background: tintBg(style.fg), color: tintFg(style.fg) }}>
               {style.icon}
             </span>
             <div style={{ minWidth: 0 }}>
@@ -372,7 +373,7 @@ export function RecentActivityFeed({ limit = 15 }: { limit?: number }) {
                   {item.user_name ?? 'System'} · <Tooltip title={fmtDateTime(item.at)}>{fromNow(item.at)}</Tooltip>
                 </Typography.Text>
               </div>
-              <Typography.Paragraph ellipsis={{ rows: 2 }} style={{ margin: 0, color: '#4a5a6c' }}>
+              <Typography.Paragraph ellipsis={{ rows: 2 }} style={{ margin: 0, color: 'var(--cmdb-text-2)' }}>
                 {what}
               </Typography.Paragraph>
             </div>

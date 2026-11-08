@@ -42,7 +42,7 @@ export function MapPage() {
             }
             styles={{ body: { padding: 0 } }}
           >
-            <div style={{ padding: 12, borderBottom: '1px solid #f0f2f5' }}>
+            <div style={{ padding: 12, borderBottom: '1px solid var(--cmdb-border-soft)' }}>
               <Input.Search allowClear placeholder="Filter plants…" value={filter} onChange={(e) => setFilter(e.target.value)} />
             </div>
             <div style={{ maxHeight: 'calc(100vh - 300px)', minHeight: 200, overflow: 'auto' }}>
@@ -53,7 +53,7 @@ export function MapPage() {
                 renderItem={(p) => (
                   <List.Item
                     onClick={() => setSelected(p.id)}
-                    style={{ cursor: 'pointer', paddingInline: 12, background: p.id === selected ? '#e6f4ff' : undefined }}
+                    style={{ cursor: 'pointer', paddingInline: 12, background: p.id === selected ? 'var(--cmdb-primary-soft)' : undefined }}
                     actions={[
                       <Link key="open" to={`/plants/${p.id}`} onClick={(e) => e.stopPropagation()} aria-label={`Open ${p.name}`}>
                         <RightOutlined />

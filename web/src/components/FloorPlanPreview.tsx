@@ -8,7 +8,7 @@ export function FloorPlanPreview({ asset, planUpdatedAt }: { asset: Asset; planU
   const placed = asset.map_x !== null && asset.map_y !== null;
   return (
     <Link to={`/buildings/${asset.building_id}?floor=${asset.floor_id}`}>
-      <div style={{ position: 'relative', border: '1px solid #e5e9ef', borderRadius: 6, overflow: 'hidden', background: '#fff' }}>
+      <div style={{ position: 'relative', border: '1px solid var(--cmdb-border)', borderRadius: 6, overflow: 'hidden', background: '#fff' }}>
         <img
           src={`/api/floors/${asset.floor_id}/plan${planUpdatedAt ? `?v=${encodeURIComponent(planUpdatedAt)}` : ''}`}
           alt={`Floor plan ${asset.floor_name ?? ''}`}

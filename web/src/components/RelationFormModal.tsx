@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { App, Col, Form, Input, Modal, Radio, Row, Select, Space, Spin, Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
-import { RELATION_TYPES, RELATION_TYPE_KEYS, type Asset, type AssetType, type RelationType } from '../../../shared/model';
+import { ASSET_TYPE_KEYS, RELATION_TYPES, RELATION_TYPE_KEYS, type Asset, type AssetType, type RelationType } from '../../../shared/model';
 import { errorText, http } from '../lib/api';
 import { useInvalidate } from '../lib/queries';
 import { AssetTypeTag } from './Tags';
@@ -22,6 +22,8 @@ function suggest(type: AssetType): { relation: RelationType; targetType?: AssetT
       return { relation: 'uplink', targetType: 'switch' };
     case 'vm':
       return { relation: 'runs_on', targetType: 'server' };
+    case 'server':
+      return { relation: 'powered_by', targetType: 'ups' };
     case 'switch':
       return { relation: 'uplink', targetType: 'switch' };
     default:
@@ -96,7 +98,7 @@ export function RelationFormModal({ open, onClose, asset }: { open: boolean; onC
           </Col>
           <Col span={8}>
             <Form.Item name="targetType" label="Other asset type">
-              <Select allowClear placeholder="Any" options={(['switch', 'access_point', 'server', 'vm'] as AssetType[]).map((t) => ({ value: t, label: <AssetTypeTag type={t} /> }))} onChange={() => form.setFieldValue('other', undefined)} />
+              <Select allowClear placeholder="Any" options={ASSET_TYPE_KEYS.map((t) => ({ value: t, label: <AssetTypeTag type={t} /> }))} onChange={() => form.setFieldValue('other', undefined)} />
             </Form.Item>
           </Col>
           <Col span={16}>

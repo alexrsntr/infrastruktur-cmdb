@@ -15,6 +15,7 @@ import { useBuilding, useInvalidate, useRacks } from '../lib/queries';
 import { RackRow } from '../components/RackRow';
 import { RackFormModal } from '../components/RackForms';
 import { useSession } from '../lib/session';
+import { tintBg, tintFg } from '../lib/palette';
 
 export function BuildingPage() {
   const { buildingId = '' } = useParams();
@@ -102,7 +103,7 @@ export function BuildingPage() {
               <Tooltip title={`${f.asset_count ?? 0} devices${f.has_plan ? '' : ' · no floor plan yet'}`}>
                 <Space size={6}>
                   {f.name}
-                  {!f.has_plan && <PictureOutlined style={{ color: '#bfbfbf' }} />}
+                  {!f.has_plan && <PictureOutlined style={{ color: 'var(--cmdb-muted)' }} />}
                 </Space>
               </Tooltip>
             ),
@@ -162,7 +163,7 @@ export function BuildingPage() {
         title={b.name}
         crumbs={[{ title: 'Plants', to: '/plants' }, { title: plantCode ?? b.plant_name ?? 'Plant', to: `/plants/${b.plant_id}` }, { title: b.name }]}
         icon={
-          <span className="stat-icon" style={{ background: '#127a7a18', color: '#127a7a', width: 60, height: 60, fontSize: 28 }}>
+          <span className="stat-icon" style={{ background: tintBg('#127a7a'), color: tintFg('#127a7a'), width: 60, height: 60, fontSize: 28 }}>
             <ClusterOutlined />
           </span>
         }

@@ -45,8 +45,8 @@ describe('data centers', () => {
       ['Site A', 'primary', 'DC', 'Server room', 2],
       ['Site B', 'secondary', 'B01', 'Server room 2', 2],
     ]);
-    // R01 (core) + R02 (4 hosts) in site A, R11 (core 2) + R12 (2 hosts) in site B
-    expect(seeded.sites.map((s) => s.device_count)).toEqual([5, 3]);
+    // R01 (core) + R02 (4 hosts + UPS) in site A, R11 (core 2) + R12 (2 hosts) in site B
+    expect(seeded.sites.map((s) => s.device_count)).toEqual([6, 3]);
   });
 
   it('returns the diagram data: racks, devices, cross-site connections and the stretched cluster', async () => {

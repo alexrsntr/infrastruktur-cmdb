@@ -15,6 +15,7 @@ import {
 import { errorText, http } from '../lib/api';
 import { DATE_FORMAT } from '../lib/format';
 import { useBuilding, useBuildings, useInvalidate, usePlants, useRacks } from '../lib/queries';
+import { DateStringInput } from './DateStringInput';
 import { ASSET_TYPE_ICONS } from './icons';
 
 type FormValues = Omit<Asset, 'purchase_date' | 'warranty_end'> & {
@@ -30,6 +31,8 @@ function AttributeInput({ field }: { field: FieldDef }) {
       return <Switch />;
     case 'select':
       return <Select allowClear options={field.options?.map((o) => ({ value: o, label: o }))} />;
+    case 'date':
+      return <DateStringInput />;
     default:
       return <Input placeholder={field.placeholder} />;
   }

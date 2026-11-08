@@ -1,4 +1,4 @@
-import type { ThemeConfig } from 'antd';
+import { theme as antTheme, type ThemeConfig } from 'antd';
 
 /**
  * Design tokens. Direction: clean infrastructure console in the style of HPE VM Essentials –
@@ -14,8 +14,28 @@ export const BORDER = '#dfe4ea';
 export const STATUS = { ok: '#1e9e5a', warn: '#d98a00', bad: '#d9363e', idle: '#8c99a6' };
 export const FONT_FAMILY = `'Segoe UI', 'Segoe UI Variable', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif`;
 
-export function buildTheme(primary: string): ThemeConfig {
+export type ColorMode = 'light' | 'dark';
+
+/** Dark scheme: same structure, values matching the CSS variables in styles.css ([data-theme='dark']). */
+const DARK = {
+  pageBg: '#0e1319',
+  container: '#161d26',
+  elevated: '#1b2430',
+  text: '#e5eaf0',
+  text2: '#a7b4c3',
+  border: '#364252',
+  borderSecondary: '#2a3441',
+  subtle: '#1b2430',
+  hover: '#1f2b3a',
+  tagBg: '#222c39',
+  segmentedTrack: '#0e1319',
+  segmentedSelected: '#222c39',
+};
+
+export function buildTheme(primary: string, mode: ColorMode = 'light'): ThemeConfig {
+  const dark = mode === 'dark';
   return {
+    algorithm: dark ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm,
     token: {
       colorPrimary: primary,
       colorInfo: primary,
@@ -23,11 +43,12 @@ export function buildTheme(primary: string): ThemeConfig {
       colorSuccess: STATUS.ok,
       colorWarning: STATUS.warn,
       colorError: STATUS.bad,
-      colorText: TEXT,
-      colorTextSecondary: TEXT_2,
-      colorBorder: '#cfd6de',
-      colorBorderSecondary: BORDER,
-      colorBgLayout: PAGE_BG,
+      colorText: dark ? DARK.text : TEXT,
+      colorTextSecondary: dark ? DARK.text2 : TEXT_2,
+      colorBorder: dark ? DARK.border : '#cfd6de',
+      colorBorderSecondary: dark ? DARK.borderSecondary : BORDER,
+      colorBgLayout: dark ? DARK.pageBg : PAGE_BG,
+      ...(dark ? { colorBgContainer: DARK.container, colorBgElevated: DARK.elevated } : {}),
       fontFamily: FONT_FAMILY,
       fontSize: 15,
       fontSizeLG: 16,
@@ -44,7 +65,7 @@ export function buildTheme(primary: string): ThemeConfig {
       wireframe: false,
     },
     components: {
-      Layout: { headerBg: HEADER_BG, headerHeight: 64, headerPadding: '0 24px', bodyBg: PAGE_BG },
+      Layout: { headerBg: dark ? '#0a1017' : HEADER_BG, headerHeight: 64, headerPadding: '0 24px', bodyBg: dark ? DARK.pageBg : PAGE_BG },
       Button: {
         fontWeight: 600,
         paddingInline: 20,
@@ -59,9 +80,9 @@ export function buildTheme(primary: string): ThemeConfig {
       Input: { paddingInline: 14 },
       Select: { optionHeight: 40, optionPadding: '9px 14px' },
       Table: {
-        headerBg: '#f6f8fa',
-        headerColor: TEXT_2,
-        rowHoverBg: '#eef4fb',
+        headerBg: dark ? DARK.subtle : '#f6f8fa',
+        headerColor: dark ? DARK.text2 : TEXT_2,
+        rowHoverBg: dark ? DARK.hover : '#eef4fb',
         cellPaddingBlock: 14,
         cellPaddingInline: 16,
         cellPaddingBlockMD: 11,
@@ -72,11 +93,11 @@ export function buildTheme(primary: string): ThemeConfig {
       Tabs: { titleFontSize: 16, horizontalItemPadding: '14px 4px', horizontalItemGutter: 28, inkBarColor: primary },
       Modal: { titleFontSize: 20, paddingContentHorizontalLG: 28 },
       Form: { labelFontSize: 14, verticalLabelPadding: '0 0 6px', itemMarginBottom: 20 },
-      Tag: { defaultBg: '#eef1f4' },
-      Segmented: { itemSelectedBg: '#ffffff', trackBg: '#e6eaef', trackPadding: 4 },
-      Descriptions: { labelBg: '#f6f8fa', itemPaddingBottom: 12 },
+      Tag: { defaultBg: dark ? DARK.tagBg : '#eef1f4' },
+      Segmented: { itemSelectedBg: dark ? DARK.segmentedSelected : '#ffffff', trackBg: dark ? DARK.segmentedTrack : '#e6eaef', trackPadding: 4 },
+      Descriptions: { labelBg: dark ? DARK.subtle : '#f6f8fa', itemPaddingBottom: 12 },
       Statistic: { contentFontSize: 30, titleFontSize: 14 },
-      Dropdown: { controlItemBgHover: '#eef4fb', paddingBlock: 8 },
+      Dropdown: { controlItemBgHover: dark ? DARK.hover : '#eef4fb', paddingBlock: 8 },
       Menu: { itemHeight: 44, iconSize: 18 },
     },
   };

@@ -114,7 +114,7 @@ interface AssetOption {
   building_name: string | null;
 }
 
-const DEFAULT_HEIGHT: Record<AssetType, number> = { switch: 1, access_point: 1, server: 2, vm: 1 };
+const DEFAULT_HEIGHT: Record<AssetType, number> = { switch: 1, access_point: 1, server: 2, ups: 2, vm: 1 };
 
 export function MountModal({
   open,
@@ -167,7 +167,7 @@ export function MountModal({
 
   const options = useQuery({
     queryKey: ['rack-mount-options', rack.plant_id, debounced],
-    queryFn: () => http.get<AssetOption[]>('/api/assets/options', { plantId: rack.plant_id, type: 'switch,server,access_point', q: debounced || undefined }),
+    queryFn: () => http.get<AssetOption[]>('/api/assets/options', { plantId: rack.plant_id, type: 'switch,server,ups,access_point', q: debounced || undefined }),
     enabled: open && mode === 'device' && !asset,
   });
 

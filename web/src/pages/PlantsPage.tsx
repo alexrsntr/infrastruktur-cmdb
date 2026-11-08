@@ -10,12 +10,13 @@ import { StatTile } from '../components/Simple';
 import { WorldMap } from '../components/WorldMap';
 import { useDashboard, usePlants } from '../lib/queries';
 import { useSession } from '../lib/session';
+import { tintBg, tintFg } from '../lib/palette';
 
 function PlantCard({ p, onOpen }: { p: Plant; onOpen: () => void }) {
   return (
     <Card hoverable onClick={onOpen} styles={{ body: { padding: 22 } }} style={{ height: '100%' }}>
       <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 14 }}>
-        <span className="stat-icon" style={{ background: '#2563eb18', color: '#2563eb', fontSize: 15, fontWeight: 800, width: 56 }}>
+        <span className="stat-icon" style={{ background: tintBg('#2563eb'), color: tintFg('#2563eb'), fontSize: 15, fontWeight: 800, width: 56 }}>
           {p.code}
         </span>
         <div style={{ minWidth: 0 }}>
@@ -36,7 +37,7 @@ function PlantCard({ p, onOpen }: { p: Plant; onOpen: () => void }) {
           </div>
         ))}
       </div>
-      <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid #edf0f3', display: 'flex', justifyContent: 'space-between', color: '#4a5a6c' }}>
+      <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--cmdb-border-soft)', display: 'flex', justifyContent: 'space-between', color: 'var(--cmdb-text-2)' }}>
         <span>
           <ClusterOutlined /> {p.building_count ?? 0} building{p.building_count === 1 ? '' : 's'}
         </span>

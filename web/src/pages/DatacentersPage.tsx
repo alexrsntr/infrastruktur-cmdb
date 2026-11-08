@@ -150,10 +150,10 @@ export function DatacentersPage() {
 
       <DatacenterFormModal open={creating} onClose={() => setCreating(false)} defaultPlantId={plantId} onSaved={(dc) => navigate(`/datacenters/${dc.id}`)} />
       <style>{`
-        .page-icon { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; font-size: 26px; background: #e8effd; color: var(--ant-color-primary, #2563eb); flex: 0 0 auto; }
-        .dc-card-site { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 15px; padding: 8px 10px; background: #f6f8fa; border-radius: 8px; }
-        .dc-card-counts { display: flex; gap: 22px; flex-wrap: wrap; font-size: 14.5px; color: #4a5a6c; border-top: 1px solid #edf0f3; padding-top: 12px; }
-        .dc-card-counts strong { color: #14202e; font-size: 17px; }
+        .page-icon { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; font-size: 26px; background: var(--cmdb-primary-soft); color: var(--ant-color-primary, #2563eb); flex: 0 0 auto; }
+        .dc-card-site { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 15px; padding: 8px 10px; background: var(--cmdb-surface-2); border-radius: 8px; }
+        .dc-card-counts { display: flex; gap: 22px; flex-wrap: wrap; font-size: 14.5px; color: var(--cmdb-text-2); border-top: 1px solid var(--cmdb-border-soft); padding-top: 12px; }
+        .dc-card-counts strong { color: var(--cmdb-text); font-size: 17px; }
       `}</style>
     </div>
   );

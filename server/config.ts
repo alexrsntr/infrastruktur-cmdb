@@ -126,8 +126,9 @@ export function loadConfig(): Config {
       brandName: str('BRAND_NAME', 'Infrastruktur'),
       appName: str('APP_NAME', 'IT CMDB'),
       primaryColor: str('BRAND_PRIMARY_COLOR', '#2563eb'),
-      mapTileUrl: str('MAP_TILE_URL', 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'),
-      mapTileAttribution: str('MAP_TILE_ATTRIBUTION', '&copy; OpenStreetMap contributors'),
+      // empty = built-in world map, the browser contacts no external map service
+      mapTileUrl: str('MAP_TILE_URL'),
+      mapTileAttribution: str('MAP_TILE_ATTRIBUTION'),
     },
   };
 

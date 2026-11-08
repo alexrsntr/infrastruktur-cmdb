@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { Button, Empty, Input, Segmented, Select, Table, Tooltip, Typography, type TableColumnsType } from 'antd';
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import type { SortOrder } from 'antd/es/table/interface';
-import { ASSET_STATUSES, ASSET_STATUS_META, ASSET_TYPES, ASSET_TYPE_KEYS, formatRackUnits, type Asset, type AssetType } from '../../../shared/model';
+import { ASSET_STATUSES, ASSET_STATUS_META, ASSET_TYPES, ASSET_TYPE_KEYS, assetTypeNoun, formatRackUnits, type Asset, type AssetType } from '../../../shared/model';
 import type { Query } from '../lib/api';
 import { fmtDateTime, fromNow } from '../lib/format';
 import { useAssets, usePlants } from '../lib/queries';
@@ -201,7 +201,7 @@ export function AssetTable({ fixed = {}, createDefaults, syncUrl = false, pageSi
               })
             }
           >
-            Add {fixed.type ? ASSET_TYPES[fixed.type].label.toLowerCase() : 'device'}
+            Add {fixed.type ? assetTypeNoun(fixed.type) : 'device'}
           </Button>
         )}
       </div>

@@ -28,7 +28,7 @@ export function AssetsPage() {
     <div>
       <PageHeader
         title={type ? ASSET_TYPES[type].plural : 'Devices'}
-        subtitle="All switches, access points, servers and virtual machines of your plants. Click a device to see its details and activity log."
+        subtitle="All switches, access points, servers, UPS and virtual machines of your plants. Click a device to see its details and activity log."
       />
       <div className="tile-grid" style={{ marginBottom: 20 }}>
         <StatTile to={`/inventory${qs}`} active={!type} icon={<AppstoreOutlined />} value={total ?? '–'} label="All devices" />

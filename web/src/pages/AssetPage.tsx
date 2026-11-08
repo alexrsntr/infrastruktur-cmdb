@@ -180,6 +180,7 @@ export function AssetPage() {
   const extra: [string, unknown, React.ReactNode?][] = [
     ...(typeDef.fields as readonly FieldDef[]).map((f): [string, unknown, React.ReactNode?] => {
       const v = a.attributes?.[f.key];
+      if (f.type === 'date' && typeof v === 'string' && v) return [f.label, v, fmtDate(v)];
       return [f.label, v, typeof v === 'boolean' ? (v ? 'Yes' : 'No') : f.unit && filled(v) ? `${v} ${f.unit}` : (v as React.ReactNode)];
     }),
     ['Criticality', a.criticality, CRITICALITY_META[a.criticality].label],

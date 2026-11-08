@@ -26,7 +26,7 @@ export function LoginPage({ config }: { config?: AppConfig }) {
         minHeight: '100vh',
         display: 'grid',
         placeItems: 'center',
-        background: `linear-gradient(135deg, ${HEADER_BG} 0%, #134a7c 55%, #e9eef4 55.1%)`,
+        background: `linear-gradient(135deg, ${HEADER_BG} 0%, #134a7c 55%, var(--cmdb-bg) 55.1%)`,
         padding: 24,
       }}
     >

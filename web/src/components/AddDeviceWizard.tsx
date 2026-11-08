@@ -3,17 +3,19 @@ import { useNavigate } from 'react-router';
 import { App, Button, Col, DatePicker, Form, Input, InputNumber, Modal, Row, Select, Steps, Switch, Typography } from 'antd';
 import { ArrowLeftOutlined, ArrowRightOutlined, CheckOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { ASSET_STATUSES, ASSET_STATUS_META, ASSET_TYPES, ASSET_TYPE_KEYS, type Asset, type AssetType, type FieldDef } from '../../../shared/model';
+import { ASSET_STATUSES, ASSET_STATUS_META, ASSET_TYPES, ASSET_TYPE_KEYS, assetTypeNoun, type Asset, type AssetType, type FieldDef } from '../../../shared/model';
 import { errorText, http } from '../lib/api';
 import { DATE_FORMAT } from '../lib/format';
 import { useBuildings, useInvalidate, usePlants, useRacks } from '../lib/queries';
 import { useSession } from '../lib/session';
+import { DateStringInput } from './DateStringInput';
 import { TypeIcon } from './Simple';
 
 const TYPE_HINT: Record<AssetType, string> = {
   switch: 'Network switch in a rack or cabinet',
   access_point: 'Wi-Fi access point on a ceiling or wall',
   server: 'Physical server or hypervisor host',
+  ups: 'Uninterruptible power supply (emergency power) in a rack or room',
   vm: 'Virtual machine on a host or cluster',
 };
 
@@ -40,6 +42,7 @@ function AttributeInput({ field }: { field: FieldDef }) {
   if (field.type === 'number') return <InputNumber style={{ width: '100%' }} addonAfter={field.unit} />;
   if (field.type === 'boolean') return <Switch />;
   if (field.type === 'select') return <Select allowClear options={field.options?.map((o) => ({ value: o, label: o }))} />;
+  if (field.type === 'date') return <DateStringInput />;
   return <Input placeholder={field.placeholder} />;
 }
 
@@ -171,7 +174,7 @@ function AddDeviceWizard({ open, defaults, onClose }: { open: boolean; defaults:
                 style={{ width: '100%' }}
                 onClick={() => {
                   setType(t);
-                  form.setFieldValue('rack_height_u', t === 'server' ? 2 : 1);
+                  form.setFieldValue('rack_height_u', t === 'server' || t === 'ups' ? 2 : 1);
                   setStep(1);
                 }}
               >
@@ -189,8 +192,8 @@ function AddDeviceWizard({ open, defaults, onClose }: { open: boolean; defaults:
         {step === 1 && typeDef && (
           <Row gutter={16}>
             <Col span={24}>
-              <Form.Item name="name" label={`Name of the ${typeDef.label.toLowerCase()} (hostname)`} rules={[{ required: true, whitespace: true, message: 'Please enter a name' }]}>
-                <Input size="large" placeholder={type === 'access_point' ? 'e.g. muc-ap-042' : type === 'switch' ? 'e.g. muc-b01-sw03' : 'e.g. muc-srv-backup01'} autoFocus />
+              <Form.Item name="name" label={`Name of the ${assetTypeNoun(type!)} (hostname)`} rules={[{ required: true, whitespace: true, message: 'Please enter a name' }]}>
+                <Input size="large" placeholder={type === 'access_point' ? 'e.g. muc-ap-042' : type === 'switch' ? 'e.g. muc-b01-sw03' : type === 'ups' ? 'e.g. muc-ups02' : 'e.g. muc-srv-backup01'} autoFocus />
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
@@ -251,7 +254,7 @@ function AddDeviceWizard({ open, defaults, onClose }: { open: boolean; defaults:
             )}
             <Col xs={24} md={12}>
               <Form.Item name="model" label="Model">
-                <Input placeholder={type === 'access_point' ? 'e.g. Meraki MR46' : type === 'switch' ? 'e.g. Catalyst 9300-48P' : 'e.g. PowerEdge R760'} />
+                <Input placeholder={type === 'access_point' ? 'e.g. Meraki MR46' : type === 'switch' ? 'e.g. Catalyst 9300-48P' : type === 'ups' ? 'e.g. Smart-UPS SRT 6000' : 'e.g. PowerEdge R760'} />
               </Form.Item>
             </Col>
           </Row>

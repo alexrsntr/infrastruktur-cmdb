@@ -11,7 +11,7 @@ import { useAssets, useInvalidate } from '../lib/queries';
 import { useSession } from '../lib/session';
 import { AssetStatusTag, AssetTypeTag } from './Tags';
 
-const SHORT_LABEL: Record<AssetType, string> = { switch: 'SW', access_point: 'AP', server: 'SRV', vm: 'VM' };
+const SHORT_LABEL: Record<AssetType, string> = { switch: 'SW', access_point: 'AP', server: 'SRV', ups: 'UPS', vm: 'VM' };
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
@@ -363,8 +363,8 @@ export function FloorPlanMap({
         </div>
 
         {canPlace && editMode && (
-          <div className="no-print" style={{ flex: '0 0 280px', display: 'flex', flexDirection: 'column', height, border: '1px solid #e5e9ef', borderRadius: 6, background: '#fff' }}>
-            <div style={{ padding: '10px 12px', borderBottom: '1px solid #f0f2f5' }}>
+          <div className="no-print" style={{ flex: '0 0 280px', display: 'flex', flexDirection: 'column', height, border: '1px solid var(--cmdb-border)', borderRadius: 6, background: 'var(--cmdb-surface)' }}>
+            <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--cmdb-border-soft)' }}>
               <Typography.Text strong>Not placed yet</Typography.Text>
               <Typography.Paragraph type="secondary" style={{ fontSize: 12, margin: '2px 0 8px' }}>
                 Assets of this building without a position. Select one, then click on the plan.
@@ -379,7 +379,7 @@ export function FloorPlanMap({
                 renderItem={(a) => (
                   <List.Item
                     onClick={() => setPlacingId(a.id === placingId ? null : a.id)}
-                    style={{ cursor: 'pointer', paddingInline: 12, background: a.id === placingId ? '#e6fffb' : undefined }}
+                    style={{ cursor: 'pointer', paddingInline: 12, background: a.id === placingId ? 'var(--cmdb-primary-soft)' : undefined }}
                   >
                     <Space size={6} style={{ minWidth: 0 }}>
                       <AssetTypeTag type={a.type} short />
