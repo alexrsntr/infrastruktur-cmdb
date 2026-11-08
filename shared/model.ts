@@ -280,9 +280,12 @@ export interface CurrentUser {
   displayName: string;
   email: string | null;
   role: Role;
-  roleSource: 'entra' | 'local';
+  roleSource: RoleSource;
   plantScope: string[]; // empty = all plants
 }
+
+/** Where a user's role comes from: Entra app role (token), Entra group mapping or set in the CMDB */
+export type RoleSource = 'entra' | 'group' | 'local';
 
 export interface AppConfig {
   brandName: string;
@@ -291,6 +294,10 @@ export interface AppConfig {
   mapTileUrl: string;
   mapTileAttribution: string;
   authMode: 'entra' | 'local' | 'dev';
+  /** "Sign in with Microsoft" is offered */
+  entraLogin: boolean;
+  /** Password sign-in: all users, administrators only, off; none = not available (AUTH_MODE entra/dev) */
+  localLogin: 'all' | 'admins' | 'off' | 'none';
 }
 
 export interface MeResponse {
@@ -464,7 +471,9 @@ export interface AppUser {
   email: string | null;
   display_name: string;
   role: Role;
-  role_source: 'entra' | 'local';
+  role_source: RoleSource;
+  /** e.g. the Entra group(s) a role comes from */
+  role_detail: string | null;
   plant_scope: string[];
   active: boolean;
   last_login_at: string | null;

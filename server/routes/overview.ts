@@ -1,13 +1,17 @@
 import { Router } from 'express';
 import type { Pool } from 'pg';
-import { ROLE_PERMISSIONS, type MeResponse } from '../../shared/model';
+import { ROLE_PERMISSIONS, type AppConfig, type MeResponse } from '../../shared/model';
 import type { Config } from '../config';
 import { ensureCsrfToken } from '../auth/context';
 import { likePattern, queryString, SqlBuilder } from '../lib/http';
 import { applyScope, isUnscoped } from '../lib/scope';
 import { ACTIVITY_FROM, ACTIVITY_SELECT } from './journal';
+import type { EntraService } from '../entra/service';
+import { effectiveLocalLogin } from '../entra/settings';
 
-export function publicConfig(config: Config) {
+/** Configuration for the browser, including which sign-in options are currently offered. */
+export async function publicConfig(config: Config, entra: EntraService): Promise<AppConfig> {
+  const rt = await entra.runtime();
   return {
     brandName: config.ui.brandName,
     appName: config.ui.appName,
@@ -15,19 +19,21 @@ export function publicConfig(config: Config) {
     mapTileUrl: config.ui.mapTileUrl,
     mapTileAttribution: config.ui.mapTileAttribution,
     authMode: config.authMode,
+    entraLogin: rt.enabled,
+    localLogin: effectiveLocalLogin(config, rt),
   };
 }
 
-export function overviewRouter(pool: Pool, config: Config): Router {
+export function overviewRouter(pool: Pool, config: Config, entra: EntraService): Router {
   const r = Router();
 
-  r.get('/me', (req, res) => {
+  r.get('/me', async (req, res) => {
     const user = req.user!;
     const body: MeResponse = {
       user,
       permissions: ROLE_PERMISSIONS[user.role],
       csrfToken: ensureCsrfToken(req),
-      config: publicConfig(config),
+      config: await publicConfig(config, entra),
     };
     res.json(body);
   });

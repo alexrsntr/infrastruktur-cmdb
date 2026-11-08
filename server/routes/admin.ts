@@ -30,7 +30,7 @@ export function buildAuditQuery(query: Record<string, unknown>) {
 
 export const AUDIT_SELECT = `l.id::text, l.at, l.user_id, l.user_name, l.action, l.entity_type, l.entity_id, l.entity_label, l.changes, l.ip`;
 
-const USER_COLUMNS = 'id, oid, email, display_name, role, role_source, plant_scope, active, last_login_at, created_at, (password_hash IS NOT NULL) AS has_password';
+const USER_COLUMNS = 'id, oid, email, display_name, role, role_source, role_detail, plant_scope, active, last_login_at, created_at, (password_hash IS NOT NULL) AS has_password';
 
 export function adminRouter(pool: Pool): Router {
   const r = Router();
@@ -65,16 +65,21 @@ export function adminRouter(pool: Pool): Router {
     if (!before) throw notFound('User');
     if (id === req.user!.id && (input.role !== 'admin' || !input.active)) throw badRequest('You cannot remove your own administrator access');
     // A role managed by an Entra app role assignment would be overwritten at the next login – keep it read-only here.
-    const role = before.role_source === 'entra' ? before.role : input.role;
+    const role = before.role_source === 'local' ? input.role : before.role;
     if (before.role_source === 'entra' && input.role !== before.role)
       throw badRequest('This role is assigned via an Entra ID app role. Change the assignment in Entra ID (Enterprise applications).');
+    // Role and plant scope of group-managed users follow the Entra group mapping (updated at every sign-in).
+    const sameScope = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
+    if (before.role_source === 'group' && (input.role !== before.role || !sameScope(input.plant_scope, before.plant_scope ?? [])))
+      throw badRequest(`Role and plant scope come from the Entra group mapping (${before.role_detail ?? 'group'}). Change the mapping under Users & permissions → Microsoft Entra ID.`);
+    const plantScope = before.role_source === 'group' ? (before.plant_scope ?? []) : input.plant_scope;
     const { rows } = await pool.query(
       `UPDATE app_user SET role = $2, plant_scope = $3::uuid[], active = $4, updated_at = now() WHERE id = $1
        RETURNING ${USER_COLUMNS}`,
-      [id, role, input.plant_scope, input.active],
+      [id, role, plantScope, input.active],
     );
     if (!input.active) await pool.query(`DELETE FROM user_session WHERE sess->>'userId' = $1`, [id]);
-    const changes = diff({ role: before.role, plant_scope: before.plant_scope, active: before.active }, { role, plant_scope: input.plant_scope, active: input.active });
+    const changes = diff({ role: before.role, plant_scope: before.plant_scope, active: before.active }, { role, plant_scope: plantScope, active: input.active });
     if (Object.keys(changes).length)
       await audit(pool, req, { action: 'user.update', entityType: 'user', entityId: id, entityLabel: before.display_name, changes });
     res.json(rows[0]);

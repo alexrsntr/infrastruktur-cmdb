@@ -1,14 +1,25 @@
 import crypto from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 import type { Pool } from 'pg';
-import { can, type CurrentUser, type Permission, type Role } from '../../shared/model';
+import { can, type CurrentUser, type Permission, type Role, type RoleSource } from '../../shared/model';
 import { HttpError, forbidden } from '../lib/http';
 
 declare module 'express-session' {
   interface SessionData {
     userId?: string;
     csrfToken?: string;
-    oidc?: { state: string; nonce: string; codeVerifier: string; returnTo: string };
+    oidc?: {
+      state: string;
+      nonce: string;
+      codeVerifier: string;
+      returnTo: string;
+      /** test = admin checks the Entra configuration before activating it (does not change the session) */
+      purpose?: 'login' | 'test';
+      /** test: the administrator who started it */
+      userId?: string;
+    };
+    /** How the user signed in (logout of Microsoft only after a Microsoft sign-in) */
+    authMethod?: 'entra' | 'local' | 'dev';
   }
 }
 
@@ -26,7 +37,7 @@ interface UserRow {
   display_name: string;
   email: string | null;
   role: Role;
-  role_source: 'entra' | 'local';
+  role_source: RoleSource;
   plant_scope: string[];
   active: boolean;
 }
@@ -74,6 +85,13 @@ export function requirePermission(...permissions: Permission[]) {
     }
     next();
   };
+}
+
+/** Administrators only – in addition to the permission checks (admin-only features such as the Entra configuration). */
+export function requireAdmin(req: Request, _res: Response, next: NextFunction) {
+  if (!req.user) return next(new HttpError(401, 'Not signed in'));
+  if (req.user.role !== 'admin') return next(forbidden());
+  next();
 }
 
 export function assertCan(user: CurrentUser | undefined, permission: Permission) {

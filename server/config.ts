@@ -11,6 +11,11 @@ function bool(name: string, fallback = false): boolean {
   return ['1', 'true', 'yes', 'on'].includes(v.toLowerCase());
 }
 
+/** True if the variable is set to a non-empty value */
+function has(name: string): boolean {
+  return !!process.env[name]?.trim();
+}
+
 function int(name: string, fallback: number): number {
   const v = Number.parseInt(process.env[name] ?? '', 10);
   return Number.isFinite(v) ? v : fallback;
@@ -35,6 +40,17 @@ export interface Config {
     useManagedIdentity: boolean;
     requireAppRole: boolean;
   };
+  /** Which Entra values come from environment variables – they win over values configured in the app */
+  entraEnv: {
+    tenantId: boolean;
+    clientId: boolean;
+    clientSecret: boolean;
+    credential: boolean;
+    managedIdentityClientId: boolean;
+    requireAppRole: boolean;
+  };
+  /** LOCAL_LOGIN_EMERGENCY=true: administrators can always sign in with their password (break-glass) */
+  localLoginEmergency: boolean;
   defaultRole: Role;
   bootstrapAdmins: string[];
   db: {
@@ -95,6 +111,15 @@ export function loadConfig(): Config {
       useManagedIdentity: bool('ENTRA_USE_MANAGED_IDENTITY'),
       requireAppRole: bool('ENTRA_REQUIRE_APP_ROLE'),
     },
+    entraEnv: {
+      tenantId: has('ENTRA_TENANT_ID'),
+      clientId: has('ENTRA_CLIENT_ID'),
+      clientSecret: has('ENTRA_CLIENT_SECRET'),
+      credential: has('ENTRA_USE_MANAGED_IDENTITY'),
+      managedIdentityClientId: has('AZURE_CLIENT_ID'),
+      requireAppRole: has('ENTRA_REQUIRE_APP_ROLE'),
+    },
+    localLoginEmergency: bool('LOCAL_LOGIN_EMERGENCY'),
     defaultRole,
     bootstrapAdmins: str('BOOTSTRAP_ADMINS')
       .split(',')

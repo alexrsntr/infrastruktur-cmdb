@@ -8,6 +8,7 @@ import { planMarkersMigration } from './migrations/005_plan_markers';
 import { datacentersMigration } from './migrations/006_datacenters';
 import { localAccountsMigration } from './migrations/007_local_accounts';
 import { upsMigration } from './migrations/008_ups';
+import { entraSettingsMigration } from './migrations/009_entra_settings';
 
 export interface Migration {
   id: string;
@@ -206,4 +207,5 @@ export const migrations: Migration[] = [
   datacentersMigration,
   localAccountsMigration,
   upsMigration,
+  entraSettingsMigration,
 ];

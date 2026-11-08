@@ -23,6 +23,8 @@ import { settingsRouter } from './routes/settings';
 import { attachmentsRouter } from './routes/attachments';
 import { plansRouter } from './routes/plans';
 import { datacentersRouter } from './routes/datacenters';
+import { entraRouter } from './routes/entra';
+import { EntraService, type EntraDeps } from './entra/service';
 
 function tileHosts(tileUrl: string): string[] {
   try {
@@ -43,7 +45,13 @@ function resolveStaticDir(): string | null {
   return candidates.find((dir) => fs.existsSync(path.join(dir, 'index.html'))) ?? null;
 }
 
-export function createApp(pool: Pool, config: Config) {
+export interface AppDeps {
+  /** Replacements for MSAL / Microsoft Graph (tests) */
+  entra?: EntraDeps;
+}
+
+export function createApp(pool: Pool, config: Config, deps: AppDeps = {}) {
+  const entra = new EntraService(pool, config, deps.entra);
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', 1); // Azure App Service front end
@@ -109,17 +117,17 @@ export function createApp(pool: Pool, config: Config) {
   app.use(loadUser(pool));
 
   // ---- auth ----
-  app.use('/auth', authRouter(pool, config));
+  app.use('/auth', authRouter(pool, config, entra));
 
   // ---- API ----
-  app.get('/api/public-config', (_req, res) => res.json(publicConfig(config)));
+  app.get('/api/public-config', async (_req, res) => res.json(await publicConfig(config, entra)));
   const api = Router();
   api.use(requireAuth, csrfProtection);
   api.use((_req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
     next();
   });
-  api.use(overviewRouter(pool, config));
+  api.use(overviewRouter(pool, config, entra));
   api.use(locationsRouter(pool));
   api.use(assetsRouter(pool));
   api.use(journalRouter(pool));
@@ -128,6 +136,7 @@ export function createApp(pool: Pool, config: Config) {
   api.use(importsRouter(pool));
   api.use(racksRouter(pool));
   api.use(settingsRouter(pool, config));
+  api.use(entraRouter(pool, config, entra));
   api.use(attachmentsRouter(pool, config));
   api.use(plansRouter(pool));
   api.use(datacentersRouter(pool));
