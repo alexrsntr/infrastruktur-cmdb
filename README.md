@@ -26,7 +26,8 @@ Pick **one** of the four ways. You do not need any IT knowledge for ways 1–3.
 | 4 | [**Azure with Terraform**](#way-4-azure-with-terraform-for-it-teams) | companies with Microsoft 365 / Entra ID | Microsoft account (SSO) | ≈ 1–2 hours, for IT staff |
 
 With ways 1–3 the **first person who opens the CMDB creates the administrator account**, so open it right
-after the installation. You can switch to Microsoft sign-in later.
+after the installation. You can add the sign-in with Microsoft later, directly in the app – see
+[Add Microsoft sign-in later](docs/SETUP.md#add-microsoft-sign-in-later).
 
 ### Way 1: Windows – try it with one double-click
 
@@ -87,7 +88,7 @@ variants – pick one:
    - **Private endpoints:** pick a subnet with free addresses – it can be shared with other resources.
    - **App Service integration subnet:** Azure requires a separate, empty subnet through which the web app reaches
      the database. Leave *Create a new subnet* selected and enter a free address range inside the network, e.g.
-     `10.210.156.0/28` – the deployment creates it (delegated to `Microsoft.Web/serverFarms`, with a network
+     `10.0.1.0/28` – the deployment creates it (delegated to `Microsoft.Web/serverFarms`, with a network
      security group). Alternatively choose an existing empty, delegated subnet.
    - **Private DNS zones:** *Create new* for a network with Azure DNS; *Use existing* if your company has central
      zones (e.g. in a hub – enter the resource IDs of `privatelink.azurewebsites.net` and
@@ -153,7 +154,7 @@ Actions (automatic deployments), groups and go-live checklist: **[docs/SETUP.md]
 | **Notes** | Free-text notes on plants, buildings, floors and assets; pinning; author-only editing |
 | **Activities** | Maintenance, incidents, changes, installations, inspections, replacements with status, assignee and due date; overdue highlighting; global activity board |
 | **History & audit** | Field-level change history for every object (who/what/when, old → new). Global audit log (incl. logins & exports) for administrators |
-| **Permissions** | 4 roles (Admin, Editor, Operator, Viewer), managed in the app or from **Entra ID app roles**, plus optional **plant scoping** per user (e.g. a technician only sees plant MUC) |
+| **Permissions** | 4 roles (Admin, Editor, Operator, Viewer), managed in the app, from **Entra ID app roles** or from **Entra groups** mapped to roles, plus optional **plant scoping** per user (e.g. a technician only sees plant MUC) |
 | **Export** | Every list exports to **Excel / CSV / JSON** with the current filters. Complete workbook (one sheet per entity & asset type), plant dossier, asset dossier, audit log, users. CSV with `;` (Excel DE) or `,`, formula-injection safe |
 | **Import** | Excel/CSV import of assets (same columns as the export) with **dry run** validation, upsert by ID or type+name, per-row error report |
 | **Warranty e-mails** | Daily digest e-mail of devices whose warranty/support ends in e.g. 90/30/7 days (and once when expired). Global recipients plus recipients per plant. Each device is reported once per stage; safe with several app instances. SMTP server configured in the app (*Administration → Settings*), password stored encrypted. Preview, "send now", test e-mail and send history |
@@ -172,10 +173,13 @@ Actions (automatic deployments), groups and go-live checklist: **[docs/SETUP.md]
 | Delete plants, user management, global audit log, settings & e-mail notifications | | | | ✔ |
 
 * **Sign-in** (`AUTH_MODE`): `local` = e-mail + password accounts managed by the administrators in the app
-  (Docker and the Azure one-click setup); `entra` = Microsoft Entra ID single sign-on.
-* With Entra ID, roles come from the **app roles** `CMDB.Admin`, `CMDB.Editor`, `CMDB.Operator`, `CMDB.Viewer`
-  (assigned to users or groups in *Enterprise applications*). Users without an app role get
-  `DEFAULT_ROLE` and can be managed in the app.
+  (Docker and the Azure one-click setup) – Microsoft Entra ID can be added later in the app
+  (*Administration → Settings → Microsoft Entra ID*, no restart); `entra` = Microsoft Entra ID single sign-on
+  configured by environment variables (Terraform).
+* With Entra ID the role is determined at every sign-in: **app role** in the token (`CMDB.Admin`, `CMDB.Editor`,
+  `CMDB.Operator`, `CMDB.Viewer`, assigned in *Enterprise applications*) > **Entra group mapped to a role**
+  (*Users & permissions → Microsoft Entra ID*, memberships read with Microsoft Graph, optional plant scope) >
+  role set in the app > `DEFAULT_ROLE`. If several apply, the highest role of that source wins.
 * Local accounts: the first visitor creates the administrator; administrators add users with an initial
   password and can reset passwords; everyone can change their own password (user menu). Passwords are
   stored as scrypt hashes, sign-in attempts are rate-limited.
@@ -246,10 +250,11 @@ The most important ones for Azure:
 | `APP_BASE_URL` | `https://cmdb-prod.azurewebsites.net` | used for the OIDC redirect URI `…/auth/callback` |
 | `SESSION_SECRET` | Key Vault reference | ≥ 32 characters |
 | `AUTH_MODE` | `entra` | `entra` (Microsoft sign-in) or `local` (e-mail + password) |
-| `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` | | app registration |
+| `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` | | app registration (with `AUTH_MODE=local` optional: configured in the app; a variable that is set always wins) |
 | `ENTRA_USE_MANAGED_IDENTITY` | `true` | secretless: managed identity as federated credential (else `ENTRA_CLIENT_SECRET`) |
 | `ENTRA_REQUIRE_APP_ROLE` | `true` | reject users without a CMDB app role |
 | `BOOTSTRAP_ADMINS` | `admin@yourdomain.com` | UPNs that are always admin |
+| `LOCAL_LOGIN_EMERGENCY` | `true` | break-glass: administrators can sign in with their password even if password sign-in is turned off |
 | `DB_AUTH` | `entra` | PostgreSQL password = Entra token of the managed identity |
 | `PGHOST`, `PGDATABASE`, `PGUSER` | `…postgres.database.azure.com`, `cmdb`, `<identity name>` | |
 | `PGSSLMODE` | `require` | |

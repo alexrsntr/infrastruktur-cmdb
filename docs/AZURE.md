@@ -346,6 +346,42 @@ Notes:
 - Role changes take effect at the user's **next sign-in**. Sessions slide for up to 10 hours. To lock a user out immediately, deactivate them in Administration → Users, which also deletes their sessions.
 - Group assignment needs Entra ID P1/P2, and nested groups are not resolved. Assign the groups whose members should get access directly.
 
+### 5.1 Entra groups mapped to CMDB roles, directory view (optional)
+
+Instead of (or in addition to) app role assignments, administrators can map **Entra groups to CMDB roles** in the app
+(*Users & permissions → Microsoft Entra ID*), optionally restricted to plants. At every sign-in the app reads the
+user's transitive group memberships with Microsoft Graph (`/users/{id}/transitiveMemberOf`, not the `groups` claim).
+Order: app role in the token > group mapping > role set in the app > `DEFAULT_ROLE`; with `ENTRA_REQUIRE_APP_ROLE=true`
+a mapped group counts as role. Without any group mapping the app makes no Graph call at sign-in.
+
+The directory features (search users and groups, group members, adding users before their first sign-in, list of app
+role assignments) use an **app-only token** of the same app registration (client secret or managed identity) and need
+these Microsoft Graph **application** permissions with admin consent – all read-only:
+
+| Permission | Used for |
+|---|---|
+| `User.Read.All` | search users, read a user before adding them |
+| `GroupMember.Read.All` | search groups, list members, group memberships at sign-in |
+| `Application.Read.All` | list users/groups assigned to the app roles of the enterprise application |
+
+```bash
+APP_ID=$(terraform -chdir=infra/terraform output -raw entra_client_id)
+for p in df021288-bdef-4463-88db-98f22de89214 98830695-27a2-44f7-8c18-0c3ebc9698f6 9a5d68dd-52b0-4cc2-bd40-abcf44ac3a30; do
+  az ad app permission add --id "$APP_ID" --api 00000003-0000-0000-c000-000000000000 --api-permissions "$p=Role"
+done
+az ad app permission admin-consent --id "$APP_ID"
+```
+
+(The GUIDs are the application permissions `User.Read.All`, `GroupMember.Read.All` and `Application.Read.All`.) With
+private networking and *route all traffic* the firewall must allow `graph.microsoft.com` in addition to
+`login.microsoftonline.com`.
+
+**Configuration in the app.** Installations with `AUTH_MODE=local` (Docker, one-click Azure templates) can configure the
+whole Entra sign-in under *Administration → Settings → Microsoft Entra ID* – see
+[SETUP.md › Add Microsoft sign-in later](SETUP.md#add-microsoft-sign-in-later). Environment variables always win: with
+`AUTH_MODE=entra` (this runbook) the tab only shows the values read-only; with `AUTH_MODE=local` every `ENTRA_*`
+variable that is set overrides and locks the corresponding field.
+
 ---
 
 ## 6. First login and BOOTSTRAP_ADMINS

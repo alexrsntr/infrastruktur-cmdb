@@ -14,7 +14,8 @@ Wähle **einen** der vier Wege. Für Weg A bis C braucht man keine IT-Kenntnisse
 | D | [**Azure mit Terraform**](#2-produktivbetrieb-planen) | Firmen mit Microsoft 365 / Entra ID | Microsoft-Konto (SSO) | ≈ 1–2 Std., für die IT |
 
 Bei Weg A bis C legt **die erste Person, die die CMDB öffnet, das Administratorkonto an** – also direkt nach der
-Installation öffnen. Auf Microsoft-Anmeldung kann man später umstellen.
+Installation öffnen. Die Anmeldung mit Microsoft lässt sich später direkt in der App ergänzen – siehe
+[Microsoft-Anmeldung nachträglich einrichten](#microsoft-anmeldung-nachträglich-einrichten).
 
 ### Weg A: Windows – ausprobieren mit einem Doppelklick
 
@@ -76,7 +77,7 @@ Es gibt zwei Varianten – eine davon wählen:
    - **Private endpoints:** ein Subnetz mit freien Adressen wählen – es darf mit anderen Ressourcen geteilt sein.
    - **App Service integration subnet:** Azure verlangt dafür ein eigenes, leeres Subnetz, über das die Web-App die
      Datenbank erreicht. *Create a new subnet* ausgewählt lassen und einen freien Adressbereich im VNet eintragen,
-     z. B. `10.210.156.0/28` – die Bereitstellung legt es an (delegiert an `Microsoft.Web/serverFarms`, mit
+     z. B. `10.0.1.0/28` – die Bereitstellung legt es an (delegiert an `Microsoft.Web/serverFarms`, mit
      Netzwerksicherheitsgruppe). Alternativ ein vorhandenes leeres, delegiertes Subnetz auswählen.
    - **Private DNS zones:** *Create new* bei einem VNet mit Azure-DNS; *Use existing*, wenn es zentrale Zonen gibt
      (z. B. im Hub – dann die Ressourcen-IDs von `privatelink.azurewebsites.net` und
@@ -317,6 +318,56 @@ Damit jedes `git push` auf `main` automatisch getestet und ausgerollt wird:
 - [ ] Test-E-Mail kommt an; Garantie-Erinnerung *Preview* zeigt die erwarteten Geräte
 - [ ] Export (Excel) funktioniert
 - [ ] Datenbank-Backup aktiv (14 Tage), Application Insights zeigt Requests
+
+## Microsoft-Anmeldung nachträglich einrichten
+
+Für Installationen, die mit E-Mail und Passwort gestartet sind (Docker, Windows-Paket, Azure mit wenigen Klicks):
+Ein Administrator richtet die Anmeldung mit Microsoft Entra ID **direkt in der App** ein – ohne Umgebungsvariablen,
+ohne Neustart. Die Anmeldung mit Passwort bleibt verfügbar, bis man sie einschränkt.
+
+### A. App-Registrierung in Microsoft Entra ID (Entra Admin Center)
+
+1. *Microsoft Entra ID → App-Registrierungen → Neue Registrierung*: Name z. B. `Infrastruktur CMDB`, *Nur Konten in
+   diesem Organisationsverzeichnis*. **Verzeichnis-ID (Mandant)** und **Anwendungs-ID (Client)** notieren.
+2. *Authentifizierung → Plattform hinzufügen → Web*: die beiden **Umleitungs-URIs** eintragen, die die App unter
+   *Administration → Settings → Microsoft Entra ID* anzeigt (`https://<ihre-cmdb>/auth/callback` und `https://<ihre-cmdb>/`).
+3. *Zertifikate & Geheimnisse → Neuer geheimer Clientschlüssel*: den **Wert** sofort kopieren (wird nur einmal
+   angezeigt) und das Ablaufdatum notieren. *Alternative ohne Geheimnis:* die verwaltete Identität des App Service
+   einschalten und als *Verbundanmeldeinformation* (Szenario „Verwaltete Identität“) hinzufügen.
+4. *App-Rollen → App-Rolle erstellen* (zulässige Mitgliedstypen: Benutzer/Gruppen), Werte genau `CMDB.Admin`,
+   `CMDB.Editor`, `CMDB.Operator`, `CMDB.Viewer`. Optional, wenn man stattdessen Entra-Gruppen in der App Rollen zuordnet.
+5. *API-Berechtigungen → Berechtigung hinzufügen → Microsoft Graph*:
+   - **Delegiert** (Anmeldung): `openid`, `profile`, `email`, `User.Read`
+   - **Anwendung** (nur lesend, für Benutzer-/Gruppensuche und Gruppenrollen): `User.Read.All`,
+     `GroupMember.Read.All`, `Application.Read.All`
+6. **Administratorzustimmung für <Mandant> erteilen** (Button auf derselben Seite; braucht z. B. die Rolle
+   *Administrator für privilegierte Rollen* oder *Globaler Administrator*).
+7. *Unternehmensanwendungen → Infrastruktur CMDB → Benutzer und Gruppen*: Personen oder Gruppen den App-Rollen zuweisen.
+   Unter *Eigenschaften → Zuweisung erforderlich = Ja* setzen, wenn nur zugewiesene Personen hinein dürfen.
+
+**Netzwerk:** Die CMDB braucht ausgehend HTTPS (Port 443) zu `login.microsoftonline.com` und `graph.microsoft.com`.
+Läuft der gesamte ausgehende Verkehr des App Service über eine Firewall (*gesamten Datenverkehr über das VNet leiten*),
+müssen dort beide Hostnamen freigegeben sein.
+
+### B. In der CMDB (Administration → Settings → Microsoft Entra ID)
+
+1. **Tenant-ID**, **Application (client) ID** und das **Client Secret** eintragen (oder *Managed identity* wählen),
+   dann **Save**. Das Secret wird verschlüsselt gespeichert und nie wieder angezeigt.
+2. **Test connection** – zeigt den Tenant-Namen und welche Graph-Berechtigungen erteilt sind; bei Fehlern steht da,
+   was nicht stimmt (falsche ID, Secret abgelaufen, Zustimmung fehlt, Firewall).
+3. **Test sign-in with Microsoft** – mit dem *eigenen* Microsoft-Konto anmelden. Es wird mit dem eigenen CMDB-Konto
+   verknüpft und muss die Administratorrolle ergeben (keine niedrigere App-Rolle), sonst könnte man sich aussperren.
+4. **Activate sign-in with Microsoft.** Die Anmeldeseite zeigt jetzt *Sign in with Microsoft*; bestehende Konten
+   werden bei der ersten Anmeldung über die E-Mail-Adresse (= UPN) verknüpft – Historie und Werks-Scopes bleiben.
+5. Optional unter *Users & permissions → Microsoft Entra ID*: Benutzer und Gruppen suchen, Personen vorab anlegen,
+   **Entra-Gruppen CMDB-Rollen zuordnen** (mit Werks-Scope) und sehen, wer welcher App-Rolle zugewiesen ist.
+6. Optional: die **Anmeldung mit Passwort** auf *Administratoren* (Notzugang) beschränken oder *abschalten* – möglich,
+   sobald sich ein Administrator mit Microsoft angemeldet hat.
+
+**Notzugang:** Fällt die Microsoft-Anmeldung aus und ist die Passwort-Anmeldung abgeschaltet, im App Service die
+Einstellung `LOCAL_LOGIN_EMERGENCY=true` setzen und neu starten – Administratoren können sich dann wieder mit Passwort
+anmelden. **Ablauf des Secrets:** das neue Client Secret vor Ablauf des alten im selben Formular eintragen (geht auch
+im aktiven Betrieb) und danach *Test connection* ausführen.
 
 ## Aktualisieren
 

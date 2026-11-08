@@ -136,13 +136,13 @@
             "type": "Microsoft.Common.TextBox",
             "label": "Address range of the new subnet",
             "defaultValue": "",
-            "placeholder": "e.g. 10.210.156.0/28",
+            "placeholder": "e.g. 10.0.1.0/28",
             "toolTip": "A free range inside the address space of the virtual network that does not overlap any existing subnet. At least /28 (16 addresses); /27 leaves room to scale out.",
             "visible": "[or(equals(steps('network').vnet.newOrExisting, 'new'), equals(steps('network').appSubnetMode, 'new'))]",
             "constraints": {
               "required": "[or(equals(steps('network').vnet.newOrExisting, 'new'), equals(steps('network').appSubnetMode, 'new'))]",
               "regex": "^(25[0-5]|2[0-4]\\d|1?\\d?\\d)(\\.(25[0-5]|2[0-4]\\d|1?\\d?\\d)){3}/(2[4-8])$",
-              "validationMessage": "Enter an address range in CIDR notation between /24 and /28, e.g. 10.210.156.0/28."
+              "validationMessage": "Enter an address range in CIDR notation between /24 and /28, e.g. 10.0.1.0/28."
             }
           },
           {

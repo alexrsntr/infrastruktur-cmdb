@@ -221,6 +221,56 @@ So that every `git push` to `main` is tested and deployed automatically:
 - [ ] Excel export works
 - [ ] Database backup active (14 days), Application Insights shows requests
 
+## Add Microsoft sign-in later
+
+For installations that started with e-mail and password (Docker, Windows package, Azure one-click setup): an
+administrator sets up the sign-in with Microsoft Entra ID **in the app** – no environment variables, no restart.
+Password sign-in stays available until you restrict it.
+
+### A. App registration in Microsoft Entra ID (Entra admin center)
+
+1. *Microsoft Entra ID → App registrations → New registration*: name e.g. `Infrastruktur CMDB`, *Accounts in this
+   organizational directory only*. Note the **Directory (tenant) ID** and the **Application (client) ID**.
+2. *Authentication → Add a platform → Web*: enter both **redirect URIs** shown in the app under
+   *Administration → Settings → Microsoft Entra ID* (`https://<your-cmdb>/auth/callback` and `https://<your-cmdb>/`).
+3. *Certificates & secrets → New client secret*: copy the **Value** right away (it is shown only once) and note the
+   expiry date. *Alternative without secret:* enable the managed identity of the App Service and add it as
+   *federated credential* (scenario "Managed identity").
+4. *App roles → Create app role* (allowed member types: users/groups), values exactly `CMDB.Admin`, `CMDB.Editor`,
+   `CMDB.Operator`, `CMDB.Viewer`. Optional if you prefer mapping Entra groups to roles in the app.
+5. *API permissions → Add a permission → Microsoft Graph*:
+   - **Delegated** (sign-in): `openid`, `profile`, `email`, `User.Read`
+   - **Application** (read-only, for searching users and groups and for group roles): `User.Read.All`,
+     `GroupMember.Read.All`, `Application.Read.All`
+6. **Grant admin consent for <tenant>** (button on the same page; needs e.g. the role *Privileged Role Administrator*
+   or *Global Administrator*).
+7. *Enterprise applications → Infrastruktur CMDB → Users and groups*: assign people or groups to the app roles. Set
+   *Properties → Assignment required = Yes* if only assigned people may sign in.
+
+**Network:** the CMDB needs outbound HTTPS (port 443) to `login.microsoftonline.com` and `graph.microsoft.com`. If all
+outbound traffic of the App Service goes through a firewall (*route all traffic through the virtual network*), allow
+both host names there.
+
+### B. In the CMDB (Administration → Settings → Microsoft Entra ID)
+
+1. Enter **tenant ID**, **application (client) ID** and the **client secret** (or choose *Managed identity*), then
+   **Save**. The secret is stored encrypted and never shown again.
+2. **Test connection** – shows the tenant name and which Graph permissions are granted; on errors it says what is
+   wrong (wrong ID, secret expired, consent missing, firewall).
+3. **Test sign-in with Microsoft** – sign in with *your* Microsoft account. It is linked to your CMDB account and
+   must result in the administrator role (no lower app role), otherwise activating could lock you out.
+4. **Activate sign-in with Microsoft.** The login page now shows *Sign in with Microsoft*; existing accounts are
+   linked at the first sign-in by their e-mail address (= user principal name), so history and plant scopes stay.
+5. Optional, under *Users & permissions → Microsoft Entra ID*: search users and groups, add people before their first
+   sign-in, **map Entra groups to CMDB roles** (with plant scope) and see who is assigned to which app role.
+6. Optional: restrict **password sign-in** to *administrators only* (emergency access) or turn it *off* – possible
+   once an administrator has signed in with Microsoft.
+
+**Emergency access:** if the sign-in with Microsoft fails and password sign-in is off, set the App Service setting
+`LOCAL_LOGIN_EMERGENCY=true` and restart – administrators can then sign in with their password again.
+**Secret expiry:** enter the new client secret in the same form before the old one expires (possible while active),
+then run *Test connection* again.
+
 ## Updating
 
 * **With GitHub Actions:** merge to `main` – CI runs the tests, *Deploy* ships the new version. Database
