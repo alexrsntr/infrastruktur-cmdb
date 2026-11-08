@@ -20,6 +20,8 @@ export interface Config {
   env: string;
   isProduction: boolean;
   port: number;
+  /** Network interface to listen on (empty = all; 127.0.0.1 = this computer only) */
+  host: string;
   baseUrl: string;
   /** Production behind HTTPS (APP_BASE_URL starts with https://): secure cookies, HSTS, upgrade-insecure-requests */
   httpsOnly: boolean;
@@ -81,6 +83,7 @@ export function loadConfig(): Config {
     env,
     isProduction,
     port: int('PORT', 3000),
+    host: str('HOST'),
     baseUrl,
     httpsOnly: isProduction && baseUrl.startsWith('https://'),
     sessionSecret,

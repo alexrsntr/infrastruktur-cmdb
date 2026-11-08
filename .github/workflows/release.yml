@@ -1,8 +1,9 @@
 name: Release
 
-# On a version tag (v1.2.3): runs CI, builds the ready-to-deploy App Service package
-# (same as deploy.yml) and attaches it to a GitHub release, so nobody needs Node.js to deploy:
-#   https://github.com/<owner>/<repo>/releases/latest/download/infrastruktur-cmdb-app.zip
+# On a version tag (v1.2.3): runs CI, builds the downloads and attaches them to a GitHub release:
+#   infrastruktur-cmdb-app.zip       ready-to-deploy App Service package (README › Way 4, Terraform)
+#   Infrastruktur-CMDB-Windows.zip   portable Windows test package (README › Way 1)
+# Latest version: https://github.com/<owner>/<repo>/releases/latest/download/<file name>
 
 on:
   push:
@@ -16,7 +17,12 @@ jobs:
     name: CI
     uses: ./.github/workflows/ci.yml
 
-  release:
+  windows:
+    name: Windows package
+    uses: ./.github/workflows/windows-package.yml
+
+  appservice:
+    name: App Service package
     needs: ci
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -43,10 +49,30 @@ jobs:
           test -f dist/server.mjs && test -f dist/public/index.html
           zip -qr ../infrastruktur-cmdb-app.zip dist node_modules package.json package-lock.json
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: appservice-package
+          path: infrastruktur-cmdb-app.zip
+          if-no-files-found: error
+
+  release:
+    name: GitHub release
+    needs: [ci, windows, appservice]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
-          gh release create "$TAG" infrastruktur-cmdb-app.zip \
+          ls -la assets
+          gh release create "$TAG" assets/infrastruktur-cmdb-app.zip assets/Infrastruktur-CMDB-Windows.zip \
             --title "$TAG" --generate-notes --verify-tag

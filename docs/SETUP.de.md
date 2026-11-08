@@ -4,18 +4,32 @@ English version: **[SETUP.md](SETUP.md)** · Kurzfassung auf Englisch: [README �
 
 ## Installation – so einfach wie möglich
 
-Wähle **einen** der drei Wege. Für Weg A und B braucht man keine IT-Kenntnisse.
+Wähle **einen** der vier Wege. Für Weg A bis C braucht man keine IT-Kenntnisse.
 
 | | Weg | Gut für | Anmeldung | Aufwand |
 |---|---|---|---|---|
-| A | [**Docker**](#weg-a-docker-auf-dem-eigenen-rechner-oder-server) | Ausprobieren, kleine Firmen, eigener Server | E-Mail + Passwort | ≈ 10 Min. |
-| B | [**Azure mit wenigen Klicks**](#weg-b-microsoft-azure-mit-wenigen-klicks) | in der Cloud betreiben, ohne IT-Kenntnisse | E-Mail + Passwort | ≈ 20 Min., ≈ 30–45 €/Monat |
-| C | [**Azure mit Terraform**](#2-produktivbetrieb-planen) | Firmen mit Microsoft 365 / Entra ID | Microsoft-Konto (SSO) | ≈ 1–2 Std., für die IT |
+| A | [**Windows, ein Doppelklick**](#weg-a-windows--ausprobieren-mit-einem-doppelklick) | Ausprobieren auf dem eigenen PC | E-Mail + Passwort | ≈ 2 Min. |
+| B | [**Docker**](#weg-b-docker-auf-dem-eigenen-rechner-oder-server) | kleine Firmen, eigener Server | E-Mail + Passwort | ≈ 10 Min. |
+| C | [**Azure mit wenigen Klicks**](#weg-c-microsoft-azure-mit-wenigen-klicks) | in der Cloud betreiben, ohne IT-Kenntnisse | E-Mail + Passwort | ≈ 20 Min., ≈ 30–45 €/Monat |
+| D | [**Azure mit Terraform**](#2-produktivbetrieb-planen) | Firmen mit Microsoft 365 / Entra ID | Microsoft-Konto (SSO) | ≈ 1–2 Std., für die IT |
 
-Bei Weg A und B legt **die erste Person, die die CMDB öffnet, das Administratorkonto an** – also direkt nach der
+Bei Weg A bis C legt **die erste Person, die die CMDB öffnet, das Administratorkonto an** – also direkt nach der
 Installation öffnen. Auf Microsoft-Anmeldung kann man später umstellen.
 
-### Weg A: Docker auf dem eigenen Rechner oder Server
+### Weg A: Windows – ausprobieren mit einem Doppelklick
+
+Zum Ausprobieren auf dem eigenen Windows-PC: nichts installieren, keine Administratorrechte, kein Docker.
+
+1. **Herunterladen:** [`Infrastruktur-CMDB-Windows.zip`](https://github.com/alexrsntr/infrastruktur-cmdb/releases/latest/download/Infrastruktur-CMDB-Windows.zip).
+2. **Entpacken:** Rechtsklick auf die Datei → *Alle extrahieren …* → *Extrahieren*.
+3. Im entpackten Ordner **doppelt auf `Start CMDB.cmd` klicken.** Fragt Windows, ob die Datei ausgeführt werden soll:
+   *Ausführen* (bzw. *Weitere Informationen* → *Trotzdem ausführen*).
+4. Nach etwa einer Minute öffnet sich der Browser mit <http://localhost:8080> – Administratorkonto anlegen. Fertig!
+
+**Beenden:** das schwarze Fenster schließen. Die **Daten** liegen im Ordner `data` daneben (zum Sichern kopieren,
+zum Neuanfang löschen). Die CMDB ist nur auf diesem Computer erreichbar – für mehrere Benutzer Weg B, C oder D.
+
+### Weg B: Docker auf dem eigenen Rechner oder Server
 
 1. **Docker Desktop installieren:** <https://www.docker.com/products/docker-desktop/> herunterladen, installieren
    und starten (auf einem Linux-Server: [Docker Engine](https://docs.docker.com/engine/install/)).
@@ -43,7 +57,7 @@ Installation öffnen. Auf Microsoft-Anmeldung kann man später umstellen.
 > `docker-compose.yml` dann `APP_BASE_URL` auf diese Adresse ändern (wird für Links in E-Mails verwendet). Die
 > Verbindung ist unverschlüsselt – nur im Firmennetz nutzen oder einen HTTPS-Reverse-Proxy davorschalten.
 
-### Weg B: Microsoft Azure mit wenigen Klicks
+### Weg C: Microsoft Azure mit wenigen Klicks
 
 Voraussetzung: eine Azure-Subscription, in der man Ressourcen anlegen darf (Rolle *Mitwirkender* oder *Besitzer*).
 Es gibt zwei Varianten – eine davon wählen:
@@ -78,12 +92,12 @@ ca. 30 € pro Monat, bei der privaten Variante zusätzlich ca. 15 € für die 
 im Azure-Portal die Web-App (`cmdb-…`) öffnen und auf **Neu starten** klicken. **Alles entfernen:** die
 Ressourcengruppe löschen (ein ausgewähltes VNet in einer anderen Ressourcengruppe bleibt unberührt).
 
-### Weg C: Azure mit Terraform
+### Weg D: Azure mit Terraform
 
 Die Unternehmensvariante mit Microsoft-Anmeldung (Single Sign-on, Rollen aus Entra-Gruppen), ohne Passwörter
 (Managed Identities), mit Key Vault, Blob Storage, Monitoring und optional privatem Netzwerk – Schritt für Schritt
 ab [Teil 2](#2-produktivbetrieb-planen). Die Kurzfassung mit allen Befehlen für die
-[Azure Cloud Shell](https://shell.azure.com) steht im [README › Way 3](../README.md#way-3-azure-with-terraform-for-it-teams).
+[Azure Cloud Shell](https://shell.azure.com) steht im [README › Way 4](../README.md#way-4-azure-with-terraform-for-it-teams).
 
 ---
 

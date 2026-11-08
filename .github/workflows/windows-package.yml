@@ -1,0 +1,54 @@
+name: Windows package
+
+# Builds the portable Windows test package (Node.js + PostgreSQL + CMDB, no installation needed),
+# tests it end to end on Windows and uploads it as artifact "windows-package".
+# release.yml calls this workflow and attaches the ZIP to the GitHub release.
+
+on:
+  push:
+    branches: ["**"]
+    paths-ignore:
+      - "docs/**"
+      - "infra/**"
+      - "azure/**"
+      - "**/*.md"
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Cache downloads (Node.js, PostgreSQL)
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/cmdb-package/downloads
+          key: windows-package-downloads-v1
+
+      - name: Build package
+        shell: pwsh
+        run: ./windows/build-package.ps1 -OutDir "$env:RUNNER_TEMP/cmdb-package"
+
+      - name: Smoke test (unpack, first start, setup, sign-in, restart)
+        shell: pwsh
+        run: ./windows/smoke-test.ps1 -Zip "$env:RUNNER_TEMP/cmdb-package/Infrastruktur-CMDB-Windows.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-package
+          path: ${{ runner.temp }}/cmdb-package/Infrastruktur-CMDB-Windows.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14

@@ -6,7 +6,7 @@ and troubleshooting are in the Azure runbook **[AZURE.md](AZURE.md)**.
 
 German version: **[SETUP.de.md](SETUP.de.md)**
 
-> **Just want to run it?** The simplest ways – Docker in 10 minutes or Azure in a few clicks, no IT knowledge
+> **Just want to run it?** The simplest ways – Windows with one double-click, Docker in 10 minutes or Azure in a few clicks, no IT knowledge
 > needed – are in the **[README › Installation](../README.md#installation)**. This guide is for developers and
 > for the full enterprise rollout with Terraform and Microsoft Entra ID.
 

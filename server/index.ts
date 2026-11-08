@@ -19,9 +19,10 @@ async function main() {
   const stopScheduler = config.notificationsScheduler ? startScheduler(pool, config) : () => undefined;
 
   const app = createApp(pool, config);
-  const server = app.listen(config.port, () => {
-    log.info(`Infrastruktur CMDB listening on port ${config.port}`, { env: config.env, authMode: config.authMode, dbAuth: config.db.auth });
-  });
+  const onListening = () => {
+    log.info(`Infrastruktur CMDB listening on ${config.host || '*'}:${config.port}`, { env: config.env, authMode: config.authMode, dbAuth: config.db.auth });
+  };
+  const server = config.host ? app.listen(config.port, config.host, onListening) : app.listen(config.port, onListening);
 
   const shutdown = (signal: string) => {
     log.info(`received ${signal}, shutting down`);

@@ -16,18 +16,32 @@ Runs anywhere with **Docker**, on **Azure** with one click, or as a hardened ent
 
 ## Installation
 
-Pick **one** of the three ways. You do not need to know how to program for way 1 or 2.
+Pick **one** of the four ways. You do not need any IT knowledge for ways 1–3.
 
 | | Way | Good for | Sign-in | Effort |
 |---|---|---|---|---|
-| 1 | [**Docker**](#way-1-docker-on-your-own-computer-or-server) | trying it out, small companies, your own server | e-mail + password | ≈ 10 minutes |
-| 2 | [**Azure in a few clicks**](#way-2-microsoft-azure-in-a-few-clicks) | running it in the cloud without IT knowledge | e-mail + password | ≈ 20 minutes, ≈ 30–45 €/month |
-| 3 | [**Azure with Terraform**](#way-3-azure-with-terraform-for-it-teams) | companies with Microsoft 365 / Entra ID | Microsoft account (SSO) | ≈ 1–2 hours, for IT staff |
+| 1 | [**Windows, one double-click**](#way-1-windows--try-it-with-one-double-click) | trying it out on your own PC | e-mail + password | ≈ 2 minutes |
+| 2 | [**Docker**](#way-2-docker-on-your-own-computer-or-server) | small companies, your own server | e-mail + password | ≈ 10 minutes |
+| 3 | [**Azure in a few clicks**](#way-3-microsoft-azure-in-a-few-clicks) | running it in the cloud without IT knowledge | e-mail + password | ≈ 20 minutes, ≈ 30–45 €/month |
+| 4 | [**Azure with Terraform**](#way-4-azure-with-terraform-for-it-teams) | companies with Microsoft 365 / Entra ID | Microsoft account (SSO) | ≈ 1–2 hours, for IT staff |
 
-With way 1 and 2 the **first person who opens the CMDB creates the administrator account**, so open it right
+With ways 1–3 the **first person who opens the CMDB creates the administrator account**, so open it right
 after the installation. You can switch to Microsoft sign-in later.
 
-### Way 1: Docker on your own computer or server
+### Way 1: Windows – try it with one double-click
+
+For trying it out on your own Windows PC: nothing to install, no administrator rights, no Docker.
+
+1. **Download** [`Infrastruktur-CMDB-Windows.zip`](https://github.com/alexrsntr/infrastruktur-cmdb/releases/latest/download/Infrastruktur-CMDB-Windows.zip).
+2. **Unpack it:** right-click the file → *Extract All…* → *Extract*.
+3. **Double-click `Start CMDB.cmd`** in the unpacked folder. If Windows asks whether to run the file, click
+   *Run* (or *More info* → *Run anyway*).
+4. After about a minute your browser opens <http://localhost:8080> – create your administrator account. Done!
+
+**Stop:** close the black window. **Data** is kept in the folder `data` next to it (copy it as a backup, delete it
+to start from scratch). Only this computer can open the CMDB – for several users use way 2, 3 or 4.
+
+### Way 2: Docker on your own computer or server
 
 1. **Install Docker Desktop** from <https://www.docker.com/products/docker-desktop/> and start it
    (on a Linux server: install [Docker Engine](https://docs.docker.com/engine/install/)).
@@ -55,7 +69,7 @@ after the installation. You can switch to Microsoft sign-in later.
 > `APP_BASE_URL` in `docker-compose.yml` to that address (used for links in e-mails). The connection is not
 > encrypted – use this only in your company network, or put an HTTPS reverse proxy in front.
 
-### Way 2: Microsoft Azure in a few clicks
+### Way 3: Microsoft Azure in a few clicks
 
 You need an Azure subscription in which you may create resources (role *Contributor* or *Owner*). There are two
 variants – pick one:
@@ -88,7 +102,7 @@ plus about 15 € for the two private endpoints in the private variant. **Update
 web app (`cmdb-…`) in the Azure portal and click **Restart**. **Remove everything:** delete the resource group
 (a virtual network you selected in another resource group is not touched).
 
-### Way 3: Azure with Terraform (for IT teams)
+### Way 4: Azure with Terraform (for IT teams)
 
 The enterprise setup: sign-in with **Microsoft Entra ID** (single sign-on, roles from Entra groups), no
 passwords anywhere (managed identities), Key Vault, Blob Storage for files, monitoring and optional private
