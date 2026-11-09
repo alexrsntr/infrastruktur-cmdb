@@ -648,6 +648,11 @@ export interface Asset {
   support_contract: string | null;
   /** Last time the device was seen on the network (discovery, monitoring, API) */
   last_seen_at: string | null;
+  /** Reported by a monitoring system through the API */
+  monitoring_status: 'up' | 'warning' | 'down' | 'unknown' | null;
+  monitoring_message: string | null;
+  monitoring_source: string | null;
+  monitoring_checked_at: string | null;
   description: string | null;
   tags: string[];
   attributes: Record<string, unknown>;

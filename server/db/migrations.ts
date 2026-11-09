@@ -14,6 +14,7 @@ import { assetTypesMigration } from './migrations/011_asset_types';
 import { lifecycleMigration } from './migrations/012_lifecycle';
 import { networkMigration } from './migrations/013_network';
 import { applicationsMigration } from './migrations/014_applications';
+import { integrationsMigration } from './migrations/015_integrations';
 
 export interface Migration {
   id: string;
@@ -218,4 +219,5 @@ export const migrations: Migration[] = [
   lifecycleMigration,
   networkMigration,
   applicationsMigration,
+  integrationsMigration,
 ];

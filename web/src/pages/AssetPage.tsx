@@ -36,6 +36,7 @@ import { FloorPlanPreview } from '../components/FloorPlanPreview';
 import { journalTabs } from '../components/Journal';
 import { PortsPanel, usePorts } from '../components/PortsPanel';
 import { ImpactCard } from '../components/ImpactCard';
+import { ExternalRefsCard, MonitoringTag } from '../components/ExternalRefsCard';
 import { WarrantyDate } from '../components/Tags';
 import { StatusDot, TypeIcon } from '../components/Simple';
 
@@ -219,7 +220,12 @@ export function AssetPage() {
         icon={<TypeIcon type={a.type} large />}
         crumbs={[{ title: 'Devices', to: '/inventory' }, { title: typeDef.plural, to: `/inventory/${typeDef.slug}` }]}
         title={a.name}
-        tags={<StatusDot status={a.status} />}
+        tags={
+          <>
+            <StatusDot status={a.status} />
+            <MonitoringTag status={a.monitoring_status} message={a.monitoring_message} source={a.monitoring_source} at={a.monitoring_checked_at} />
+          </>
+        }
         subtitle={[typeDef.label, [a.manufacturer, a.model].filter(Boolean).join(' '), [a.plant_code, a.building_name, a.room].filter(Boolean).join(' › ')].filter(Boolean).join(' · ')}
         extra={
           <>
@@ -313,6 +319,7 @@ export function AssetPage() {
               )}
             </Card>
             <ImpactCard assetId={a.id} assetName={a.name} />
+            <ExternalRefsCard assetId={a.id} />
           </div>
         </Col>
 

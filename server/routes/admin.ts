@@ -38,7 +38,7 @@ export function adminRouter(pool: Pool): Router {
   // -------------------------------------------------------------- users
   r.get('/users', requirePermission('user.manage'), async (_req, res) => {
     const { rows } = await pool.query(
-      `SELECT ${USER_COLUMNS} FROM app_user ORDER BY active DESC, display_name`,
+      `SELECT ${USER_COLUMNS} FROM app_user WHERE NOT is_service ORDER BY active DESC, display_name`,
     );
     res.json(rows);
   });

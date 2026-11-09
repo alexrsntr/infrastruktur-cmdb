@@ -28,6 +28,8 @@ declare global {
   namespace Express {
     interface Request {
       user?: CurrentUser;
+      /** Set when the request is authenticated with an API token (Authorization: Bearer …) instead of a session */
+      apiToken?: { id: string; name: string };
     }
   }
 }
@@ -53,9 +55,43 @@ export function toCurrentUser(row: UserRow): CurrentUser {
   };
 }
 
-/** Loads the current user from the session on every request so role/scope changes apply immediately. */
+export const API_TOKEN_PREFIX = 'cmdb_';
+
+export function hashApiToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+/** API token → its service user. Expired or revoked tokens and deactivated service users are rejected. */
+async function loadTokenUser(pool: Pool, req: Request): Promise<boolean> {
+  const header = req.get('authorization');
+  const m = header?.match(/^Bearer\s+(\S+)$/i);
+  if (!m) return false;
+  if (!m[1].startsWith(API_TOKEN_PREFIX)) throw new HttpError(401, 'Invalid API token');
+  const { rows } = await pool.query<UserRow & { token_id: string; token_name: string }>(
+    `SELECT u.id, u.display_name, u.email, u.role, u.role_source, u.plant_scope, u.active, t.id AS token_id, t.name AS token_name
+     FROM api_token t JOIN app_user u ON u.id = t.user_id
+     WHERE t.token_hash = $1 AND t.revoked_at IS NULL AND (t.expires_at IS NULL OR t.expires_at > now())`,
+    [hashApiToken(m[1])],
+  );
+  const row = rows[0];
+  if (!row || !row.active) throw new HttpError(401, 'Invalid, expired or revoked API token');
+  req.user = toCurrentUser(row);
+  req.apiToken = { id: row.token_id, name: row.token_name };
+  // remember the last use (at most once a minute per token)
+  pool
+    .query(`UPDATE api_token SET last_used_at = now(), last_used_ip = $2 WHERE id = $1 AND (last_used_at IS NULL OR last_used_at < now() - interval '1 minute')`, [row.token_id, req.ip ?? null])
+    .catch(() => undefined);
+  return true;
+}
+
+/** Loads the current user from the session (or API token) on every request so role/scope changes apply immediately. */
 export function loadUser(pool: Pool) {
   return async (req: Request, _res: Response, next: NextFunction) => {
+    try {
+      if (req.path.startsWith('/api/') && (await loadTokenUser(pool, req))) return next();
+    } catch (err) {
+      return next(err);
+    }
     const userId = req.session?.userId;
     if (!userId) return next();
     const { rows } = await pool.query<UserRow>(
@@ -87,6 +123,13 @@ export function requirePermission(...permissions: Permission[]) {
   };
 }
 
+/** Only signed-in people – not API tokens (e.g. creating new API tokens). */
+export function requireSession(req: Request, _res: Response, next: NextFunction) {
+  if (!req.user) return next(new HttpError(401, 'Not signed in'));
+  if (req.apiToken) return next(forbidden('Not possible with an API token'));
+  next();
+}
+
 /** Administrators only – in addition to the permission checks (admin-only features such as the Entra configuration). */
 export function requireAdmin(req: Request, _res: Response, next: NextFunction) {
   if (!req.user) return next(new HttpError(401, 'Not signed in'));
@@ -107,6 +150,8 @@ export function ensureCsrfToken(req: Request): string {
 /** Double-submit style CSRF protection for state changing API calls (token lives in the session). */
 export function csrfProtection(req: Request, _res: Response, next: NextFunction) {
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+  // API tokens are sent explicitly in a header – browsers never attach them on their own, so no CSRF risk
+  if (req.apiToken) return next();
   const expected = req.session?.csrfToken;
   const actual = req.get('x-csrf-token');
   if (!expected || !actual) return next(new HttpError(403, 'Missing CSRF token'));

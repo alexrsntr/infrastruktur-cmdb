@@ -66,11 +66,43 @@ export async function audit(db: DbClient, req: Request | null, input: AuditInput
         req ? clientIp(req) : null,
       ],
     );
+    await enqueueEvent(db, req, input);
   } catch (err) {
     // Inside a transaction the error must propagate so the whole change is rolled back
     if ('release' in db) throw err;
     log.error('audit: failed to write audit entry', { error: (err as Error).message });
   }
+}
+
+/** Actions that are not sent to webhooks */
+const NO_EVENT = new Set(['login', 'logout', 'export', 'login.failed', 'seed', 'settings.test-mail']);
+
+/** Webhook event name, e.g. "asset.create", "asset.port.connect", "application.update" */
+export function eventName(input: AuditInput): string {
+  return input.entityType ? `${input.entityType}.${input.action}` : input.action;
+}
+
+/**
+ * Transactional outbox: the event is stored in the same transaction as the change and the audit entry,
+ * the webhook dispatcher delivers it later. Nothing is written while no webhook is active.
+ */
+async function enqueueEvent(db: DbClient, req: Request | null, input: AuditInput) {
+  if (NO_EVENT.has(input.action) || input.entityType === 'settings' || input.entityType === 'user') return;
+  const payload = {
+    event: eventName(input),
+    action: input.action,
+    entity_type: input.entityType ?? null,
+    entity_id: input.entityId ?? null,
+    entity_label: input.entityLabel ?? null,
+    plant_id: input.plantId ?? null,
+    changes: input.changes ?? null,
+    user: req?.user?.displayName ?? null,
+    at: new Date().toISOString(),
+  };
+  await db.query(
+    `INSERT INTO event_outbox (event, payload) SELECT $1, $2 WHERE EXISTS (SELECT 1 FROM webhook WHERE active)`,
+    [payload.event, JSON.stringify(payload)],
+  );
 }
 
 export function clientIp(req: Request): string | null {

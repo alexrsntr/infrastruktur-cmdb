@@ -12,6 +12,7 @@ export const ASSET_SELECT = `
   a.room, a.rack_id, rk.name AS rack_name, a.rack_u, a.rack_height_u, a.map_x, a.map_y, a.manufacturer, a.model, a.serial_number, a.asset_tag,
   a.ip_address, a.mac_address, a.fqdn, a.os, a.owner, a.cost_center, a.purchase_date, a.warranty_end,
   a.support_end, a.end_of_life, a.support_contract, a.last_seen_at,
+  a.monitoring_status, a.monitoring_message, a.monitoring_source, a.monitoring_checked_at,
   a.description, a.tags, a.attributes, a.created_at, a.updated_at,
   cu.display_name AS created_by_name, uu.display_name AS updated_by_name,
   la.at AS last_activity_at, la.user_name AS last_activity_by, la.text AS last_activity`;

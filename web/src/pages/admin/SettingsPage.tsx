@@ -46,6 +46,7 @@ import { useSession } from '../../lib/session';
 import { PageHeader } from '../../components/PageHeader';
 import { EntraSettingsTab } from './EntraSettingsTab';
 import { DeviceTypesTab } from './DeviceTypesTab';
+import { IntegrationsTab } from './IntegrationsTab';
 import { AssetTypeTag, WarrantyDate } from '../../components/Tags';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -573,6 +574,7 @@ export function SettingsPage() {
             { key: 'warranty', label: 'Warranty notifications', children: <WarrantyTab /> },
             { key: 'history', label: 'History', children: <HistoryTab /> },
             { key: 'types', label: 'Device types', children: <DeviceTypesTab /> },
+            { key: 'integrations', label: 'API & webhooks', children: <IntegrationsTab /> },
             { key: 'entra', label: 'Microsoft Entra ID', children: <EntraSettingsTab /> },
           ]}
         />
