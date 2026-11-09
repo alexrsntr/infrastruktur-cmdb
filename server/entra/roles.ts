@@ -35,7 +35,8 @@ export async function groupRoleFor(pool: Pool, entra: EntraService, rt: EntraRun
   try {
     groupIds = await entra.userGroupIds(rt, oid);
   } catch (err) {
-    log.warn('entra: group memberships could not be read at sign-in', { code: explainEntraError(err, 'GroupMember.Read.All').code });
+    const e = explainEntraError(err, 'GroupMember.Read.All');
+    log.warn('entra: group memberships could not be read at sign-in', { code: e.code, ...e.detail });
     return { role: null, scope: [], groupNames: [], failed: true };
   }
   const member = new Set(groupIds.map((g) => g.toLowerCase()));

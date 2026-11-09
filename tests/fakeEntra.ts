@@ -61,7 +61,15 @@ export function createFakeEntra() {
       // the tests pass the state as authorization code
       acquireTokenByCode: async (r) => {
         if (!state.nextIdentity) throw new Error('no identity prepared');
-        return { idTokenClaims: { tid: TENANT, ...state.nextIdentity, nonce: state.nonces.get(r.code) } };
+        const nonce = state.nonces.get(r.code);
+        // like MSAL 7: an ID token with a nonce is only accepted together with the nonce of the request
+        if (nonce && r.nonce !== nonce) {
+          throw Object.assign(new Error('nonce_mismatch: The nonce in the ID token does not match the nonce of the request.'), {
+            name: 'ClientAuthError',
+            errorCode: 'nonce_mismatch',
+          });
+        }
+        return { idTokenClaims: { tid: TENANT, ...state.nextIdentity, nonce } };
       },
       acquireAppToken: async () => {
         if (state.tokenError) throw state.tokenError;

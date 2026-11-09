@@ -216,7 +216,7 @@ function mountEntra(router: Router, pool: Pool, config: Config, entra: EntraServ
       await startFlow(req, res, rt, 'login', returnTo, req.query.prompt === 'select_account' ? 'select_account' : undefined);
     } catch (err) {
       const e = explainEntraError(err);
-      log.error('auth: could not start the Microsoft sign-in', { code: e.code });
+      log.error('auth: could not start the Microsoft sign-in', { code: e.code, ...e.detail });
       return errorPage(res, 502, 'Sign-in not available', 'The sign-in with Microsoft could not be started. Please try again later.');
     }
   });
@@ -230,6 +230,7 @@ function mountEntra(router: Router, pool: Pool, config: Config, entra: EntraServ
       await startFlow(req, res, rt, 'test', SETTINGS_URL, 'select_account');
     } catch (err) {
       const e = explainEntraError(err);
+      log.error('auth: could not start the Microsoft test sign-in', { code: e.code, ...e.detail });
       await saveLoginCheck(req, rt, { ok: false, account: null, role: null, message: [e.error, e.hint].filter(Boolean).join(' ') });
       res.redirect(SETTINGS_URL);
     }
@@ -243,14 +244,20 @@ function mountEntra(router: Router, pool: Pool, config: Config, entra: EntraServ
 
     const fail = async (status: number, title: string, message: string) => {
       if (isTest && req.user?.id === pending?.userId && req.user?.role === 'admin') {
-        await saveLoginCheck(req, rt, { ok: false, account: null, role: null, message });
-        return res.redirect(SETTINGS_URL);
+        try {
+          await saveLoginCheck(req, rt, { ok: false, account: null, role: null, message });
+          return res.redirect(SETTINGS_URL);
+        } catch (saveErr) {
+          const e = explainEntraError(saveErr);
+          log.error('auth: test sign-in result could not be saved', { code: e.code, ...e.detail });
+          return errorPage(res, status, title, `${message} (The result could not be saved: ${e.error})`);
+        }
       }
       return errorPage(res, status, title, message);
     };
 
     if (error) {
-      log.warn('auth: Entra returned an error', { error });
+      log.warn('auth: Entra returned an error', { error, aadsts: errorDescription?.match(/AADSTS\d+/)?.[0] });
       delete req.session.oidc;
       return fail(401, 'Sign-in failed', errorDescription ?? error);
     }
@@ -265,7 +272,8 @@ function mountEntra(router: Router, pool: Pool, config: Config, entra: EntraServ
     }
 
     try {
-      const result = await entra.client(rt).acquireTokenByCode({ code, scopes: SCOPES, redirectUri, codeVerifier: pending.codeVerifier });
+      // the nonce goes to MSAL as well – it validates the ID token against it (we check it again below)
+      const result = await entra.client(rt).acquireTokenByCode({ code, scopes: SCOPES, redirectUri, codeVerifier: pending.codeVerifier, nonce: pending.nonce });
       const claims = result.idTokenClaims;
       if (claims.nonce !== pending.nonce) throw new HttpError(400, 'Invalid nonce');
       if (String(claims.tid ?? '').toLowerCase() !== rt.tenantId.toLowerCase()) throw new HttpError(403, 'Sign-ins from other tenants are not allowed');
@@ -302,7 +310,8 @@ function mountEntra(router: Router, pool: Pool, config: Config, entra: EntraServ
         return fail(err.status, 'Sign-in failed', isTest ? err.message : 'We could not complete the sign-in. Please try again.');
       }
       const e = explainEntraError(err);
-      log.error('auth: callback failed', { code: e.code });
+      // name, MSAL errorCode/subError, PostgreSQL code and a sanitized message – never tokens, codes, secrets or claims
+      log.error('auth: callback failed', { code: e.code, purpose: isTest ? 'test' : 'login', ...e.detail });
       return fail(401, 'Sign-in failed', isTest ? [e.error, e.hint].filter(Boolean).join(' ') : 'We could not complete the sign-in. Please try again.');
     }
   });

@@ -110,7 +110,7 @@ export class EntraService {
       token = await this.client(rt).acquireAppToken(GRAPH_SCOPE);
     } catch (err) {
       const e = explainEntraError(err);
-      log.warn('entra: connection test failed', { code: e.code });
+      log.warn('entra: connection test failed', { code: e.code, ...e.detail });
       return { result: { ok: false, error: e.error, hint: e.hint }, check: null, code: e.code };
     }
 

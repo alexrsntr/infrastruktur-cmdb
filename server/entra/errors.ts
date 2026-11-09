@@ -11,6 +11,73 @@ export interface ExplainedError {
   status: number;
   /** Short code for logs and the audit log */
   code: string;
+  /** Safe details for the server log (no tokens, codes, secrets or claim values) */
+  detail: ErrorDetail;
+}
+
+export interface ErrorDetail {
+  name?: string;
+  /** MSAL error code, e.g. nonce_mismatch */
+  errorCode?: string;
+  subError?: string;
+  /** MSAL correlation ID (useful for Microsoft support) */
+  correlationId?: string;
+  /** PostgreSQL error code (SQLSTATE) */
+  pgCode?: string;
+  /** shortened message with tokens, secrets, codes and e-mail addresses removed */
+  message?: string;
+}
+
+/** Removes everything that could be a token, secret, authorization code or personal data from a message. */
+export function sanitizeMessage(message: string): string {
+  return message
+    .replace(/eyJ[\w-]{5,}\.[\w-]{5,}\.[\w-]*/g, '[token]')
+    .replace(/\b(code|code_verifier|client_secret|client_assertion|refresh_token|access_token|id_token|assertion|password)=([^&\s"']+)/gi, '$1=[redacted]')
+    .replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, '[e-mail]')
+    .replace(/[A-Za-z0-9_\-~.]{40,}/g, '[redacted]')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 200);
+}
+
+/** Safe, structured description of any error for the log. */
+export function errorDetail(err: unknown): ErrorDetail {
+  if (!err || typeof err !== 'object') return { message: sanitizeMessage(String(err ?? '')) };
+  const e = err as { name?: unknown; errorCode?: unknown; subError?: unknown; correlationId?: unknown; code?: unknown; message?: unknown; severity?: unknown };
+  const str = (v: unknown) => (typeof v === 'string' && v ? v.slice(0, 80) : undefined);
+  // PostgreSQL errors carry a 5-character SQLSTATE in "code" and a "severity"
+  const pgCode = typeof e.code === 'string' && /^[0-9A-Z]{5}$/.test(e.code) && e.severity ? e.code : undefined;
+  return {
+    name: str(e.name),
+    errorCode: str(e.errorCode) ?? (pgCode ? undefined : str(e.code)),
+    subError: str(e.subError),
+    correlationId: str(e.correlationId),
+    pgCode,
+    message: typeof e.message === 'string' ? sanitizeMessage(e.message) : undefined,
+  };
+}
+
+/** MSAL client-side errors (no AADSTS code) the administrator can act on */
+const MSAL_CLIENT: Record<string, { error: string; hint?: string }> = {
+  nonce_mismatch: { error: 'The sign-in response does not belong to this sign-in request (nonce).', hint: 'Start the sign-in again. If it keeps failing, update the app.' },
+  state_mismatch: { error: 'The sign-in response does not belong to this sign-in request (state).', hint: 'Start the sign-in again.' },
+  invalid_state: { error: 'The sign-in response does not belong to this sign-in request (state).', hint: 'Start the sign-in again.' },
+  token_refresh_required: { error: 'The sign-in has to be repeated.', hint: 'Start the sign-in again.' },
+  client_info_decoding_error: { error: 'The sign-in response of Microsoft Entra ID could not be read.' },
+  invalid_cache_environment: { error: 'The sign-in response comes from an unexpected Microsoft cloud environment.' },
+};
+
+/** PostgreSQL errors during sign-in */
+function databaseError(detail: ErrorDetail): ExplainedError | null {
+  if (!detail.pgCode) return null;
+  const known: Record<string, { error: string; hint?: string }> = {
+    '42P01': { error: 'The database is not up to date (table missing).', hint: 'Restart the app so that the database migrations run.' },
+    '42703': { error: 'The database is not up to date (column missing).', hint: 'Restart the app so that the database migrations run.' },
+    '23505': { error: 'This Microsoft account is already linked to another CMDB user.', hint: 'Check the users under Users & permissions.' },
+    '23514': { error: 'The database rejected a value (check constraint).', hint: 'Restart the app so that the database migrations run.' },
+  };
+  const k = known[detail.pgCode];
+  return { status: 500, code: `db-${detail.pgCode}`, error: k?.error ?? `Database error (${detail.pgCode}).`, hint: k?.hint ?? 'See the server log.', detail };
 }
 
 const FIREWALL_HINT =
@@ -51,6 +118,11 @@ export function isNetworkError(err: unknown): boolean {
 }
 
 export function explainEntraError(err: unknown, permission?: string): ExplainedError {
+  const detail = errorDetail(err);
+  return { ...explain(err, detail, permission), detail };
+}
+
+function explain(err: unknown, detail: ErrorDetail, permission?: string): Omit<ExplainedError, 'detail'> {
   if (err instanceof GraphError) {
     if (err.status === 403 || err.code === 'Authorization_RequestDenied') {
       return {
@@ -87,5 +159,16 @@ export function explainEntraError(err: unknown, permission?: string): ExplainedE
     const known = AADSTS[aadsts];
     return { status: 502, code: `AADSTS${aadsts}`, error: known ? `${known.error} (AADSTS${aadsts})` : `Microsoft Entra ID rejected the request (AADSTS${aadsts}).`, hint: known?.hint };
   }
-  return { status: 502, code: 'unknown', error: 'The request to Microsoft Entra ID failed.', hint: 'Check the configuration and the server log.' };
+  const db = databaseError(detail);
+  if (db) return db;
+  const client = detail.errorCode ? MSAL_CLIENT[detail.errorCode] : undefined;
+  if (client) return { status: 502, code: `msal-${detail.errorCode}`, error: client.error, hint: client.hint };
+  // never silent: the code names the error type, the hint carries the (sanitized) reason
+  const code = [detail.name ?? 'Error', detail.errorCode].filter(Boolean).join(':');
+  return {
+    status: 502,
+    code,
+    error: `The sign-in could not be completed in the app (${code}).`,
+    hint: detail.message ? `Reason: ${detail.message}. Details are in the server log.` : 'Details are in the server log.',
+  };
 }
