@@ -15,6 +15,7 @@ import { lifecycleMigration } from './migrations/012_lifecycle';
 import { networkMigration } from './migrations/013_network';
 import { applicationsMigration } from './migrations/014_applications';
 import { integrationsMigration } from './migrations/015_integrations';
+import { discoveryMigration } from './migrations/016_discovery';
 
 export interface Migration {
   id: string;
@@ -220,4 +221,5 @@ export const migrations: Migration[] = [
   networkMigration,
   applicationsMigration,
   integrationsMigration,
+  discoveryMigration,
 ];

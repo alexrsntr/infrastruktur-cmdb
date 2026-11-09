@@ -19,6 +19,7 @@ import { BuildingPage } from './pages/BuildingPage';
 import { AssetsPage } from './pages/AssetsPage';
 import { AssetPage } from './pages/AssetPage';
 import { ApplicationPage, ApplicationsPage } from './pages/ApplicationsPage';
+import { DiscoveryPage } from './pages/DiscoveryPage';
 import { ActivitiesPage } from './pages/ActivitiesPage';
 import { DataExchangePage } from './pages/DataExchangePage';
 import { UsersPage } from './pages/admin/UsersPage';
@@ -107,6 +108,7 @@ export function Root() {
             <Route path="applications" element={<ApplicationsPage />} />
             <Route path="applications/:applicationId" element={<ApplicationPage />} />
             <Route path="data" element={<DataExchangePage />} />
+            <Route path="discovery" element={<DiscoveryPage />} />
             <Route path="admin/users" element={<UsersPage />} />
             <Route path="admin/audit" element={<AuditPage />} />
             <Route path="admin/settings" element={<SettingsPage />} />

@@ -17,6 +17,7 @@ import {
   TeamOutlined,
   UserOutlined,
   BlockOutlined,
+  RadarChartOutlined,
 } from '@ant-design/icons';
 import { ROLE_META } from '../../../shared/model';
 import { useSession } from '../lib/session';
@@ -64,6 +65,7 @@ export function AppLayout() {
 
   const adminItems: MenuProps['items'] = [
     ...(can('export') ? [{ key: '/data', icon: <SwapOutlined />, label: 'Export & import' }] : []),
+    ...(can('asset.write') ? [{ key: '/discovery', icon: <RadarChartOutlined />, label: 'Discovered devices' }] : []),
     ...(can('user.manage') ? [{ key: '/admin/users', icon: <TeamOutlined />, label: 'Users & permissions' }] : []),
     ...(can('audit.read') ? [{ key: '/admin/audit', icon: <AuditOutlined />, label: 'Audit log' }] : []),
     ...(can('settings.manage') ? [{ key: '/admin/settings', icon: <SettingOutlined />, label: 'Settings & e-mail' }] : []),

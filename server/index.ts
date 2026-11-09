@@ -6,6 +6,7 @@ import { log } from './lib/log';
 import { checkSecretsKey } from './lib/secrets';
 import { startScheduler } from './services/scheduler';
 import { startWebhookDispatcher } from './services/webhooks';
+import { startDiscoveryScheduler } from './discovery/service';
 
 async function main() {
   const config = loadConfig();
@@ -19,6 +20,7 @@ async function main() {
   checkSecretsKey(config);
   const stopScheduler = config.notificationsScheduler ? startScheduler(pool, config) : () => undefined;
   const stopWebhooks = startWebhookDispatcher(pool, config);
+  const stopDiscovery = startDiscoveryScheduler(pool, config);
 
   const app = createApp(pool, config);
   const onListening = () => {
@@ -30,6 +32,7 @@ async function main() {
     log.info(`received ${signal}, shutting down`);
     stopScheduler();
     stopWebhooks();
+    stopDiscovery();
     server.close(() => {
       pool.end().finally(() => process.exit(0));
     });
