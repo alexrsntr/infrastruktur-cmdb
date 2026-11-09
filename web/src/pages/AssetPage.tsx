@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { App, Button, Card, Col, Dropdown, Empty, Result, Row, Skeleton, Tabs, Tag, Tooltip, Typography, type MenuProps } from 'antd';
 import {
+  QrcodeOutlined,
   ArrowLeftOutlined,
   ArrowRightOutlined,
   DeleteOutlined,
@@ -36,6 +37,7 @@ import { FloorPlanPreview } from '../components/FloorPlanPreview';
 import { journalTabs } from '../components/Journal';
 import { PortsPanel, usePorts } from '../components/PortsPanel';
 import { ImpactCard } from '../components/ImpactCard';
+import { QualityBadge } from '../components/QualityBadge';
 import { ExternalRefsCard, MonitoringTag } from '../components/ExternalRefsCard';
 import { WarrantyDate } from '../components/Tags';
 import { StatusDot, TypeIcon } from '../components/Simple';
@@ -147,6 +149,7 @@ export function AssetPage() {
         ]
       : []),
     ...(can('asset.write') ? [{ key: 'relation', icon: <LinkOutlined />, label: 'Add connection' }] : []),
+    { key: 'label', icon: <QrcodeOutlined />, label: 'Print QR label' },
     ...(can('export')
       ? [
           {
@@ -166,6 +169,7 @@ export function AssetPage() {
   const onMore: MenuProps['onClick'] = ({ key }) => {
     if (key.startsWith('status:')) void changeStatus(key.slice(7));
     else if (key === 'relation') setRelating(true);
+    else if (key === 'label') navigate(`/labels?ids=${a.id}&format=single`);
     else if (key.startsWith('export:')) window.location.href = buildUrl(`/api/export/asset/${a.id}`, { format: key.slice(7) });
     else if (key === 'delete') remove();
   };
@@ -248,7 +252,7 @@ export function AssetPage() {
       <Row gutter={[20, 20]}>
         <Col xs={24} xl={9}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            <Card title="About">
+            <Card title="About" extra={<QualityBadge assetId={a.id} />}>
               {aboutRows.length ? (
                 <Facts rows={aboutRows} />
               ) : (

@@ -18,6 +18,7 @@ import {
   UserOutlined,
   BlockOutlined,
   RadarChartOutlined,
+  SafetyCertificateOutlined,
 } from '@ant-design/icons';
 import { ROLE_META } from '../../../shared/model';
 import { useSession } from '../lib/session';
@@ -65,6 +66,7 @@ export function AppLayout() {
 
   const adminItems: MenuProps['items'] = [
     ...(can('export') ? [{ key: '/data', icon: <SwapOutlined />, label: 'Export & import' }] : []),
+    { key: '/data-quality', icon: <SafetyCertificateOutlined />, label: 'Data quality' },
     ...(can('asset.write') ? [{ key: '/discovery', icon: <RadarChartOutlined />, label: 'Discovered devices' }] : []),
     ...(can('user.manage') ? [{ key: '/admin/users', icon: <TeamOutlined />, label: 'Users & permissions' }] : []),
     ...(can('audit.read') ? [{ key: '/admin/audit', icon: <AuditOutlined />, label: 'Audit log' }] : []),

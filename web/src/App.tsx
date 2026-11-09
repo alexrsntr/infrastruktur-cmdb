@@ -20,6 +20,8 @@ import { AssetsPage } from './pages/AssetsPage';
 import { AssetPage } from './pages/AssetPage';
 import { ApplicationPage, ApplicationsPage } from './pages/ApplicationsPage';
 import { DiscoveryPage } from './pages/DiscoveryPage';
+import { LabelsPage } from './pages/LabelsPage';
+import { DataQualityPage } from './pages/DataQualityPage';
 import { ActivitiesPage } from './pages/ActivitiesPage';
 import { DataExchangePage } from './pages/DataExchangePage';
 import { UsersPage } from './pages/admin/UsersPage';
@@ -95,6 +97,7 @@ export function Root() {
       <SessionContext.Provider value={session}>
         <AddDeviceProvider>
         <Routes>
+          <Route path="labels" element={<LabelsPage />} />
           <Route element={<AppLayout />}>
             <Route index element={<DashboardPage />} />
             <Route path="map" element={<MapPage />} />
@@ -109,6 +112,7 @@ export function Root() {
             <Route path="applications/:applicationId" element={<ApplicationPage />} />
             <Route path="data" element={<DataExchangePage />} />
             <Route path="discovery" element={<DiscoveryPage />} />
+            <Route path="data-quality" element={<DataQualityPage />} />
             <Route path="admin/users" element={<UsersPage />} />
             <Route path="admin/audit" element={<AuditPage />} />
             <Route path="admin/settings" element={<SettingsPage />} />

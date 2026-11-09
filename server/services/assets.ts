@@ -5,6 +5,8 @@ import { badRequest, isUuid, likePattern, queryList, queryString, SqlBuilder } f
 import { applyScope } from '../lib/scope';
 import type { AssetInput } from '../lib/schemas';
 import { assertRackSlot } from './racks';
+import { QUALITY_ISSUES, type QualityIssue } from '../../shared/quality';
+import { QUALITY_SQL } from './quality';
 
 export const ASSET_SELECT = `
   a.id, a.type, a.name, a.status, a.criticality, a.plant_id, a.building_id, a.floor_id,
@@ -90,6 +92,7 @@ export interface AssetFilters {
   warrantyBefore?: string;
   placed?: 'yes' | 'no';
   attention: AttentionKind[];
+  issues: QualityIssue[];
   sort: string;
   order: 'asc' | 'desc';
 }
@@ -111,8 +114,11 @@ export function parseAssetFilters(query: Record<string, unknown>): AssetFilters 
   const placed = queryString(query.placed);
   const attention = queryList(query.attention);
   for (const k of attention) if (!ATTENTION_KINDS.includes(k as never)) throw badRequest(`Unknown attention filter "${k}"`);
+  const issues = queryList(query.issue);
+  for (const k of issues) if (!QUALITY_ISSUES.includes(k as never)) throw badRequest(`Unknown data quality issue "${k}"`);
   return {
     attention: attention as AttentionKind[],
+    issues: issues as QualityIssue[],
     types,
     statuses,
     criticalities,
@@ -141,6 +147,7 @@ export function buildAssetQuery(user: CurrentUser, f: AssetFilters): { sql: SqlB
   if (f.warrantyBefore) sql.and(`a.warranty_end IS NOT NULL AND a.warranty_end <= ${sql.p(f.warrantyBefore)}`);
   if (f.placed === 'yes') sql.and('a.map_x IS NOT NULL');
   if (f.placed === 'no') sql.and('a.map_x IS NULL');
+  if (f.issues.length) sql.and(`a.status <> 'retired' AND (${f.issues.map((k) => `(${QUALITY_SQL[k]})`).join(' OR ')})`);
   if (f.attention.length) sql.and(`${ATTENTION_BASE} AND (${f.attention.map((k) => ATTENTION_SQL[k]).join(' OR ')})`);
   if (f.q) {
     const like = sql.p(likePattern(f.q));

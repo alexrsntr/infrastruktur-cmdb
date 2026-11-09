@@ -28,6 +28,7 @@ import { networkRouter } from './routes/network';
 import { applicationsRouter } from './routes/applications';
 import { integrationsRouter } from './routes/integrations';
 import { discoveryRouter } from './routes/discovery';
+import { qualityRouter } from './routes/quality';
 import type { DiscoveryDeps } from './discovery/service';
 import type { FetchLike } from './services/webhooks';
 import { EntraService, type EntraDeps } from './entra/service';
@@ -154,6 +155,7 @@ export function createApp(pool: Pool, config: Config, deps: AppDeps = {}) {
   api.use(applicationsRouter(pool));
   api.use(integrationsRouter(pool, config, { fetch: deps.webhookFetch }));
   api.use(discoveryRouter(pool, config, deps.discovery));
+  api.use(qualityRouter(pool));
   api.use((_req, _res, next) => next(new HttpError(404, 'API endpoint not found')));
   app.use('/api', api);
 

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { Button, Empty, Input, Select, Table, Tooltip, Typography, type TableColumnsType } from 'antd';
-import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
+import { Button, Empty, Input, Select, Tag, Table, Tooltip, Typography, type TableColumnsType } from 'antd';
+import { PlusOutlined, QrcodeOutlined, SearchOutlined } from '@ant-design/icons';
+import { QUALITY_META, type QualityIssue } from '../../../shared/quality';
 import type { SortOrder } from 'antd/es/table/interface';
 import { ASSET_STATUSES, ASSET_STATUS_META, ASSET_TYPES, ASSET_TYPE_KEYS, ATTENTION_DAYS, ATTENTION_KINDS, ATTENTION_META, assetTypeNoun, formatRackUnits, type Asset, type AssetType } from '../../../shared/model';
 import type { Query } from '../lib/api';
@@ -74,6 +75,7 @@ export function AssetTable({ fixed = {}, createDefaults, syncUrl = false, pageSi
     floorId: fixed.floorId,
     status: get('status') || undefined,
     attention: get('attention') || undefined,
+    issue: get('issue') || undefined,
     q: get('q') || undefined,
     sort: get('sort') || 'name',
     order: get('order') || 'asc',
@@ -233,7 +235,24 @@ export function AssetTable({ fixed = {}, createDefaults, syncUrl = false, pageSi
             options={(plants.data ?? []).map((p) => ({ value: p.id, label: `${p.code} – ${p.name}` }))}
           />
         )}
+        {get('issue') && (
+          <Tag closable color="orange" onClose={() => set({ issue: undefined })} style={{ padding: '4px 8px' }}>
+            Data quality: {get('issue').split(',').map((k) => QUALITY_META[k as QualityIssue]?.label ?? k).join(', ')}
+          </Tag>
+        )}
         <div style={{ flex: 1 }} />
+        <Tooltip title="Print QR labels for the devices in this list">
+          <Button
+            icon={<QrcodeOutlined />}
+            onClick={() => {
+              const q = new URLSearchParams();
+              for (const [k, v] of Object.entries({ ...query, page: undefined, pageSize: undefined })) if (v !== undefined && v !== '') q.set(k, String(v));
+              navigate(`/labels?${q.toString()}`);
+            }}
+          >
+            Labels
+          </Button>
+        </Tooltip>
         <ExportMenu dataset="assets" query={{ ...query, page: undefined, pageSize: undefined }} />
         {can('asset.write') && !syncUrl && (
           <Button
