@@ -195,6 +195,13 @@ your organisation account. The `bootstrap_admins` are administrators automatical
 3. **Set up e-mail:** *Settings & e-mail* → enter the SMTP relay → *Send test e-mail* → enable warranty
    reminders and enter recipients (central and per plant). Details: [NOTIFICATIONS.md](NOTIFICATIONS.md).
 4. Optional: buildings, floors with floor plans, racks, data centers and site pictures.
+5. **Device types:** *Settings & e-mail → Device types* – hide the types you do not document and add your own
+   fields (e.g. contract number for switches).
+6. **Network:** on a plant page, tab *Network* – enter the VLANs and IP subnets; the CMDB then shows used and free
+   addresses and duplicate IPs. Ports and cables are documented on the device page (tab *Ports*) or come from discovery.
+7. **Applications:** *Applications → Add application* and link the servers / VMs it runs on – every device page then
+   shows which applications fail with it.
+8. Optional: [auto-discovery](#auto-discovery) and [connections to other systems](#connect-other-systems).
 
 ---
 
@@ -272,6 +279,68 @@ both host names there.
 `LOCAL_LOGIN_EMERGENCY=true` and restart – administrators can then sign in with their password again.
 **Secret expiry:** enter the new client secret in the same form before the old one expires (possible while active),
 then run *Test connection* again.
+
+## Auto-discovery
+
+The CMDB finds network devices and servers itself and keeps them up to date (*Administration → Discovered devices*).
+
+**What is read**
+
+| Source | Data |
+|---|---|
+| SNMP v2c / v3 (UDP 161) | system name, description and location, vendor (sysObjectID – e.g. Extreme Networks, HPE, Aruba, Cisco, Fortinet, APC), serial number, model and firmware (ENTITY-MIB), physical ports with speed and MAC (IF-MIB), neighbours (LLDP-MIB) |
+| Active Directory (LDAPS 636 or LDAP 389) | enabled computer objects – by default only servers – with host name, operating system and last logon |
+
+**Network requirements**
+
+* The CMDB sends the queries itself. In Azure the plant networks must be reachable from the App Service through the
+  VNet integration (variant *private network* of the one-click setup or Terraform) and the VPN / ExpressRoute; allow
+  UDP 161 from the App Service integration subnet to the management networks and TCP 636 to the domain controllers.
+* App Service cannot send ICMP (ping) – devices are found by SNMP only. A device that does not answer SNMP (wrong
+  community, ACL) is not found.
+* Use a **read-only** SNMP community or, better, an SNMPv3 user with *authPriv* (SHA + AES), and a service account
+  without special rights for LDAP (every domain user can read computer objects).
+
+**Set up**
+
+1. *Discovered devices → Sources & runs → SNMP network scan*: name, networks (`10.10.0.0/24, 10.10.1.1-10.10.1.50`,
+   max. 4096 addresses per source), version and credentials, plant for new devices, interval (e.g. every 24 h).
+2. *Run now* (▶) – the result appears under *Recent runs*.
+3. *Inbox*: **Add** creates the device (type, name and location can be adjusted), **Link** connects it with an
+   existing device, **Ignore** hides it permanently.
+4. Optional: *Active Directory* source with `ldaps://dc01.example.local:636`, search base and service account.
+
+**Rules**
+
+* Matching: serial number → MAC address → host name / FQDN → IP address. The first criterion that identifies exactly
+  one device wins (with several, the one in the source's plant).
+* Only **empty** fields are filled (serial number, manufacturer, model, MAC, FQDN, OS / firmware, IP); what was
+  documented by hand is never overwritten. *Last seen* is updated on every run.
+* Missing ports are added; LLDP neighbours become *connected to* relations and cables between the two ports – only
+  where nothing is documented yet.
+* Several app instances: only one runs the schedule at a time (database lock). Credentials are stored encrypted
+  (`SETTINGS_ENCRYPTION_KEY`).
+
+## Connect other systems
+
+*Settings & e-mail → API & webhooks*:
+
+* **API tokens** for scripts, monitoring, ticket system or inventory tools – each with its own role, plant scope and
+  expiry. The token is shown once.
+* **Webhooks** send every change (device created, changed, deleted, monitoring state, activities …) as a signed JSON
+  request to another system, with retries when it is not reachable.
+* **Monitoring:** Zabbix, PRTG, Checkmk & co. report the state of devices (`POST /api/monitoring`); the device page
+  shows it and *last seen* is updated.
+* **Tickets:** link tickets or other references to devices (device page → *Tickets & links* or by API).
+
+Everything is described in [API.md](API.md).
+
+## QR labels and data quality
+
+* *Device page → More → Print QR label*, or *Devices → Labels* for the current list: A4 sheets with 3 × 8 labels
+  (70 × 37 mm) or one label per page for label printers (62 × 40 mm). The QR code opens the device page.
+* *Administration → Data quality* shows a score per device and overall, the gaps per rule and possible duplicates
+  (same serial number, MAC or IP address). Click a rule to see and fix the devices.
 
 ## Updating
 

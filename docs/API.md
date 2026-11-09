@@ -166,8 +166,9 @@ Set up under **API & webhooks → New webhook**: URL, events and active/inactive
 same database transaction as the change (outbox), so nothing is lost when the receiver is down.
 
 Event names are `<entity>.<action>`, for example `asset.create`, `asset.update`, `asset.delete`,
-`asset.relation.add`, `asset.port.connect`, `asset.monitoring`, `activity.create`, `application.update`,
-`subnet.create`, `discovery.run`. Filters: `*` (all), `asset.*`, or exact names.
+`asset.relation.add`, `asset.port.connect`, `asset.monitoring`, `asset.activity.add`, `plant.note.add`,
+`application.update`, `subnet.create`, `discovery.run`. Filters: `*` (all), `asset.*` (everything about devices),
+exact names, or an action on any object such as `activity.*` or `note.*`.
 
 Request:
 
@@ -221,6 +222,8 @@ See [SETUP.md](SETUP.md#auto-discovery). The API for discovery sources and the i
 | POST | `/api/discovery/items/{id}/create` | asset.write | Create a device from it |
 | POST | `/api/discovery/items/{id}/link` | asset.write | `{ "asset_id" }` – link with an existing device |
 | POST | `/api/discovery/items/{id}/ignore` | asset.write | |
+| POST | `/api/discovery/items/{id}/reset` | asset.write | Back to the inbox |
+| GET | `/api/assets/{id}/discovery` | read | What the sources found about a device |
 
 ## Examples
 

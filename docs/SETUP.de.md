@@ -293,6 +293,14 @@ Firmenkonto anmelden. Die `bootstrap_admins` sind automatisch Administrator.
 3. **E-Mail einrichten:** *Settings & e-mail* → SMTP-Relay eintragen → *Send test e-mail* → Garantie-Erinnerungen
    aktivieren und Empfänger (zentral + je Werk) eintragen. Details: [NOTIFICATIONS.md](NOTIFICATIONS.md).
 4. Optional: Gebäude, Etagen mit Grundriss, Racks, Rechenzentren und Werksbilder anlegen.
+5. **Gerätetypen:** *Settings & e-mail → Device types* – nicht benötigte Typen ausblenden und eigene Felder ergänzen
+   (z. B. Vertragsnummer bei Switches).
+6. **Netzwerk:** auf der Werksseite, Reiter *Network* – VLANs und IP-Subnetze eintragen; die CMDB zeigt dann belegte und
+   freie Adressen sowie doppelte IPs. Ports und Kabel werden auf der Geräteseite (Reiter *Ports*) gepflegt oder kommen aus
+   der Discovery.
+7. **Anwendungen:** *Applications → Add application* und die Server / VMs verknüpfen, auf denen sie läuft – jede Geräteseite
+   zeigt dann, welche Anwendungen bei einem Ausfall betroffen sind.
+8. Optional: [Auto-Discovery](#auto-discovery) und [Anbindung anderer Systeme](#andere-systeme-anbinden).
 
 ---
 
@@ -371,6 +379,68 @@ müssen dort beide Hostnamen freigegeben sein.
 Einstellung `LOCAL_LOGIN_EMERGENCY=true` setzen und neu starten – Administratoren können sich dann wieder mit Passwort
 anmelden. **Ablauf des Secrets:** das neue Client Secret vor Ablauf des alten im selben Formular eintragen (geht auch
 im aktiven Betrieb) und danach *Test connection* ausführen.
+
+## Auto-Discovery
+
+Die CMDB findet Netzwerkgeräte und Server selbst und hält sie aktuell (*Administration → Discovered devices*).
+
+**Was gelesen wird**
+
+| Quelle | Daten |
+|---|---|
+| SNMP v2c / v3 (UDP 161) | Systemname, Beschreibung und Standort, Hersteller (sysObjectID – z. B. Extreme Networks, HPE, Aruba, Cisco, Fortinet, APC), Seriennummer, Modell und Firmware (ENTITY-MIB), physische Ports mit Geschwindigkeit und MAC (IF-MIB), Nachbarn (LLDP-MIB) |
+| Active Directory (LDAPS 636 oder LDAP 389) | aktive Computerobjekte – standardmäßig nur Server – mit Hostname, Betriebssystem und letzter Anmeldung |
+
+**Netzwerk-Voraussetzungen**
+
+* Die CMDB fragt selbst ab. In Azure müssen die Werksnetze vom App Service über die VNet-Integration (Variante
+  *privates Netzwerk* der Ein-Klick-Einrichtung bzw. Terraform) und VPN / ExpressRoute erreichbar sein; UDP 161 vom
+  Integrations-Subnetz des App Service zu den Management-Netzen und TCP 636 zu den Domain Controllern freigeben.
+* App Service kann kein ICMP (Ping) – Geräte werden ausschließlich per SNMP gefunden. Ein Gerät, das nicht auf SNMP
+  antwortet (falsche Community, ACL), wird nicht gefunden.
+* Eine **nur lesende** SNMP-Community oder besser einen SNMPv3-Benutzer mit *authPriv* (SHA + AES) verwenden, für LDAP
+  ein Dienstkonto ohne besondere Rechte (jeder Domänenbenutzer darf Computerobjekte lesen).
+
+**Einrichten**
+
+1. *Discovered devices → Sources & runs → SNMP network scan*: Name, Netze (`10.10.0.0/24, 10.10.1.1-10.10.1.50`,
+   max. 4096 Adressen je Quelle), Version und Zugangsdaten, Werk für neue Geräte, Intervall (z. B. alle 24 h).
+2. *Jetzt ausführen* (▶) – das Ergebnis steht unter *Recent runs*.
+3. *Inbox*: **Add** legt das Gerät an (Typ, Name und Ort anpassbar), **Link** verknüpft es mit einem vorhandenen Gerät,
+   **Ignore** blendet es dauerhaft aus.
+4. Optional: Quelle *Active Directory* mit `ldaps://dc01.example.local:636`, Suchbasis und Dienstkonto.
+
+**Regeln**
+
+* Abgleich: Seriennummer → MAC-Adresse → Hostname / FQDN → IP-Adresse. Das erste Merkmal, das genau ein Gerät findet,
+  gewinnt (bei mehreren das im Werk der Quelle).
+* Es werden nur **leere** Felder gefüllt (Seriennummer, Hersteller, Modell, MAC, FQDN, OS / Firmware, IP); von Hand
+  Gepflegtes wird nie überschrieben. *Zuletzt gesehen* wird bei jedem Lauf aktualisiert.
+* Fehlende Ports werden ergänzt; LLDP-Nachbarn werden zu *connected to*-Beziehungen und Kabeln zwischen den beiden
+  Ports – nur wo noch nichts dokumentiert ist.
+* Mehrere App-Instanzen: nur eine führt den Zeitplan aus (Datenbank-Sperre). Zugangsdaten werden verschlüsselt
+  gespeichert (`SETTINGS_ENCRYPTION_KEY`).
+
+## Andere Systeme anbinden
+
+*Settings & e-mail → API & webhooks*:
+
+* **API-Tokens** für Skripte, Monitoring, Ticketsystem oder Inventar-Tools – je mit eigener Rolle, Werksbeschränkung
+  und Ablaufdatum. Der Token wird nur einmal angezeigt.
+* **Webhooks** melden jede Änderung (Gerät angelegt, geändert, gelöscht, Monitoring-Status, Aktivitäten …) als
+  signierte JSON-Anfrage an ein anderes System, mit Wiederholungen, wenn es nicht erreichbar ist.
+* **Monitoring:** Zabbix, PRTG, Checkmk & Co. melden den Zustand der Geräte (`POST /api/monitoring`); die Geräteseite
+  zeigt ihn an, *zuletzt gesehen* wird aktualisiert.
+* **Tickets:** Tickets oder andere Referenzen mit Geräten verknüpfen (Geräteseite → *Tickets & links* oder per API).
+
+Alles Weitere steht in [API.md](API.md) (englisch).
+
+## QR-Etiketten und Datenqualität
+
+* *Geräteseite → More → Print QR label* oder *Devices → Labels* für die aktuelle Liste: A4-Bögen mit 3 × 8 Etiketten
+  (70 × 37 mm) oder ein Etikett je Seite für Etikettendrucker (62 × 40 mm). Der QR-Code öffnet die Geräteseite.
+* *Administration → Data quality* zeigt einen Wert je Gerät und insgesamt, die Lücken je Regel und mögliche Dubletten
+  (gleiche Seriennummer, MAC- oder IP-Adresse). Ein Klick auf eine Regel zeigt die betroffenen Geräte.
 
 ## Aktualisieren
 

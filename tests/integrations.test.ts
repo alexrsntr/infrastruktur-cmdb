@@ -218,3 +218,16 @@ describe('external references and monitoring', () => {
     await bearer(token).put(`/api/assets/${a.id}`, { type: 'switch', name: 'mon-a' }).expect(403); // operator token
   });
 });
+
+describe('event filters', () => {
+  it('match entity events and actions on any object', async () => {
+    const { eventMatches } = await import('../shared/integrations');
+    expect(eventMatches(['*'], 'asset.create')).toBe(true);
+    expect(eventMatches(['asset.*'], 'asset.port.connect')).toBe(true);
+    expect(eventMatches(['asset.update'], 'asset.create')).toBe(false);
+    expect(eventMatches(['activity.*'], 'asset.activity.add')).toBe(true);
+    expect(eventMatches(['activity.*'], 'plant.activity.update')).toBe(true);
+    expect(eventMatches(['activity.*'], 'asset.update')).toBe(false);
+    expect(eventMatches(['plant.*'], 'asset.create')).toBe(false);
+  });
+});

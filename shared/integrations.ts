@@ -29,7 +29,8 @@ export const WEBHOOK_EVENT_GROUPS = [
   { value: 'asset.update', label: 'Device changed' },
   { value: 'asset.delete', label: 'Device deleted' },
   { value: 'asset.monitoring', label: 'Monitoring status changed' },
-  { value: 'activity.*', label: 'Activities (maintenance, incidents …)' },
+  { value: 'activity.*', label: 'Activities (maintenance, incidents …) on any object' },
+  { value: 'note.*', label: 'Notes on any object' },
   { value: 'application.*', label: 'Applications' },
   { value: 'plant.*', label: 'Plants' },
   { value: 'building.*', label: 'Buildings' },
@@ -39,8 +40,14 @@ export const WEBHOOK_EVENT_GROUPS = [
   { value: 'discovery.*', label: 'Discovery runs' },
 ] as const;
 
+/**
+ * "*" matches everything, "asset.*" all events of devices, "asset.update" exactly that event.
+ * Patterns are also compared with the action alone, so "activity.*" matches "asset.activity.add" and "plant.activity.update".
+ */
 export function eventMatches(patterns: string[], event: string): boolean {
-  return patterns.some((p) => p === '*' || p === event || (p.endsWith('.*') && event.startsWith(p.slice(0, -1))));
+  const action = event.split('.').slice(1).join('.');
+  const hit = (p: string, e: string) => p === e || (p.endsWith('.*') && e.startsWith(p.slice(0, -1)));
+  return patterns.some((p) => p === '*' || hit(p, event) || (!!action && hit(p, action)));
 }
 
 export interface WebhookDto {
