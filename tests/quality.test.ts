@@ -25,7 +25,6 @@ afterAll(async () => {
 
 const complete = {
   type: 'switch',
-  plant_id: muc?.id,
   manufacturer: 'Cisco',
   model: 'C9300',
   owner: 'Network Team',
