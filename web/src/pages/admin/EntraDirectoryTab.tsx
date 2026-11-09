@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Alert, App, Button, Card, Empty, Form, Input, Modal, Popconfirm, Segmented, Select, Space, Table, Tag, Tooltip, Typography } from 'antd';
 import { DeleteOutlined, EditOutlined, TeamOutlined, UserAddOutlined, UserOutlined } from '@ant-design/icons';
 import { ROLES, ROLE_META, type Role } from '../../../../shared/model';
-import type { AppRoleAssignmentDto, DirectoryGroup, DirectoryPage, DirectoryUser, GroupRoleMapping } from '../../../../shared/entra';
+import { GRAPH_APP_PERMISSIONS, type AppRoleAssignmentDto, type DirectoryGroup, type DirectoryPage, type DirectoryUser, type EntraSettingsDto, type GroupRoleMapping } from '../../../../shared/entra';
 import { errorText, http } from '../../lib/api';
 import { usePlants } from '../../lib/queries';
 
@@ -47,18 +47,43 @@ function GraphError({ error }: { error: unknown }) {
   return <Alert type="error" showIcon message="Microsoft Graph" description={errorText(error)} style={{ marginBottom: 12 }} />;
 }
 
-export function EntraDirectoryTab() {
+/** Graph application permissions missing according to the last connection test (null = not tested yet). */
+function missingPermissions(settings?: EntraSettingsDto): string[] | null {
+  if (!settings?.connection) return null;
+  const granted = settings.connection.grantedPermissions;
+  if (granted.includes('Directory.Read.All')) return [];
+  return GRAPH_APP_PERMISSIONS.map((p) => p.permission as string).filter((p) => !granted.includes(p));
+}
+
+export function EntraDirectoryTab({ settings }: { settings?: EntraSettingsDto }) {
+  const missing = missingPermissions(settings);
   const [kind, setKind] = useState<'users' | 'groups'>('users');
   const [input, setInput] = useState('');
   const [q, setQ] = useState('');
   const [provisioning, setProvisioning] = useState<DirectoryUser | null>(null);
   const [mapping, setMapping] = useState<{ groupId: string; displayName: string; role?: Role; plantScope?: string[] } | null>(null);
 
-  const users = usePaged<DirectoryUser>(['entra', 'users'], kind === 'users' ? '/api/entra/users' : null, q);
-  const groups = usePaged<DirectoryGroup>(['entra', 'groups'], kind === 'groups' ? '/api/entra/groups' : null, q);
+  const can = (permission: string) => !missing?.includes(permission);
+  const users = usePaged<DirectoryUser>(['entra', 'users'], kind === 'users' && can('User.Read.All') ? '/api/entra/users' : null, q);
+  const groups = usePaged<DirectoryGroup>(['entra', 'groups'], kind === 'groups' && can('GroupMember.Read.All') ? '/api/entra/groups' : null, q);
 
   return (
     <div>
+      {!!missing?.length && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Optional features need Microsoft Graph application permissions"
+          description={
+            <>
+              Missing: {missing.map((p) => <code key={p} style={{ marginInlineEnd: 6 }}>{p}</code>)} – they need admin consent by a Privileged Role
+              Administrator or Global Administrator. Without them the sign-in works and roles come from the <b>app roles</b> of the enterprise
+              application (assigned in Microsoft Entra ID); searching here and Entra group roles are not available.
+            </>
+          }
+        />
+      )}
       <Card
         title="Search Microsoft Entra ID"
         extra={<Typography.Text type="secondary">read-only · Microsoft Graph</Typography.Text>}
@@ -183,8 +208,8 @@ export function EntraDirectoryTab() {
         )}
       </Card>
 
-      <GroupRoleTable onEdit={setMapping} />
-      <AppRoleAssignments />
+      <GroupRoleTable onEdit={setMapping} groupPermissionMissing={!!missing?.includes('GroupMember.Read.All')} />
+      <AppRoleAssignments enabled={can('Application.Read.All')} />
 
       <ProvisionModal user={provisioning} onClose={() => setProvisioning(null)} />
       <GroupRoleModal value={mapping} onClose={() => setMapping(null)} />
@@ -336,7 +361,13 @@ function GroupRoleModal({ value, onClose }: { value: { groupId: string; displayN
   );
 }
 
-function GroupRoleTable({ onEdit }: { onEdit: (v: { groupId: string; displayName: string; role?: Role; plantScope?: string[] }) => void }) {
+function GroupRoleTable({
+  onEdit,
+  groupPermissionMissing,
+}: {
+  onEdit: (v: { groupId: string; displayName: string; role?: Role; plantScope?: string[] }) => void;
+  groupPermissionMissing: boolean;
+}) {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
   const plants = usePlants();
@@ -355,6 +386,15 @@ function GroupRoleTable({ onEdit }: { onEdit: (v: { groupId: string; displayName
 
   return (
     <Card title="Entra groups → CMDB roles" style={{ marginBottom: 16 }} extra={<Typography.Text type="secondary">search a group above to add one</Typography.Text>}>
+      {groupPermissionMissing && !!mappings.data?.length && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message="Group roles cannot be evaluated"
+          description="Without the application permission GroupMember.Read.All the group memberships cannot be read at sign-in – members of these groups without an app role are refused."
+        />
+      )}
       <Table<GroupRoleMapping>
         rowKey="groupId"
         loading={mappings.isLoading}
@@ -389,8 +429,13 @@ function GroupRoleTable({ onEdit }: { onEdit: (v: { groupId: string; displayName
   );
 }
 
-function AppRoleAssignments() {
-  const assignments = useQuery({ queryKey: ['entra', 'app-role-assignments'], queryFn: () => http.get<AppRoleAssignmentDto[]>('/api/entra/app-role-assignments'), retry: false });
+function AppRoleAssignments({ enabled }: { enabled: boolean }) {
+  const assignments = useQuery({
+    queryKey: ['entra', 'app-role-assignments'],
+    queryFn: () => http.get<AppRoleAssignmentDto[]>('/api/entra/app-role-assignments'),
+    retry: false,
+    enabled,
+  });
   return (
     <Card title="App role assignments of the enterprise application" extra={<Typography.Text type="secondary">read-only · managed in Microsoft Entra ID</Typography.Text>}>
       <GraphError error={assignments.error} />
@@ -399,7 +444,7 @@ function AppRoleAssignments() {
         loading={assignments.isLoading}
         dataSource={assignments.data ?? []}
         pagination={{ pageSize: 25, hideOnSinglePage: true }}
-        locale={{ emptyText: 'No users or groups are assigned to an app role.' }}
+        locale={{ emptyText: enabled ? 'No users or groups are assigned to an app role.' : 'Needs the application permission Application.Read.All – see the Enterprise application in Microsoft Entra ID.' }}
         columns={[
           {
             title: 'Assigned to',

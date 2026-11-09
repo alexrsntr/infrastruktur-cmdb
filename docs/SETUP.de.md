@@ -338,10 +338,13 @@ ohne Neustart. Die Anmeldung mit Passwort bleibt verfügbar, bis man sie einschr
    `CMDB.Editor`, `CMDB.Operator`, `CMDB.Viewer`. Optional, wenn man stattdessen Entra-Gruppen in der App Rollen zuordnet.
 5. *API-Berechtigungen → Berechtigung hinzufügen → Microsoft Graph*:
    - **Delegiert** (Anmeldung): `openid`, `profile`, `email`, `User.Read`
-   - **Anwendung** (nur lesend, für Benutzer-/Gruppensuche und Gruppenrollen): `User.Read.All`,
-     `GroupMember.Read.All`, `Application.Read.All`
-6. **Administratorzustimmung für <Mandant> erteilen** (Button auf derselben Seite; braucht z. B. die Rolle
-   *Administrator für privilegierte Rollen* oder *Globaler Administrator*).
+   - **Anwendung** – *optional*, nur lesend, nur für Benutzer-/Gruppensuche und Entra-Gruppenrollen:
+     `User.Read.All`, `GroupMember.Read.All`, `Application.Read.All`
+6. **Zustimmung (Consent):** Für die Anmeldung ist keine Administratorzustimmung nötig, wenn Benutzer in Ihrem
+   Mandanten Apps zustimmen dürfen; sonst erteilt ein *Anwendungsadministrator* oder *Cloudanwendungsadministrator* die
+   Zustimmung für die delegierten Berechtigungen. Die optionalen Anwendungsberechtigungen brauchen immer die Zustimmung
+   eines *Administrators für privilegierte Rollen* oder *Globalen Administrators* – ohne sie kommen die CMDB-Rollen aus
+   den App-Rollen (Schritt 7).
 7. *Unternehmensanwendungen → Infrastruktur CMDB → Benutzer und Gruppen*: Personen oder Gruppen den App-Rollen zuweisen.
    Unter *Eigenschaften → Zuweisung erforderlich = Ja* setzen, wenn nur zugewiesene Personen hinein dürfen.
 

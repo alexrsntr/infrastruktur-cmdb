@@ -468,7 +468,7 @@ export function UsersPage() {
           }}
           items={[
             { key: 'users', label: 'CMDB users', children: usersContent },
-            { key: 'entra', label: 'Microsoft Entra ID', children: <EntraDirectoryTab /> },
+            { key: 'entra', label: 'Microsoft Entra ID', children: <EntraDirectoryTab settings={entraSettings.data} /> },
           ]}
         />
       ) : (

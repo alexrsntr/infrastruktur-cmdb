@@ -57,7 +57,10 @@ export function explainEntraError(err: unknown, permission?: string): ExplainedE
         status: 502,
         code: 'graph-forbidden',
         error: `Microsoft Graph denied access${permission ? ` (permission ${permission} missing)` : ''}.`,
-        hint: `Add the Microsoft Graph application permission${permission ? ` ${permission}` : 's'} to the app registration and grant admin consent.`,
+        hint:
+          `Add the Microsoft Graph application permission${permission ? ` ${permission}` : 's'} to the app registration and grant admin consent ` +
+          '(application permissions of Microsoft Graph can only be consented by a Privileged Role Administrator or Global Administrator). ' +
+          'This is optional: the sign-in and roles from app roles work without it.',
       };
     }
     if (err.status === 401) return { status: 502, code: 'graph-unauthorized', error: 'Microsoft Graph rejected the token.', hint: 'Check tenant, application and admin consent.' };

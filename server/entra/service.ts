@@ -4,7 +4,7 @@ import { GRAPH_APP_PERMISSIONS, type EntraConnectionCheck, type EntraTestResult 
 import { log } from '../lib/log';
 import { msalClientFactory, tokenAppRoles, type EntraClient, type EntraClientFactory } from './client';
 import { explainEntraError } from './errors';
-import { GRAPH_SCOPE, GraphClient, encodeNext, decodeNext, type FetchLike, type GraphPage } from './graph';
+import { GRAPH_SCOPE, GraphClient, GraphError, encodeNext, decodeNext, type FetchLike, type GraphPage } from './graph';
 import { EntraSettingsStore, type EntraRuntime } from './settings';
 
 export interface EntraDeps {
@@ -99,36 +99,62 @@ export class EntraService {
 
   // ------------------------------------------------------------------ connection test
 
+  /**
+   * Connection test: an app-only token proves tenant, application and credential – that is all the sign-in needs.
+   * Microsoft Graph is checked only for information: application permissions (directory features, group roles) are
+   * optional and need admin consent; reading the tenant name needs Organization.Read.All, which is not required.
+   */
   async testConnection(rt: EntraRuntime): Promise<{ result: EntraTestResult; check: EntraConnectionCheck | null; code: string }> {
+    let token: string;
     try {
-      const token = await this.client(rt).acquireAppToken(GRAPH_SCOPE);
-      const granted = tokenAppRoles(token);
-      const org = await new GraphClient(async () => token, this.deps.fetch, this.deps.sleep).get<GraphPage<{ id: string; displayName: string }>>(
-        '/organization?$select=id,displayName',
-      );
-      const tenantName = org.value[0]?.displayName ?? null;
-      const required = GRAPH_APP_PERMISSIONS.map((p) => p.permission as string);
-      // Directory.Read.All covers all three read permissions
-      const missing = granted.includes('Directory.Read.All') ? [] : required.filter((p) => !granted.includes(p));
-      const check: EntraConnectionCheck = { at: new Date().toISOString(), tenantName, grantedPermissions: granted.filter((g) => required.includes(g) || g === 'Directory.Read.All') };
-      return {
-        result: {
-          ok: true,
-          tenantName,
-          grantedPermissions: check.grantedPermissions,
-          missingPermissions: missing,
-          hint: missing.length
-            ? `Sign-in works. For the directory features add the application permission(s) ${missing.join(', ')} for Microsoft Graph and grant admin consent.`
-            : undefined,
-        },
-        check,
-        code: 'ok',
-      };
+      token = await this.client(rt).acquireAppToken(GRAPH_SCOPE);
     } catch (err) {
       const e = explainEntraError(err);
       log.warn('entra: connection test failed', { code: e.code });
       return { result: { ok: false, error: e.error, hint: e.hint }, check: null, code: e.code };
     }
+
+    const granted = tokenAppRoles(token);
+    const required = GRAPH_APP_PERMISSIONS.map((p) => p.permission as string);
+    // Directory.Read.All covers all three read permissions
+    const missing = granted.includes('Directory.Read.All') ? [] : required.filter((p) => !granted.includes(p));
+
+    let tenantName: string | null = null;
+    let graphWarning: string | null = null;
+    try {
+      const org = await new GraphClient(async () => token, this.deps.fetch, this.deps.sleep).get<GraphPage<{ id: string; displayName: string }>>(
+        '/organization?$select=id,displayName',
+      );
+      tenantName = org.value[0]?.displayName ?? null;
+    } catch (err) {
+      // 401/403 = Graph is reachable, the app may just not read the organization (not needed)
+      if (!(err instanceof GraphError && (err.status === 401 || err.status === 403))) {
+        const e = explainEntraError(err);
+        graphWarning =
+          e.code === 'network'
+            ? 'graph.microsoft.com could not be reached. The sign-in works without it, but the directory features and Entra group roles need it – allow it in the firewall.'
+            : `Microsoft Graph: ${e.error}`;
+      }
+    }
+
+    const hints: string[] = [];
+    if (missing.length) {
+      hints.push(
+        `Optional: searching users and groups and Entra group roles need the Microsoft Graph application permission(s) ${missing.join(', ')} with admin consent. ` +
+          'The sign-in and roles from app roles work without them.',
+      );
+    }
+    if (graphWarning) hints.push(graphWarning);
+    const check: EntraConnectionCheck = {
+      at: new Date().toISOString(),
+      tenantName,
+      grantedPermissions: granted.filter((g) => required.includes(g) || g === 'Directory.Read.All'),
+    };
+    return {
+      result: { ok: true, tenantName, grantedPermissions: check.grantedPermissions, missingPermissions: missing, hint: hints.join(' ') || undefined },
+      check,
+      code: missing.length ? 'ok-without-graph-permissions' : 'ok',
+    };
   }
 
   // ------------------------------------------------------------------ directory (read-only)

@@ -275,14 +275,14 @@ export function EntraSettingsTab() {
               </Button>
             )}
 
-            {test && <TestResult result={test} />}
+            {test && <TestResult result={test} tenantId={s.tenantId} />}
             {!test && s.connection && (
               <Alert
                 style={{ marginTop: 16 }}
                 type="success"
                 showIcon
-                message={`Connection OK${s.connection.tenantName ? ` – tenant "${s.connection.tenantName}"` : ''}`}
-                description={`Tested ${fmtDateTime(s.connection.at)}. Granted Graph permissions: ${s.connection.grantedPermissions.join(', ') || 'none'}`}
+                message={`Connection OK – tenant ${s.connection.tenantName ? `"${s.connection.tenantName}"` : s.tenantId}`}
+                description={`Tested ${fmtDateTime(s.connection.at)}. Optional Graph application permissions granted: ${s.connection.grantedPermissions.join(', ') || 'none'}`}
               />
             )}
             {s.login && !s.enabled && (
@@ -384,7 +384,7 @@ export function EntraSettingsTab() {
                     delegated for the sign-in: <code>openid</code>, <code>profile</code>, <code>email</code>, <code>User.Read</code>
                   </li>
                   <li>
-                    application (read-only, for the directory features):{' '}
+                    application – <i>optional</i>, read-only, only for searching users/groups and for Entra group roles:{' '}
                     {GRAPH_APP_PERMISSIONS.map((p) => (
                       <Tooltip key={p.permission} title={p.purpose}>
                         <code style={{ marginInlineEnd: 6 }}>{p.permission}</code>
@@ -394,7 +394,9 @@ export function EntraSettingsTab() {
                 </ul>
               </li>
               <li>
-                <b>Grant admin consent</b> for the tenant (button on the API permissions page).
+                <b>Consent</b>: the sign-in needs no admin consent if users may consent to apps in your tenant; otherwise an <i>Application Administrator</i>{' '}
+                or <i>Cloud Application Administrator</i> grants consent for the delegated permissions. The optional application permissions always need
+                admin consent by a <i>Privileged Role Administrator</i> or <i>Global Administrator</i> – without them, use app roles for the CMDB roles.
               </li>
               <li>
                 Enterprise application → <b>Users and groups</b>: assign people or groups to the app roles (and set <i>Assignment required</i> if only assigned users may sign in).
@@ -411,30 +413,31 @@ export function EntraSettingsTab() {
   );
 }
 
-function TestResult({ result }: { result: EntraTestResult }) {
+function TestResult({ result, tenantId }: { result: EntraTestResult; tenantId: string }) {
   if (!result.ok) {
     return <Alert style={{ marginTop: 16 }} type="error" showIcon message={result.error} description={result.hint} />;
   }
-  const missing = result.missingPermissions ?? [];
   return (
     <Alert
       style={{ marginTop: 16 }}
-      type={missing.length ? 'warning' : 'success'}
+      type="success"
       showIcon
-      message={`Connection OK${result.tenantName ? ` – tenant "${result.tenantName}"` : ''}`}
+      message={`Connection OK – Microsoft Entra ID accepts tenant ${result.tenantName ? `"${result.tenantName}"` : tenantId}, application and credential`}
       description={
         <Space direction="vertical" size={6}>
+          <span>The sign-in can be tested and activated.</span>
           <span>
+            <Typography.Text type="secondary">Optional Graph application permissions: </Typography.Text>
             {GRAPH_APP_PERMISSIONS.map((p) => {
               const granted = (result.grantedPermissions ?? []).includes(p.permission) || (result.grantedPermissions ?? []).includes('Directory.Read.All');
               return (
-                <Tag key={p.permission} icon={granted ? <CheckCircleFilled /> : <CloseCircleFilled />} color={granted ? 'success' : 'warning'}>
+                <Tag key={p.permission} icon={granted ? <CheckCircleFilled /> : <CloseCircleFilled />} color={granted ? 'success' : 'default'}>
                   {p.permission}
                 </Tag>
               );
             })}
           </span>
-          {result.hint && <span>{result.hint}</span>}
+          {result.hint && <Typography.Text type="secondary">{result.hint}</Typography.Text>}
         </Space>
       }
     />

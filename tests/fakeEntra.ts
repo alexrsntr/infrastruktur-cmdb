@@ -40,6 +40,8 @@ export function createFakeEntra() {
     tokenError: null as Error | null,
     graphError: null as { status: number; code: string; path?: string } | null,
     throttleOnce: false,
+    /** Microsoft Graph not reachable (network error), the token endpoint still works */
+    graphUnreachable: false,
     users: [] as FakeUser[],
     groups: [] as FakeGroup[],
     /** service principal app role assignments */
@@ -71,8 +73,14 @@ export function createFakeEntra() {
   const json = (status: number, body: unknown, headers: Record<string, string> = {}) =>
     new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...headers } });
 
-  const fetch: FetchLike = async (url) => {
+  const fetch: FetchLike = async (url, init) => {
     state.graphCalls.push(url);
+    if (state.graphUnreachable) {
+      throw Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error('getaddrinfo ENOTFOUND graph.microsoft.com'), { code: 'ENOTFOUND' }) });
+    }
+    // permissions of the app-only token, as Microsoft Graph checks them
+    const auth = new Headers(init?.headers).get('authorization') ?? '';
+    const roles: string[] = JSON.parse(Buffer.from(auth.replace(/^Bearer /, '').split('.')[1] ?? '', 'base64url').toString() || '{}').roles ?? [];
     const u = new URL(url);
     const path = decodeURIComponent(u.pathname.replace(/^\/v1\.0/, ''));
     if (state.throttleOnce) {
@@ -86,7 +94,13 @@ export function createFakeEntra() {
     const term = search.match(/displayname:([^"]*)"/)?.[1]?.trim() ?? '';
     const user = (x: FakeUser) => ({ ...x, mail: x.mail ?? null, jobTitle: null, department: null, accountEnabled: true });
 
-    if (path === '/organization') return json(200, { value: [{ id: TENANT, displayName: 'Example Corp' }] });
+    if (path === '/organization') {
+      // needs Organization.Read.All or Directory.Read.All – not part of the permissions the CMDB asks for
+      if (!roles.some((r) => r === 'Organization.Read.All' || r === 'Directory.Read.All')) {
+        return json(403, { error: { code: 'Authorization_RequestDenied', message: 'Insufficient privileges to complete the operation.' } });
+      }
+      return json(200, { value: [{ id: TENANT, displayName: 'Example Corp' }] });
+    }
     if (path === '/users') return json(200, { value: state.users.filter((x) => !term || x.displayName.toLowerCase().includes(term)).map(user) });
     let m = path.match(/^\/users\/([^/]+)\/transitiveMemberOf\/microsoft\.graph\.group$/);
     if (m) return json(200, { value: state.groups.filter((g) => g.members.includes(m![1])).map((g) => ({ id: g.id })) });

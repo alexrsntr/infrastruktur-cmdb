@@ -240,10 +240,12 @@ Password sign-in stays available until you restrict it.
    `CMDB.Operator`, `CMDB.Viewer`. Optional if you prefer mapping Entra groups to roles in the app.
 5. *API permissions → Add a permission → Microsoft Graph*:
    - **Delegated** (sign-in): `openid`, `profile`, `email`, `User.Read`
-   - **Application** (read-only, for searching users and groups and for group roles): `User.Read.All`,
-     `GroupMember.Read.All`, `Application.Read.All`
-6. **Grant admin consent for <tenant>** (button on the same page; needs e.g. the role *Privileged Role Administrator*
-   or *Global Administrator*).
+   - **Application** – *optional*, read-only, only for searching users and groups and for Entra group roles:
+     `User.Read.All`, `GroupMember.Read.All`, `Application.Read.All`
+6. **Consent:** the sign-in needs no admin consent if users may consent to apps in your tenant; otherwise an
+   *Application Administrator* or *Cloud Application Administrator* grants consent for the delegated permissions.
+   The optional application permissions always need admin consent by a *Privileged Role Administrator* or *Global
+   Administrator* – without them, the CMDB roles come from the app roles (step 7).
 7. *Enterprise applications → Infrastruktur CMDB → Users and groups*: assign people or groups to the app roles. Set
    *Properties → Assignment required = Yes* if only assigned people may sign in.
 

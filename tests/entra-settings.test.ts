@@ -105,21 +105,32 @@ describe('Microsoft Entra ID settings (AUTH_MODE=local)', () => {
     expect(res.body.error).toMatch(/could not be reached/);
     expect(res.body.hint).toMatch(/login\.microsoftonline\.com.*graph\.microsoft\.com/);
 
+    // no Graph application permissions / no admin consent: the token proves the configuration – that is enough
     fake.state.tokenError = null;
     fake.state.appTokenRoles = [];
     res = await admin.post('/api/settings/entra/test').expect(200);
-    expect(res.body).toMatchObject({ ok: true, tenantName: 'Example Corp' });
+    expect(res.body).toMatchObject({ ok: true, tenantName: null });
     expect(res.body.missingPermissions).toEqual(['User.Read.All', 'GroupMember.Read.All', 'Application.Read.All']);
+    expect(res.body.hint).toMatch(/^Optional:/);
 
+    // Graph not reachable (firewall) – the sign-in still works, the hint names the host
+    fake.state.graphUnreachable = true;
+    res = await admin.post('/api/settings/entra/test').expect(200);
+    expect(res.body).toMatchObject({ ok: true });
+    expect(res.body.hint).toMatch(/graph\.microsoft\.com could not be reached/);
+    fake.state.graphUnreachable = false;
+
+    // the three read permissions granted (the tenant name needs Organization.Read.All, which is not required)
     fake.state.appTokenRoles = ['User.Read.All', 'GroupMember.Read.All', 'Application.Read.All'];
     res = await admin.post('/api/settings/entra/test').expect(200);
-    expect(res.body).toMatchObject({ ok: true, tenantName: 'Example Corp', missingPermissions: [] });
+    expect(res.body).toMatchObject({ ok: true, tenantName: null, missingPermissions: [] });
+    expect(res.body.hint).toBeUndefined();
     expect(JSON.stringify(res.body)).not.toContain(SECRET);
     // the fake MSAL client was built from the stored configuration
     expect(fake.state.configs.at(-1)).toMatchObject({ tenantId: TENANT, clientId: CLIENT, credential: 'secret', clientSecret: SECRET });
 
     const s = (await admin.get('/api/settings/entra').expect(200)).body;
-    expect(s.connection).toMatchObject({ tenantName: 'Example Corp' });
+    expect(s.connection).toMatchObject({ grantedPermissions: ['User.Read.All', 'GroupMember.Read.All', 'Application.Read.All'] });
     expect(s.canActivate).toBe(false);
     expect(s.activationBlockers.join(' ')).toMatch(/Test sign-in/);
   });
