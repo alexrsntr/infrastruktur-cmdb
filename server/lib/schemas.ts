@@ -119,6 +119,9 @@ export const assetSchema = z
     cost_center: optText(50),
     purchase_date: optDate,
     warranty_end: optDate,
+    support_end: optDate,
+    end_of_life: optDate,
+    support_contract: optText(200),
     description: optText(8000),
     tags: z
       .array(z.string().trim().min(1).max(50))

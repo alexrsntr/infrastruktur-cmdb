@@ -308,6 +308,18 @@ export async function seed(pool: Pool, opts: { force?: boolean } = {}) {
       await relate(core.id, fw.id, 'uplink', 'Te1/1/8', 'port1');
     }
 
+    // ---- lifecycle data: vendor support and end of life of the network gear, last seen on the network
+    await client.query(`
+      UPDATE asset SET support_end = CURRENT_DATE + 120, end_of_life = CURRENT_DATE + 300, support_contract = 'Siemens Industry Online Support'
+      WHERE type = 'switch' AND model = 'SCALANCE XC216';
+      UPDATE asset SET support_end = CURRENT_DATE + 1500, end_of_life = CURRENT_DATE + 2400, support_contract = 'Cisco Smart Net Total Care 8x5xNBD'
+      WHERE type = 'switch' AND model LIKE 'Catalyst%';
+      UPDATE asset SET support_end = CURRENT_DATE - 30, end_of_life = CURRENT_DATE + 200 WHERE type = 'server' AND name LIKE '%-esx02';
+      UPDATE asset SET support_contract = 'FortiCare 24x7' WHERE type = 'firewall';
+      UPDATE asset SET last_seen_at = now() - interval '2 hours' WHERE type IN ('switch','access_point','server','firewall','ups') AND status = 'active';
+      UPDATE asset SET last_seen_at = now() - interval '45 days' WHERE type = 'access_point' AND status = 'active' AND name LIKE '%-ap-003';
+    `);
+
     // ---- demo site plan for the headquarters (only with the database storage driver)
     if (!process.env.STORAGE_DRIVER || process.env.STORAGE_DRIVER === 'database') {
       await seedSitePlan(client);

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
-import { App, Button, Card, Col, Dropdown, Empty, Result, Row, Skeleton, Tabs, Tag, Typography, type MenuProps } from 'antd';
+import { App, Button, Card, Col, Dropdown, Empty, Result, Row, Skeleton, Tabs, Tag, Tooltip, Typography, type MenuProps } from 'antd';
 import {
   ArrowLeftOutlined,
   ArrowRightOutlined,
@@ -18,6 +18,7 @@ import {
   ASSET_STATUSES,
   ASSET_STATUS_META,
   ASSET_TYPES,
+  ATTENTION_DAYS,
   CRITICALITY_META,
   RELATION_TYPES,
   formatRackUnits,
@@ -25,7 +26,7 @@ import {
   type AssetRelation,
 } from '../../../shared/model';
 import { ApiError, buildUrl, errorText, http } from '../lib/api';
-import { fmtDate, fmtDateTime } from '../lib/format';
+import { fmtDate, fmtDateTime, fromNow } from '../lib/format';
 import { useAsset, useAssetTypes, useInvalidate } from '../lib/queries';
 import { useSession } from '../lib/session';
 import { PageHeader } from '../components/PageHeader';
@@ -173,7 +174,9 @@ export function AssetPage() {
     ['MAC address', a.mac_address, <span className="mono">{a.mac_address}</span>],
     ['Hostname (FQDN)', a.fqdn, <span className="mono">{a.fqdn}</span>],
     ['OS / firmware', a.os],
-    ['Warranty until', a.warranty_end, <WarrantyDate value={a.warranty_end} />],
+    ['Warranty until', a.warranty_end, <WarrantyDate value={a.warranty_end} warnDays={ATTENTION_DAYS.warranty} />],
+    ['Vendor support until', a.support_end, <WarrantyDate value={a.support_end} warnDays={ATTENTION_DAYS.support} />],
+    ['End of life', a.end_of_life, <WarrantyDate value={a.end_of_life} warnDays={ATTENTION_DAYS.eol} />],
     ['Responsible', a.owner],
     ['Inventory no.', a.asset_tag],
   ];
@@ -185,6 +188,8 @@ export function AssetPage() {
     }),
     ['Criticality', a.criticality, CRITICALITY_META[a.criticality].label],
     ['Cost center', a.cost_center],
+    ['Support contract', a.support_contract],
+    ['Last seen on the network', a.last_seen_at, <Tooltip title={fmtDateTime(a.last_seen_at)}>{fromNow(a.last_seen_at)}</Tooltip>],
     ['Purchase date', a.purchase_date, fmtDate(a.purchase_date)],
     ['Tags', a.tags, a.tags.map((t) => <Tag key={t}>{t}</Tag>)],
     ['Description', a.description, <span className="note-body">{a.description}</span>],

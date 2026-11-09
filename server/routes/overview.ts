@@ -1,11 +1,12 @@
 import { Router, type Request } from 'express';
 import type { Pool } from 'pg';
-import { ROLE_PERMISSIONS, type AppConfig, type MeResponse } from '../../shared/model';
+import { ATTENTION_KINDS, ROLE_PERMISSIONS, type AppConfig, type AttentionData, type AttentionKind, type MeResponse } from '../../shared/model';
 import type { Config } from '../config';
 import { ensureCsrfToken } from '../auth/context';
-import { likePattern, queryString, SqlBuilder } from '../lib/http';
+import { badRequest, clampInt, isUuid, likePattern, queryString, SqlBuilder } from '../lib/http';
 import { applyScope, isUnscoped } from '../lib/scope';
 import { ACTIVITY_FROM, ACTIVITY_SELECT } from './journal';
+import { ATTENTION_BASE, ATTENTION_SQL } from '../services/assets';
 import type { EntraService } from '../entra/service';
 import { effectiveLocalLogin } from '../entra/settings';
 
@@ -94,6 +95,46 @@ export function overviewRouter(pool: Pool, config: Config, entra: EntraService):
 
     const [p, b, a] = await Promise.all([plants, buildings, assets]);
     res.json([...p.rows, ...b.rows, ...a.rows]);
+  });
+
+  /** "Needs attention": warranty, vendor support, end of life and devices not seen lately */
+  r.get('/attention', async (req, res) => {
+    const sql = new SqlBuilder();
+    applyScope(sql, req.user!, 'a.plant_id');
+    const plantId = queryString(req.query.plantId);
+    if (plantId) {
+      if (!isUuid(plantId)) throw badRequest('Invalid plantId');
+      sql.and(`a.plant_id = ${sql.p(plantId)}`);
+    }
+    sql.and(ATTENTION_BASE);
+    const limit = clampInt(req.query.limit, 12, 1, 200);
+    const flags = ATTENTION_KINDS.map((k) => `(${ATTENTION_SQL[k]}) AS "${k}"`).join(', ');
+    const { rows } = await pool.query<Record<string, unknown>>(
+      `WITH x AS (
+         SELECT a.id, a.name, a.type, a.status, a.criticality, p.code AS plant_code, a.warranty_end, a.support_end, a.end_of_life, a.last_seen_at, ${flags}
+         FROM asset a LEFT JOIN plant p ON p.id = a.plant_id ${sql.whereSql()}
+       )
+       SELECT * FROM x WHERE ${ATTENTION_KINDS.map((k) => `"${k}"`).join(' OR ')}`,
+      sql.params,
+    );
+    const counts = Object.fromEntries(ATTENTION_KINDS.map((k) => [k, 0])) as Record<AttentionKind, number>;
+    const crit = { critical: 0, high: 1, medium: 2, low: 3 } as Record<string, number>;
+    const items = rows.map((r) => {
+      const kinds = ATTENTION_KINDS.filter((k) => r[k]);
+      for (const k of kinds) counts[k]++;
+      const dates = [
+        kinds.some((k) => k.startsWith('warranty')) ? r.warranty_end : null,
+        kinds.some((k) => k.startsWith('support')) ? r.support_end : null,
+        kinds.includes('eol') ? r.end_of_life : null,
+        kinds.includes('not_seen') && r.last_seen_at ? (r.last_seen_at as Date).toISOString().slice(0, 10) : null,
+      ].filter((d): d is string => typeof d === 'string');
+      const out: Record<string, unknown> = { ...r, kinds, due: dates.sort()[0] ?? null };
+      for (const k of ATTENTION_KINDS) delete out[k];
+      return out as unknown as AttentionData['items'][number];
+    });
+    items.sort((a, b) => (a.due ?? '9999').localeCompare(b.due ?? '9999') || (crit[a.criticality] ?? 9) - (crit[b.criticality] ?? 9) || a.name.localeCompare(b.name));
+    const body: AttentionData = { counts, total: items.length, items: items.slice(0, limit) };
+    res.json(body);
   });
 
   r.get('/dashboard', async (req, res) => {

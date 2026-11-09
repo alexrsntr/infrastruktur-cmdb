@@ -45,10 +45,10 @@ export const ActivityKindTag = ({ kind }: { kind: ActivityKind }) => (
 export const RoleTag = ({ role }: { role: Role }) => <Tag color={ROLE_META[role].color}>{ROLE_META[role].label}</Tag>;
 
 /** Warranty end date coloured by urgency */
-export function WarrantyDate({ value }: { value: string | null }) {
+export function WarrantyDate({ value, warnDays = 90 }: { value: string | null; warnDays?: number }) {
   const days = daysUntil(value);
   if (days === null) return <span className="muted">–</span>;
-  const color = days < 0 ? '#cf1322' : days <= 90 ? '#d46b08' : undefined;
+  const color = days < 0 ? '#cf1322' : days <= warnDays ? '#d46b08' : undefined;
   const hint = days < 0 ? `expired ${-days} days ago` : `in ${days} days`;
   return (
     <Tooltip title={hint}>

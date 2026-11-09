@@ -640,6 +640,14 @@ export interface Asset {
   cost_center: string | null;
   purchase_date: string | null;
   warranty_end: string | null;
+  /** End of vendor support (security updates) */
+  support_end: string | null;
+  /** End of life: the device should be replaced by then */
+  end_of_life: string | null;
+  /** Support / maintenance contract (number, vendor, level) */
+  support_contract: string | null;
+  /** Last time the device was seen on the network (discovery, monitoring, API) */
+  last_seen_at: string | null;
   description: string | null;
   tags: string[];
   attributes: Record<string, unknown>;
@@ -744,6 +752,37 @@ export interface SearchResult {
   title: string;
   subtitle: string | null;
   assetType?: AssetType;
+}
+
+// ---------------------------------------------------------------------------
+// Needs attention (lifecycle)
+// ---------------------------------------------------------------------------
+
+/** Look-ahead windows for "Needs attention" (days) */
+export const ATTENTION_DAYS = { warranty: 90, support: 180, eol: 365, notSeen: 30 } as const;
+
+export const ATTENTION_KINDS = ['warranty_expiring', 'warranty_expired', 'support_ending', 'support_ended', 'eol', 'not_seen'] as const;
+export type AttentionKind = (typeof ATTENTION_KINDS)[number];
+export const ATTENTION_META: Record<AttentionKind, { label: string; description: string; color: string }> = {
+  warranty_expiring: { label: 'Warranty ends soon', description: `Warranty ends within ${ATTENTION_DAYS.warranty} days`, color: 'orange' },
+  warranty_expired: { label: 'Warranty expired', description: 'Warranty has ended', color: 'red' },
+  support_ending: { label: 'Support ends soon', description: `Vendor support ends within ${ATTENTION_DAYS.support} days`, color: 'orange' },
+  support_ended: { label: 'Out of support', description: 'Vendor support has ended – no more security updates', color: 'red' },
+  eol: { label: 'End of life', description: `End of life reached or within ${ATTENTION_DAYS.eol} days – plan the replacement`, color: 'volcano' },
+  not_seen: { label: 'Not seen lately', description: `Not seen on the network for more than ${ATTENTION_DAYS.notSeen} days`, color: 'purple' },
+};
+
+export interface AttentionItem extends Pick<Asset, 'id' | 'name' | 'type' | 'status' | 'criticality' | 'plant_code' | 'warranty_end' | 'support_end' | 'end_of_life' | 'last_seen_at'> {
+  kinds: AttentionKind[];
+  /** Most urgent date of the reasons (for sorting) */
+  due: string | null;
+}
+
+export interface AttentionData {
+  counts: Record<AttentionKind, number>;
+  /** Devices with at least one reason, most urgent first */
+  total: number;
+  items: AttentionItem[];
 }
 
 export interface DashboardData {

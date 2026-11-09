@@ -4,10 +4,11 @@ import { BankOutlined, SafetyCertificateOutlined, ScheduleOutlined } from '@ant-
 import dayjs from 'dayjs';
 import { ACTIVITY_KIND_META, ASSET_TYPES, type AssetType } from '../../../shared/model';
 import { useAssetTypes, useDashboard } from '../lib/queries';
+import { AttentionList, attentionLink, useAttention } from '../components/AttentionList';
 import { useSession } from '../lib/session';
 import { daysUntil, fmtDate } from '../lib/format';
 import { PageHeader } from '../components/PageHeader';
-import { StatTile, TypeIcon } from '../components/Simple';
+import { StatTile } from '../components/Simple';
 import { ASSET_TYPE_ICONS } from '../components/icons';
 import { EntityLink, RecentActivityFeed } from '../components/ActivityLog';
 import { tintBg, tintFg } from '../lib/palette';
@@ -21,6 +22,7 @@ export function DashboardPage() {
   const { me, scoped } = useSession();
   const { data, isLoading } = useDashboard();
   const types = useAssetTypes();
+  const attention = useAttention();
   const byType = Object.fromEntries((data?.byType ?? []).map((t) => [t.type, t.count])) as Record<string, number>;
   const firstName = me.user.displayName.split(' ')[0];
 
@@ -41,11 +43,11 @@ export function DashboardPage() {
             ))}
             <StatTile to="/activities" icon={<ScheduleOutlined />} color="#b26a00" value={data.totals.openActivities} label="Open activities" />
             <StatTile
-              to="/inventory?sort=warranty_end&order=asc"
+              to={attentionLink()}
               icon={<SafetyCertificateOutlined />}
-              color={data.warrantyExpiring.length ? '#c4262e' : '#1e9e5a'}
-              value={data.warrantyExpiring.length}
-              label="Warranty ends soon"
+              color={attention.data?.total ? '#c4262e' : '#1e9e5a'}
+              value={attention.data?.total ?? '–'}
+              label="Devices need attention"
             />
           </div>
 
@@ -58,7 +60,7 @@ export function DashboardPage() {
             <Col xs={24} xl={9}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                 <Card title="Needs attention">
-                  {!data.upcomingActivities.length && !data.warrantyExpiring.length ? (
+                  {!data.upcomingActivities.length && !attention.data?.total ? (
                     <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="All good – nothing open" />
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -84,22 +86,7 @@ export function DashboardPage() {
                           </div>
                         );
                       })}
-                      {data.warrantyExpiring.slice(0, 5).map((w) => {
-                        const d = daysUntil(w.warranty_end);
-                        return (
-                          <div key={w.id} style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                            <TypeIcon type={w.type} />
-                            <div style={{ minWidth: 0, flex: 1 }}>
-                              <Link to={`/assets/${w.id}`} style={{ fontWeight: 600 }}>
-                                {w.name}
-                              </Link>
-                              <div className="muted" style={{ fontSize: 13.5 }}>
-                                Warranty {d !== null && d < 0 ? 'ended' : 'ends'} {fmtDate(w.warranty_end)} · {w.plant_name}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
+                      <AttentionList />
                     </div>
                   )}
                 </Card>

@@ -107,6 +107,9 @@ const ASSET_BASE_COLUMNS: Column[] = [
   { key: 'cost_center', header: 'Cost center', width: 12 },
   { key: 'purchase_date', header: 'Purchase date', width: 13 },
   { key: 'warranty_end', header: 'Warranty end', width: 13 },
+  { key: 'support_end', header: 'Support end', width: 13 },
+  { key: 'end_of_life', header: 'End of life', width: 13 },
+  { key: 'support_contract', header: 'Support contract', width: 20 },
   { key: 'tags', header: 'Tags', width: 20, get: (r) => (Array.isArray(r.tags) ? r.tags.join(', ') : r.tags ?? null) },
   { key: 'description', header: 'Description', width: 40 },
 ];
@@ -114,6 +117,7 @@ const ASSET_BASE_COLUMNS: Column[] = [
 const ASSET_TRAILING_COLUMNS: Column[] = [
   { key: 'map_x', header: 'Plan X', width: 8 },
   { key: 'map_y', header: 'Plan Y', width: 8 },
+  { key: 'last_seen_at', header: 'Last seen', width: 20, get: (r) => fmtDateTime(r.last_seen_at) },
   { key: 'updated_at', header: 'Last change', width: 20, get: (r) => fmtDateTime(r.updated_at) },
   { key: 'updated_by_name', header: 'Changed by', width: 20 },
 ];

@@ -1,5 +1,5 @@
 import type { CurrentUser } from '../../shared/model';
-import { ASSET_STATUSES, ASSET_TYPES, ASSET_TYPE_KEYS, CRITICALITIES, type AssetType } from '../../shared/model';
+import { ASSET_STATUSES, ASSET_TYPES, ASSET_TYPE_KEYS, ATTENTION_DAYS, ATTENTION_KINDS, CRITICALITIES, type AssetType, type AttentionKind } from '../../shared/model';
 import type { DbClient } from '../db/pool';
 import { badRequest, isUuid, likePattern, queryList, queryString, SqlBuilder } from '../lib/http';
 import { applyScope } from '../lib/scope';
@@ -11,6 +11,7 @@ export const ASSET_SELECT = `
   p.name AS plant_name, p.code AS plant_code, b.name AS building_name, b.code AS building_code, f.name AS floor_name,
   a.room, a.rack_id, rk.name AS rack_name, a.rack_u, a.rack_height_u, a.map_x, a.map_y, a.manufacturer, a.model, a.serial_number, a.asset_tag,
   a.ip_address, a.mac_address, a.fqdn, a.os, a.owner, a.cost_center, a.purchase_date, a.warranty_end,
+  a.support_end, a.end_of_life, a.support_contract, a.last_seen_at,
   a.description, a.tags, a.attributes, a.created_at, a.updated_at,
   cu.display_name AS created_by_name, uu.display_name AS updated_by_name,
   la.at AS last_activity_at, la.user_name AS last_activity_by, la.text AS last_activity`;
@@ -55,9 +56,25 @@ const SORTABLE: Record<string, string> = {
   manufacturer: 'a.manufacturer',
   serial_number: 'a.serial_number',
   warranty_end: 'a.warranty_end',
+  support_end: 'a.support_end',
+  end_of_life: 'a.end_of_life',
+  last_seen_at: 'a.last_seen_at',
   updated_at: 'a.updated_at',
   last_activity: 'la.at',
   created_at: 'a.created_at',
+};
+
+/** Devices that are installed (planned and retired devices need no attention) */
+export const ATTENTION_BASE = `a.status NOT IN ('planned','retired')`;
+
+/** SQL condition (on asset alias "a") for one "Needs attention" reason */
+export const ATTENTION_SQL: Record<AttentionKind, string> = {
+  warranty_expiring: `a.warranty_end BETWEEN CURRENT_DATE AND CURRENT_DATE + ${ATTENTION_DAYS.warranty}`,
+  warranty_expired: `a.warranty_end < CURRENT_DATE`,
+  support_ending: `a.support_end BETWEEN CURRENT_DATE AND CURRENT_DATE + ${ATTENTION_DAYS.support}`,
+  support_ended: `a.support_end < CURRENT_DATE`,
+  eol: `a.end_of_life <= CURRENT_DATE + ${ATTENTION_DAYS.eol}`,
+  not_seen: `a.last_seen_at < now() - interval '${ATTENTION_DAYS.notSeen} days'`,
 };
 
 export interface AssetFilters {
@@ -71,6 +88,7 @@ export interface AssetFilters {
   tag?: string;
   warrantyBefore?: string;
   placed?: 'yes' | 'no';
+  attention: AttentionKind[];
   sort: string;
   order: 'asc' | 'desc';
 }
@@ -90,7 +108,10 @@ export function parseAssetFilters(query: Record<string, unknown>): AssetFilters 
   const warrantyBefore = queryString(query.warrantyBefore);
   if (warrantyBefore && !/^\d{4}-\d{2}-\d{2}$/.test(warrantyBefore)) throw badRequest('Invalid warrantyBefore');
   const placed = queryString(query.placed);
+  const attention = queryList(query.attention);
+  for (const k of attention) if (!ATTENTION_KINDS.includes(k as never)) throw badRequest(`Unknown attention filter "${k}"`);
   return {
+    attention: attention as AttentionKind[],
     types,
     statuses,
     criticalities,
@@ -119,6 +140,7 @@ export function buildAssetQuery(user: CurrentUser, f: AssetFilters): { sql: SqlB
   if (f.warrantyBefore) sql.and(`a.warranty_end IS NOT NULL AND a.warranty_end <= ${sql.p(f.warrantyBefore)}`);
   if (f.placed === 'yes') sql.and('a.map_x IS NOT NULL');
   if (f.placed === 'no') sql.and('a.map_x IS NULL');
+  if (f.attention.length) sql.and(`${ATTENTION_BASE} AND (${f.attention.map((k) => ATTENTION_SQL[k]).join(' OR ')})`);
   if (f.q) {
     const like = sql.p(likePattern(f.q));
     sql.and(
@@ -217,7 +239,7 @@ export async function resolveAssetLocation(db: DbClient, input: LocationInput, a
 export const ASSET_WRITE_COLUMNS = [
   'type', 'name', 'status', 'criticality', 'plant_id', 'building_id', 'floor_id', 'room', 'rack_id', 'rack_u', 'rack_height_u', 'map_x', 'map_y',
   'manufacturer', 'model', 'serial_number', 'asset_tag', 'ip_address', 'mac_address', 'fqdn', 'os', 'owner', 'cost_center',
-  'purchase_date', 'warranty_end', 'description', 'tags', 'attributes',
+  'purchase_date', 'warranty_end', 'support_end', 'end_of_life', 'support_contract', 'description', 'tags', 'attributes',
 ] as const;
 
 export function assetValues(input: AssetInput, loc: ResolvedLocation): unknown[] {

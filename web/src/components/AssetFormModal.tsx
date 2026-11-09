@@ -18,10 +18,8 @@ import { useAssetTypes, useBuilding, useBuildings, useInvalidate, usePlants, use
 import { DateStringInput } from './DateStringInput';
 import { ASSET_TYPE_ICONS } from './icons';
 
-type FormValues = Omit<Asset, 'purchase_date' | 'warranty_end'> & {
-  purchase_date: dayjs.Dayjs | null;
-  warranty_end: dayjs.Dayjs | null;
-};
+const DATE_FIELDS = ['purchase_date', 'warranty_end', 'support_end', 'end_of_life'] as const;
+type FormValues = Omit<Asset, (typeof DATE_FIELDS)[number]> & Record<(typeof DATE_FIELDS)[number], dayjs.Dayjs | null>;
 
 function AttributeInput({ field }: { field: FieldDef }) {
   switch (field.type) {
@@ -77,8 +75,7 @@ export function AssetFormModal({
     form.resetFields();
     form.setFieldsValue({
       ...src,
-      purchase_date: src.purchase_date ? dayjs(src.purchase_date) : null,
-      warranty_end: src.warranty_end ? dayjs(src.warranty_end) : null,
+      ...Object.fromEntries(DATE_FIELDS.map((k) => [k, src[k] ? dayjs(src[k]) : null])),
     } as FormValues);
   }, [open, asset?.id, form]);
 
@@ -102,7 +99,7 @@ export function AssetFormModal({
       map_x: asset && !floorChanged ? asset.map_x : (defaults?.map_x ?? null),
       map_y: asset && !floorChanged ? asset.map_y : (defaults?.map_y ?? null),
       purchase_date: v.purchase_date ? v.purchase_date.format('YYYY-MM-DD') : null,
-      warranty_end: v.warranty_end ? v.warranty_end.format('YYYY-MM-DD') : null,
+      ...Object.fromEntries(DATE_FIELDS.map((k) => [k, v[k] ? v[k].format('YYYY-MM-DD') : null])),
       tags: v.tags ?? [],
       attributes: v.attributes ?? {},
     };
@@ -320,8 +317,23 @@ export function AssetFormModal({
             </Form.Item>
           </Col>
           <Col xs={12} md={6}>
-            <Form.Item name="warranty_end" label="Warranty / support end">
+            <Form.Item name="warranty_end" label="Warranty end">
               <DatePicker format={DATE_FORMAT} style={{ width: '100%' }} />
+            </Form.Item>
+          </Col>
+          <Col xs={12} md={6}>
+            <Form.Item name="support_end" label="Vendor support until" tooltip="End of software / security updates from the manufacturer">
+              <DatePicker format={DATE_FORMAT} style={{ width: '100%' }} />
+            </Form.Item>
+          </Col>
+          <Col xs={12} md={6}>
+            <Form.Item name="end_of_life" label="End of life" tooltip="When the device should be replaced at the latest">
+              <DatePicker format={DATE_FORMAT} style={{ width: '100%' }} />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={12}>
+            <Form.Item name="support_contract" label="Support contract">
+              <Input placeholder="e.g. Cisco SmartNet 24x7, contract 9182-77" />
             </Form.Item>
           </Col>
           <Col span={24}>

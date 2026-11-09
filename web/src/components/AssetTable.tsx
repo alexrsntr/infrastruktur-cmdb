@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { Button, Empty, Input, Segmented, Select, Table, Tooltip, Typography, type TableColumnsType } from 'antd';
+import { Button, Empty, Input, Select, Table, Tooltip, Typography, type TableColumnsType } from 'antd';
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import type { SortOrder } from 'antd/es/table/interface';
-import { ASSET_STATUSES, ASSET_STATUS_META, ASSET_TYPES, ASSET_TYPE_KEYS, assetTypeNoun, formatRackUnits, type Asset, type AssetType } from '../../../shared/model';
+import { ASSET_STATUSES, ASSET_STATUS_META, ASSET_TYPES, ASSET_TYPE_KEYS, ATTENTION_DAYS, ATTENTION_KINDS, ATTENTION_META, assetTypeNoun, formatRackUnits, type Asset, type AssetType } from '../../../shared/model';
 import type { Query } from '../lib/api';
 import { fmtDateTime, fromNow } from '../lib/format';
 import { useAssets, usePlants } from '../lib/queries';
@@ -11,6 +11,7 @@ import { useSession } from '../lib/session';
 import { useAddDevice } from './AddDeviceWizard';
 import { ExportMenu } from './ExportMenu';
 import { StatusDot, TypeIcon } from './Simple';
+import { WarrantyDate } from './Tags';
 
 export interface AssetTableProps {
   /** Filters that cannot be changed by the user (e.g. on a plant page) */
@@ -72,6 +73,7 @@ export function AssetTable({ fixed = {}, createDefaults, syncUrl = false, pageSi
     buildingId: fixed.buildingId,
     floorId: fixed.floorId,
     status: get('status') || undefined,
+    attention: get('attention') || undefined,
     q: get('q') || undefined,
     sort: get('sort') || 'name',
     order: get('order') || 'asc',
@@ -79,6 +81,7 @@ export function AssetTable({ fixed = {}, createDefaults, syncUrl = false, pageSi
     pageSize,
   };
   const assets = useAssets(query);
+  const attentionOn = !!get('attention');
   const sortOrder = (key: string): SortOrder => (query.sort === key ? (query.order === 'desc' ? 'descend' : 'ascend') : null);
   const showPlant = !fixed.plantId && !fixed.buildingId && !(scoped && me.user.plantScope.length === 1);
 
@@ -118,6 +121,35 @@ export function AssetTable({ fixed = {}, createDefaults, syncUrl = false, pageSi
         );
       },
     },
+    ...(attentionOn
+      ? ([
+          {
+            key: 'lifecycle',
+            title: 'Lifecycle',
+            width: 230,
+            render: (_, a) => (
+              <div style={{ fontSize: 13, lineHeight: 1.5 }}>
+                {a.warranty_end && (
+                  <div>
+                    Warranty <WarrantyDate value={a.warranty_end} warnDays={ATTENTION_DAYS.warranty} />
+                  </div>
+                )}
+                {a.support_end && (
+                  <div>
+                    Support <WarrantyDate value={a.support_end} warnDays={ATTENTION_DAYS.support} />
+                  </div>
+                )}
+                {a.end_of_life && (
+                  <div>
+                    End of life <WarrantyDate value={a.end_of_life} warnDays={ATTENTION_DAYS.eol} />
+                  </div>
+                )}
+                {a.last_seen_at && <div className="muted">Seen {fromNow(a.last_seen_at)}</div>}
+              </div>
+            ),
+          },
+        ] as TableColumnsType<Asset>)
+      : []),
     { key: 'ip_address', title: 'IP address', width: 150, render: (_, a) => (a.ip_address ? <span className="mono">{a.ip_address}</span> : <span className="muted">–</span>) },
     {
       key: 'last_activity',
@@ -161,10 +193,13 @@ export function AssetTable({ fixed = {}, createDefaults, syncUrl = false, pageSi
           style={{ width: 340 }}
         />
         {!fixed.type && !syncUrl && (
-          <Segmented
-            value={get('type') || 'all'}
-            onChange={(v) => set({ type: v === 'all' ? undefined : String(v) })}
-            options={[{ value: 'all', label: 'All' }, ...ASSET_TYPE_KEYS.map((t) => ({ value: t, label: ASSET_TYPES[t].plural }))]}
+          <Select
+            allowClear
+            placeholder="All types"
+            style={{ width: 180 }}
+            value={get('type') || undefined}
+            onChange={(v) => set({ type: v })}
+            options={ASSET_TYPE_KEYS.map((t) => ({ value: t, label: ASSET_TYPES[t].plural }))}
           />
         )}
         <Select
@@ -174,6 +209,16 @@ export function AssetTable({ fixed = {}, createDefaults, syncUrl = false, pageSi
           value={get('status') || undefined}
           onChange={(v) => set({ status: v })}
           options={ASSET_STATUSES.map((s) => ({ value: s, label: ASSET_STATUS_META[s].label }))}
+        />
+        <Select
+          allowClear
+          mode="multiple"
+          maxTagCount="responsive"
+          placeholder="Needs attention"
+          style={{ minWidth: 190, maxWidth: 360 }}
+          value={get('attention') ? get('attention').split(',') : []}
+          onChange={(v: string[]) => set({ attention: v.length ? v.join(',') : undefined })}
+          options={ATTENTION_KINDS.map((k) => ({ value: k, label: ATTENTION_META[k].label, title: ATTENTION_META[k].description }))}
         />
         {showPlant && (plants.data?.length ?? 0) > 1 && (
           <Select
