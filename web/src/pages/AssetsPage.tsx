@@ -1,12 +1,12 @@
 import { useLocation, useParams } from 'react-router';
 import { Card } from 'antd';
 import { AppstoreOutlined } from '@ant-design/icons';
-import { ASSET_TYPES, ASSET_TYPE_KEYS, assetTypeBySlug } from '../../../shared/model';
+import { ASSET_TYPES, assetTypeBySlug, type AssetType } from '../../../shared/model';
 import { PageHeader } from '../components/PageHeader';
 import { AssetTable } from '../components/AssetTable';
 import { StatTile } from '../components/Simple';
 import { ASSET_TYPE_ICONS } from '../components/icons';
-import { useDashboard } from '../lib/queries';
+import { useAssetTypes, useDashboard } from '../lib/queries';
 import { NotFoundPage } from './NotFoundPage';
 
 export function AssetsPage() {
@@ -14,6 +14,7 @@ export function AssetsPage() {
   const location = useLocation();
   const type = assetTypeBySlug(typeSlug);
   const dashboard = useDashboard();
+  const types = useAssetTypes();
   if (typeSlug && !type) return <NotFoundPage />;
 
   const counts = Object.fromEntries((dashboard.data?.byType ?? []).map((t) => [t.type, t.count])) as Record<string, number>;
@@ -28,11 +29,11 @@ export function AssetsPage() {
     <div>
       <PageHeader
         title={type ? ASSET_TYPES[type].plural : 'Devices'}
-        subtitle="All switches, access points, servers, UPS and virtual machines of your plants. Click a device to see its details and activity log."
+        subtitle="All network, server, power, production and other devices of your plants. Click a device to see its details and activity log."
       />
       <div className="tile-grid" style={{ marginBottom: 20 }}>
         <StatTile to={`/inventory${qs}`} active={!type} icon={<AppstoreOutlined />} value={total ?? '–'} label="All devices" />
-        {ASSET_TYPE_KEYS.map((t) => (
+        {[...types.shown(counts as Partial<Record<AssetType, number>>), ...(type && !types.shown(counts as Partial<Record<AssetType, number>>).includes(type) ? [type] : [])].map((t) => (
           <StatTile
             key={t}
             to={`/inventory/${ASSET_TYPES[t].slug}${qs}`}

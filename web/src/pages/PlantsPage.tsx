@@ -27,7 +27,7 @@ function PlantCard({ p, onOpen }: { p: Plant; onOpen: () => void }) {
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px 16px' }}>
-        {ASSET_TYPE_KEYS.map((t) => (
+        {ASSET_TYPE_KEYS.filter((t) => (p.asset_counts?.[t] ?? 0) > 0).map((t) => (
           <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ width: 10, height: 10, borderRadius: '50%', background: ASSET_TYPES[t].color, flex: 'none' }} />
             <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{p.asset_counts?.[t] ?? 0}</span>

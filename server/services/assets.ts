@@ -1,5 +1,5 @@
 import type { CurrentUser } from '../../shared/model';
-import { ASSET_STATUSES, ASSET_TYPE_KEYS, CRITICALITIES } from '../../shared/model';
+import { ASSET_STATUSES, ASSET_TYPES, ASSET_TYPE_KEYS, CRITICALITIES, type AssetType } from '../../shared/model';
 import type { DbClient } from '../db/pool';
 import { badRequest, isUuid, likePattern, queryList, queryString, SqlBuilder } from '../lib/http';
 import { applyScope } from '../lib/scope';
@@ -164,7 +164,8 @@ export async function resolveAssetLocation(db: DbClient, input: LocationInput, a
   let rack: { id: string; name: string; building_id: string; floor_id: string | null } | null = null;
 
   if (input.rack_id) {
-    if (input.type === 'vm') throw badRequest('Virtual machines cannot be mounted in a rack');
+    if (input.type && ASSET_TYPES[input.type as AssetType] && !ASSET_TYPES[input.type as AssetType].physical)
+      throw badRequest(`${ASSET_TYPES[input.type as AssetType].plural} cannot be mounted in a rack`);
     const { rows } = await db.query('SELECT id, name, building_id, floor_id FROM rack WHERE id = $1', [input.rack_id]);
     rack = rows[0] ?? null;
     if (!rack) throw badRequest('Rack does not exist');

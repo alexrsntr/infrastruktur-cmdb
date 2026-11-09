@@ -14,7 +14,7 @@ import {
 } from '../../../shared/model';
 import { errorText, http } from '../lib/api';
 import { DATE_FORMAT } from '../lib/format';
-import { useBuilding, useBuildings, useInvalidate, usePlants, useRacks } from '../lib/queries';
+import { useAssetTypes, useBuilding, useBuildings, useInvalidate, usePlants, useRacks } from '../lib/queries';
 import { DateStringInput } from './DateStringInput';
 import { ASSET_TYPE_ICONS } from './icons';
 
@@ -55,6 +55,7 @@ export function AssetFormModal({
   const { message } = App.useApp();
   const invalidate = useInvalidate();
   const [saving, setSaving] = useState(false);
+  const types = useAssetTypes();
   const plants = usePlants();
   const buildings = useBuildings();
 
@@ -141,7 +142,14 @@ export function AssetFormModal({
           <Col xs={24} md={8}>
             <Form.Item name="type" label="Type" rules={[{ required: true }]}>
               <Select
-                options={ASSET_TYPE_KEYS.map((t) => ({ value: t, label: <span>{ASSET_TYPE_ICONS[t]} {ASSET_TYPES[t].label}</span> }))}
+                options={ASSET_TYPE_KEYS.filter((t) => types.offered.includes(t) || t === asset?.type).map((t) => ({
+                  value: t,
+                  label: (
+                    <span>
+                      {ASSET_TYPE_ICONS[t]} {ASSET_TYPES[t].label}
+                    </span>
+                  ),
+                }))}
                 onChange={() => form.setFieldValue('attributes', {})}
               />
             </Form.Item>
@@ -199,10 +207,10 @@ export function AssetFormModal({
             </Form.Item>
           </Col>
           <Col xs={8}>
-            <Form.Item name="rack_id" label="Rack" extra={type === 'vm' ? 'VMs are not mounted in racks' : undefined}>
+            <Form.Item name="rack_id" label="Rack" extra={typeDef && !typeDef.physical ? `${typeDef.plural} are not mounted in racks` : undefined}>
               <Select
                 allowClear
-                disabled={!buildingId || type === 'vm'}
+                disabled={!buildingId || (!!typeDef && !typeDef.physical)}
                 placeholder={buildingId ? 'Select rack' : 'Select a building first'}
                 options={(racks.data ?? []).map((r) => ({ value: r.id, label: `${r.name}${r.room ? ` · ${r.room}` : ''} (${r.height_u - Number(r.used_u ?? 0)} U free)` }))}
                 onChange={(id) => {
@@ -275,13 +283,13 @@ export function AssetFormModal({
           </Col>
         </Row>
 
-        {typeDef && typeDef.fields.length > 0 && (
+        {typeDef && type && types.fields(type).length > 0 && (
           <>
             <Divider titlePlacement="start" plain>
               {typeDef.label} details
             </Divider>
             <Row gutter={16}>
-              {typeDef.fields.map((f) => (
+              {types.fields(type).map((f) => (
                 <Col xs={12} md={6} key={f.key}>
                   <Form.Item name={['attributes', f.key]} label={f.label} valuePropName={f.type === 'boolean' ? 'checked' : 'value'}>
                     <AttributeInput field={f} />

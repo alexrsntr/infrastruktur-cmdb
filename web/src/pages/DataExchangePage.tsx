@@ -17,16 +17,12 @@ import {
   type UploadFile,
 } from 'antd';
 import {
-  ApartmentOutlined,
   AuditOutlined,
   BankOutlined,
   BranchesOutlined,
   CheckCircleOutlined,
-  CloudServerOutlined,
   CloudUploadOutlined,
   CodeOutlined,
-  DatabaseOutlined,
-  ThunderboltOutlined,
   FileExcelOutlined,
   FileSearchOutlined,
   InboxOutlined,
@@ -35,7 +31,6 @@ import {
   ScheduleOutlined,
   SnippetsOutlined,
   TeamOutlined,
-  WifiOutlined,
   BuildOutlined,
   DownloadOutlined,
 } from '@ant-design/icons';
@@ -47,7 +42,8 @@ import {
   type ImportReport,
 } from '../../../shared/model';
 import { buildUrl, errorText, http, type Query } from '../lib/api';
-import { useInvalidate, usePlants } from '../lib/queries';
+import { useAssetTypes, useInvalidate, usePlants } from '../lib/queries';
+import { ASSET_TYPE_ICONS } from '../components/icons';
 import { useSession } from '../lib/session';
 import { PageHeader } from '../components/PageHeader';
 import { SectionHead } from '../components/PageParts';
@@ -67,13 +63,6 @@ interface DatasetCard {
   visible?: boolean;
 }
 
-const TYPE_ICONS: Record<AssetType, React.ReactNode> = {
-  switch: <ApartmentOutlined />,
-  access_point: <WifiOutlined />,
-  server: <DatabaseOutlined />,
-  ups: <ThunderboltOutlined />,
-  vm: <CloudServerOutlined />,
-};
 
 function DatasetGrid({ cards }: { cards: DatasetCard[] }) {
   return (
@@ -130,20 +119,21 @@ function ExportSection() {
   const { can, scoped } = useSession();
   const plants = usePlants();
   const [plantId, setPlantId] = useState<string | undefined>();
+  const types = useAssetTypes();
 
   const cards: DatasetCard[] = [
     { key: 'plants', title: 'Plants', description: 'Plants with address, coordinates, contacts and counts.', icon: <BankOutlined />, dataset: 'plants' },
     { key: 'buildings', title: 'Buildings', description: 'Buildings per plant with floor and device counts.', icon: <BuildOutlined />, dataset: 'buildings' },
     { key: 'floors', title: 'Floors', description: 'Floors per building, incl. floor plan availability.', icon: <ClusterOutlined />, dataset: 'floors' },
     { key: 'assets', title: 'All devices', description: 'Complete list of all devices with all details.', icon: <AppstoreOutlined />, dataset: 'assets' },
-    ...ASSET_TYPE_KEYS.map((t) => ({
+    ...types.offered.map((t) => ({
       key: `assets-${t}`,
       title: ASSET_TYPES[t].plural,
       description: `${ASSET_TYPES[t].plural} with type-specific columns (${ASSET_TYPES[t].fields
         .slice(0, 3)
         .map((f) => f.label)
         .join(', ')} …).`,
-      icon: TYPE_ICONS[t],
+      icon: ASSET_TYPE_ICONS[t],
       dataset: 'assets',
       query: { type: t },
     })),
@@ -259,15 +249,15 @@ const BASE_HEADERS = [
   'Description',
 ];
 
-function templateFields(type?: AssetType): FieldDef[] {
+function templateFields(type: AssetType | undefined, fieldsOf: (t: AssetType) => readonly FieldDef[], offered: AssetType[]): FieldDef[] {
   const seen = new Map<string, FieldDef>();
-  for (const t of type ? [type] : ASSET_TYPE_KEYS) {
-    for (const f of ASSET_TYPES[t].fields as readonly FieldDef[]) if (!seen.has(f.key)) seen.set(f.key, f);
+  for (const t of type ? [type] : offered) {
+    for (const f of fieldsOf(t)) if (!seen.has(f.key)) seen.set(f.key, f);
   }
   return [...seen.values()];
 }
 
-const EXAMPLES: Record<AssetType, Record<string, string>> = {
+const EXAMPLES: Partial<Record<AssetType, Record<string, string>>> = {
   switch: { Name: 'muc-b01-sw10', Model: 'Catalyst 9300-48P', Manufacturer: 'Cisco', 'IP address': '10.10.0.50', Ports: '48', PoE: 'yes', Layer: 'L2', 'Network role': 'Access' },
   access_point: { Name: 'muc-ap-200', Model: 'MR46', Manufacturer: 'Cisco Meraki', 'IP address': '10.10.20.200', 'Wi-Fi standard': 'Wi-Fi 6 (ax)', Mounting: 'Ceiling' },
   server: { Name: 'muc-esx10', Model: 'PowerEdge R760', Manufacturer: 'Dell', 'IP address': '10.10.1.50', 'RAM (GB)': '512', Hypervisor: 'VMware ESXi', 'Form factor': 'Rack' },
@@ -279,8 +269,8 @@ function csvCell(v: string): string {
   return /[;"\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
 }
 
-function downloadTemplate(type?: AssetType) {
-  const attrHeaders = templateFields(type).map((f) => (f.unit ? `${f.label} (${f.unit})` : f.label));
+function downloadTemplate(type: AssetType | undefined, fieldsOf: (t: AssetType) => readonly FieldDef[], offered: AssetType[]) {
+  const attrHeaders = templateFields(type, fieldsOf, offered).map((f) => (f.unit ? `${f.label} (${f.unit})` : f.label));
   const headers = [...BASE_HEADERS, ...attrHeaders.filter((h) => !BASE_HEADERS.includes(h))];
   const exampleType: AssetType = type ?? 'switch';
   const example: Record<string, string> = {
@@ -288,12 +278,12 @@ function downloadTemplate(type?: AssetType) {
     Status: 'Active',
     Criticality: 'Medium',
     Plant: 'MUC',
-    Building: exampleType === 'vm' ? '' : 'B01',
-    Floor: exampleType === 'vm' ? '' : 'Ground floor',
+    Building: ASSET_TYPES[exampleType].physical ? 'B01' : '',
+    Floor: ASSET_TYPES[exampleType].physical ? 'Ground floor' : '',
     'Warranty end': '31.12.2029',
     Tags: 'example, import',
     Description: 'Example row – delete before importing',
-    ...EXAMPLES[exampleType],
+    ...(EXAMPLES[exampleType] ?? { Name: ASSET_TYPES[exampleType].example }),
   };
   const lines = [headers.map(csvCell).join(';'), headers.map((h) => csvCell(example[h] ?? '')).join(';')];
   const blob = new Blob(['﻿' + lines.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' });
@@ -363,6 +353,7 @@ function ImportSection() {
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [defaultType, setDefaultType] = useState<AssetType | undefined>();
   const [templateType, setTemplateType] = useState<AssetType | undefined>();
+  const types = useAssetTypes();
   const [report, setReport] = useState<ImportReport | null>(null);
   const [validatedFor, setValidatedFor] = useState<File | null>(null);
   const [busy, setBusy] = useState<'dry' | 'import' | null>(null);
@@ -420,9 +411,9 @@ function ImportSection() {
               style={{ flex: 1 }}
               value={templateType}
               onChange={setTemplateType}
-              options={ASSET_TYPE_KEYS.map((t) => ({ value: t, label: ASSET_TYPES[t].plural }))}
+              options={types.offered.map((t) => ({ value: t, label: ASSET_TYPES[t].plural }))}
             />
-            <Button icon={<DownloadOutlined />} onClick={() => downloadTemplate(templateType)}>
+            <Button icon={<DownloadOutlined />} onClick={() => downloadTemplate(templateType, types.fields, types.offered)}>
               Download template
             </Button>
           </Space.Compact>
@@ -469,7 +460,7 @@ function ImportSection() {
                 setDefaultType(v);
                 setValidatedFor(null);
               }}
-              options={ASSET_TYPE_KEYS.map((t) => ({ value: t, label: ASSET_TYPES[t].label }))}
+              options={types.offered.map((t) => ({ value: t, label: ASSET_TYPES[t].label }))}
             />
             <div style={{ flex: 1 }} />
             <Button icon={<FileSearchOutlined />} disabled={!file} loading={busy === 'dry'} onClick={() => run(true)}>

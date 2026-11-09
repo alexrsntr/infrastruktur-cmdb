@@ -13,13 +13,12 @@ import { useBuildings, useInvalidate, useRacks } from '../lib/queries';
 import { useSession } from '../lib/session';
 import { AssetStatusTag, AssetTypeTag } from './Tags';
 
-const SHORT: Record<AssetType, string> = { switch: 'SW', access_point: 'AP', server: 'SRV', ups: 'UPS', vm: 'VM' };
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 function markerIcon(m: PlanMarker): L.DivIcon {
   if (m.asset_id && m.asset_type) {
-    const label = SHORT[m.asset_type];
+    const label = ASSET_TYPES[m.asset_type].short;
     return L.divIcon({
       className: '',
       html: `<div class="asset-marker status-${m.asset_status ?? 'active'}" style="background:${ASSET_TYPES[m.asset_type].color};font-size:${label.length > 2 ? 9 : 10}px;font-weight:700">${label}</div>`,

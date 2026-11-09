@@ -16,6 +16,7 @@ import {
   updateAsset,
 } from '../services/assets';
 import { deleteAttachmentsFor, purgeBlobs } from '../services/attachments';
+import { cleanAttributes, loadAssetTypeSettings } from '../services/assetTypes';
 
 export function assetsRouter(pool: Pool): Router {
   const r = Router();
@@ -75,6 +76,7 @@ export function assetsRouter(pool: Pool): Router {
   r.post('/assets', requirePermission('asset.write'), async (req, res) => {
     const input = parse(assetSchema, req.body);
     const row = await withTransaction(pool, async (db) => {
+      input.attributes = cleanAttributes(input.type, input.attributes, await loadAssetTypeSettings(db));
       const loc = await resolveAssetLocation(db, input);
       assertPlantAccess(req.user!, loc.plant_id);
       const created = await insertAsset(db, input, loc, req.user!.id);
@@ -88,6 +90,7 @@ export function assetsRouter(pool: Pool): Router {
     const id = requireUuid(req.params.id);
     const input = parse(assetSchema, req.body);
     const row = await withTransaction(pool, async (db) => {
+      input.attributes = cleanAttributes(input.type, input.attributes, await loadAssetTypeSettings(db));
       const before = await db.query('SELECT * FROM asset WHERE id = $1 FOR UPDATE', [id]);
       if (!before.rows[0]) throw notFound('Asset');
       assertPlantAccess(req.user!, before.rows[0].plant_id);

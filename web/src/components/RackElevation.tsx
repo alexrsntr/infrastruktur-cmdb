@@ -9,6 +9,7 @@ import {
   type RackAsset,
   type RackItem,
   type RackItemKind,
+  type AssetType,
 } from '../../../shared/model';
 
 export type RackSelection = { kind: 'asset' | 'item'; id: string } | null;
@@ -177,13 +178,13 @@ export function RackElevation({
   );
 }
 
-export function RackLegend() {
+export function RackLegend({ types = ['switch', 'server', 'ups'] }: { types?: AssetType[] }) {
   const sw = (bg: string, extra?: React.CSSProperties) => (
     <span style={{ display: 'inline-block', width: 14, height: 10, borderRadius: 2, background: bg, marginRight: 6, verticalAlign: 'middle', border: '1px solid rgba(0,0,0,.2)', ...extra }} />
   );
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, fontSize: 12.5, color: 'var(--cmdb-text-2)' }}>
-      {(['switch', 'access_point', 'server', 'ups'] as const).map((t) => (
+      {types.map((t) => (
         <span key={t}>
           {sw('#fbfcfd', { borderLeft: `4px solid ${ASSET_TYPES[t].color}` })}
           {ASSET_TYPES[t].label}

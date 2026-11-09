@@ -8,6 +8,8 @@ import {
   ASSET_TYPES,
   ASSET_TYPE_KEYS,
   CRITICALITY_META,
+  assetTypeFields,
+  type AssetTypeSettings,
   RELATION_TYPES,
   RACK_ITEM_KIND_META,
   ROLE_META,
@@ -117,16 +119,16 @@ const ASSET_TRAILING_COLUMNS: Column[] = [
 ];
 
 /** Attribute field definitions for one or several asset types (deduplicated by key). */
-export function attributeFields(types: AssetType[]): FieldDef[] {
+export function attributeFields(types: AssetType[], settings?: AssetTypeSettings | null): FieldDef[] {
   const seen = new Map<string, FieldDef>();
   for (const t of types.length ? types : ASSET_TYPE_KEYS) {
-    for (const f of ASSET_TYPES[t].fields) if (!seen.has(f.key)) seen.set(f.key, f);
+    for (const f of assetTypeFields(t, settings)) if (!seen.has(f.key)) seen.set(f.key, f);
   }
   return [...seen.values()];
 }
 
-export function assetColumns(types: AssetType[]): Column[] {
-  const attrs: Column[] = attributeFields(types).map((f) => ({
+export function assetColumns(types: AssetType[], settings?: AssetTypeSettings | null): Column[] {
+  const attrs: Column[] = attributeFields(types, settings).map((f) => ({
     key: `attr:${f.key}`,
     header: f.unit ? `${f.label} (${f.unit})` : f.label,
     width: 14,

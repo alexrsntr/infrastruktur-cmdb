@@ -133,7 +133,8 @@ export function PlantPage() {
     <div>
       {/* all device types in one row on wide screens, two per row on phones */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 16, marginBottom: 24 }}>
-        {ASSET_TYPE_KEYS.map((t) => (
+        {/* only the types that exist in this plant */}
+        {ASSET_TYPE_KEYS.filter((t) => (p.asset_counts?.[t] ?? 0) > 0).map((t) => (
           <StatTile
             key={t}
             to={`/inventory/${ASSET_TYPES[t].slug}?plantId=${p.id}`}

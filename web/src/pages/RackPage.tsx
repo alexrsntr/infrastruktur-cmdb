@@ -276,7 +276,7 @@ export function RackPage() {
               />
             </div>
             <div style={{ marginTop: 14 }}>
-              <RackLegend />
+              <RackLegend types={[...new Set(r.assets.map((x) => x.type))]} />
             </div>
           </Card>
         </Col>

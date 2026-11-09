@@ -23,11 +23,10 @@ import {
   formatRackUnits,
   type AssetDetail,
   type AssetRelation,
-  type FieldDef,
 } from '../../../shared/model';
 import { ApiError, buildUrl, errorText, http } from '../lib/api';
 import { fmtDate, fmtDateTime } from '../lib/format';
-import { useAsset, useInvalidate } from '../lib/queries';
+import { useAsset, useAssetTypes, useInvalidate } from '../lib/queries';
 import { useSession } from '../lib/session';
 import { PageHeader } from '../components/PageHeader';
 import { AssetFormModal } from '../components/AssetFormModal';
@@ -61,6 +60,7 @@ export function AssetPage() {
   const { message, modal } = App.useApp();
   const invalidate = useInvalidate();
   const asset = useAsset(assetId);
+  const types = useAssetTypes();
   const onPlans = useQuery({
     queryKey: ['asset-plans', assetId],
     queryFn: () => http.get<{ id: string; title: string }[]>(`/api/assets/${assetId}/plans`),
@@ -178,7 +178,7 @@ export function AssetPage() {
     ['Inventory no.', a.asset_tag],
   ];
   const extra: [string, unknown, React.ReactNode?][] = [
-    ...(typeDef.fields as readonly FieldDef[]).map((f): [string, unknown, React.ReactNode?] => {
+    ...types.fields(a.type).map((f): [string, unknown, React.ReactNode?] => {
       const v = a.attributes?.[f.key];
       if (f.type === 'date' && typeof v === 'string' && v) return [f.label, v, fmtDate(v)];
       return [f.label, v, typeof v === 'boolean' ? (v ? 'Yes' : 'No') : f.unit && filled(v) ? `${v} ${f.unit}` : (v as React.ReactNode)];

@@ -3,21 +3,32 @@ import { useNavigate } from 'react-router';
 import { App, Button, Col, DatePicker, Form, Input, InputNumber, Modal, Row, Select, Steps, Switch, Typography } from 'antd';
 import { ArrowLeftOutlined, ArrowRightOutlined, CheckOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { ASSET_STATUSES, ASSET_STATUS_META, ASSET_TYPES, ASSET_TYPE_KEYS, assetTypeNoun, type Asset, type AssetType, type FieldDef } from '../../../shared/model';
+import { ASSET_CATEGORIES, ASSET_STATUSES, ASSET_STATUS_META, ASSET_TYPES, assetTypeNoun, type AssetCategory, type Asset, type AssetType, type FieldDef } from '../../../shared/model';
 import { errorText, http } from '../lib/api';
 import { DATE_FORMAT } from '../lib/format';
-import { useBuildings, useInvalidate, usePlants, useRacks } from '../lib/queries';
+import { useAssetTypes, useBuildings, useInvalidate, usePlants, useRacks } from '../lib/queries';
 import { useSession } from '../lib/session';
 import { DateStringInput } from './DateStringInput';
 import { TypeIcon } from './Simple';
 
-const TYPE_HINT: Record<AssetType, string> = {
-  switch: 'Network switch in a rack or cabinet',
-  access_point: 'Wi-Fi access point on a ceiling or wall',
-  server: 'Physical server or hypervisor host',
-  ups: 'Emergency power (UPS) in a rack or room',
-  vm: 'Virtual machine on a host or cluster',
+const MODEL_EXAMPLE: Partial<Record<AssetType, string>> = {
+  switch: 'Catalyst 9300-48P',
+  router: 'ISR 1100',
+  firewall: 'FortiGate 100F',
+  access_point: 'Meraki MR46',
+  wlan_controller: 'Aruba 7210',
+  server: 'PowerEdge R760',
+  storage: 'PowerStore 500T',
+  ups: 'Smart-UPS SRT 6000',
+  pdu: 'Rack PDU 9000 switched',
+  ot_device: 'SIMATIC S7-1500',
+  printer: 'LaserJet M611',
+  camera: 'AXIS P3265-LVE',
 };
+
+/** Usually not mounted in a rack – the rack fields are not offered in the wizard */
+const NOT_IN_RACK = new Set<AssetType>(['access_point', 'printer', 'camera']);
+
 
 const LAST_PLANT_KEY = 'cmdb.lastPlant';
 
@@ -58,6 +69,7 @@ function AddDeviceWizard({ open, defaults, onClose }: { open: boolean; defaults:
   const [step, setStep] = useState(0);
   const [type, setType] = useState<AssetType | null>(null);
   const [saving, setSaving] = useState(false);
+  const types = useAssetTypes();
 
   const plantId = Form.useWatch('plant_id', form) as string | undefined;
   const buildingId = Form.useWatch('building_id', form) as string | undefined;
@@ -166,26 +178,37 @@ function AddDeviceWizard({ open, defaults, onClose }: { open: boolean; defaults:
       />
       {step === 0 && (
         <Row gutter={[14, 14]}>
-          {ASSET_TYPE_KEYS.map((t) => (
-            <Col xs={24} sm={12} key={t} style={{ display: 'flex' }}>
-              <button
-                type="button"
-                className="stat-tile"
-                style={{ width: '100%', height: '100%' }}
-                onClick={() => {
-                  setType(t);
-                  form.setFieldValue('rack_height_u', t === 'server' || t === 'ups' ? 2 : 1);
-                  setStep(1);
-                }}
-              >
-                <TypeIcon type={t} large />
-                <span>
-                  <div style={{ fontSize: 18, fontWeight: 700 }}>{ASSET_TYPES[t].label}</div>
-                  <div className="stat-label">{TYPE_HINT[t]}</div>
-                </span>
-              </button>
-            </Col>
-          ))}
+          {(Object.keys(ASSET_CATEGORIES) as AssetCategory[]).map((c) => {
+            const inCategory = types.offered.filter((t) => ASSET_TYPES[t].category === c);
+            if (!inCategory.length) return null;
+            return [
+              <Col span={24} key={c} style={{ marginBottom: -6 }}>
+                <Typography.Text type="secondary" strong style={{ textTransform: 'uppercase', fontSize: 11.5, letterSpacing: 0.4 }}>
+                  {ASSET_CATEGORIES[c].label}
+                </Typography.Text>
+              </Col>,
+              ...inCategory.map((t) => (
+                <Col xs={24} sm={12} key={t} style={{ display: 'flex' }}>
+                  <button
+                    type="button"
+                    className="stat-tile"
+                    style={{ width: '100%', height: '100%' }}
+                    onClick={() => {
+                      setType(t);
+                      form.setFieldValue('rack_height_u', ASSET_TYPES[t].rackHeight);
+                      setStep(1);
+                    }}
+                  >
+                    <TypeIcon type={t} large />
+                    <span>
+                      <div style={{ fontSize: 18, fontWeight: 700 }}>{ASSET_TYPES[t].label}</div>
+                      <div className="stat-label">{ASSET_TYPES[t].hint}</div>
+                    </span>
+                  </button>
+                </Col>
+              )),
+            ];
+          })}
         </Row>
       )}
       <Form form={form} layout="vertical" requiredMark={(label, { required }) => (required ? <>{label} *</> : label)} preserve>
@@ -193,7 +216,7 @@ function AddDeviceWizard({ open, defaults, onClose }: { open: boolean; defaults:
           <Row gutter={16}>
             <Col span={24}>
               <Form.Item name="name" label={`Name of the ${assetTypeNoun(type!)} (hostname)`} rules={[{ required: true, whitespace: true, message: 'Please enter a name' }]}>
-                <Input size="large" placeholder={type === 'access_point' ? 'e.g. muc-ap-042' : type === 'switch' ? 'e.g. muc-b01-sw03' : type === 'ups' ? 'e.g. muc-ups02' : 'e.g. muc-srv-backup01'} autoFocus />
+                <Input size="large" placeholder={`e.g. ${typeDef.example}`} autoFocus />
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
@@ -228,7 +251,7 @@ function AddDeviceWizard({ open, defaults, onClose }: { open: boolean; defaults:
                 <Input className="mono" placeholder="e.g. 10.10.20.42" />
               </Form.Item>
             </Col>
-            {typeDef.physical && type !== 'access_point' && (
+            {typeDef.physical && !NOT_IN_RACK.has(type!) && (
               <>
                 <Col xs={24} md={12}>
                   <Form.Item name="rack_id" label="Rack">
@@ -254,7 +277,7 @@ function AddDeviceWizard({ open, defaults, onClose }: { open: boolean; defaults:
             )}
             <Col xs={24} md={12}>
               <Form.Item name="model" label="Model">
-                <Input placeholder={type === 'access_point' ? 'e.g. Meraki MR46' : type === 'switch' ? 'e.g. Catalyst 9300-48P' : type === 'ups' ? 'e.g. Smart-UPS SRT 6000' : 'e.g. PowerEdge R760'} />
+                <Input placeholder={MODEL_EXAMPLE[type!] ? `e.g. ${MODEL_EXAMPLE[type!]}` : undefined} />
               </Form.Item>
             </Col>
           </Row>
@@ -286,7 +309,7 @@ function AddDeviceWizard({ open, defaults, onClose }: { open: boolean; defaults:
                 <Select options={ASSET_STATUSES.map((s) => ({ value: s, label: ASSET_STATUS_META[s].label }))} />
               </Form.Item>
             </Col>
-            {(typeDef.fields as readonly FieldDef[]).slice(0, 6).map((f) => (
+            {[...(typeDef.fields as readonly FieldDef[]).slice(0, 6), ...(types.settings.customFields[type!] ?? [])].map((f) => (
               <Col xs={24} md={12} key={f.key}>
                 <Form.Item name={['attributes', f.key]} label={f.label} valuePropName={f.type === 'boolean' ? 'checked' : 'value'}>
                   <AttributeInput field={f} />

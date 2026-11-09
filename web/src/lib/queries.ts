@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ASSET_TYPE_KEYS, EMPTY_ASSET_TYPE_SETTINGS, assetTypeFields, type AssetType, type AssetTypeSettings, type FieldDef } from '../../../shared/model';
 import type {
   Activity,
   AppUser,
@@ -73,4 +74,26 @@ export const usePlan = (id: string | undefined) =>
 export function useInvalidate() {
   const qc = useQueryClient();
   return () => qc.invalidateQueries();
+}
+
+/** Device type settings (hidden types, administrator fields) with helpers for forms and lists. */
+export function useAssetTypes() {
+  const q = useQuery({
+    queryKey: ['asset-types'],
+    queryFn: () => http.get<AssetTypeSettings>('/api/asset-types'),
+    staleTime: 5 * 60 * 1000,
+  });
+  const settings = q.data ?? EMPTY_ASSET_TYPE_SETTINGS;
+  const hidden = new Set(settings.hidden);
+  return {
+    settings,
+    /** Types offered when adding devices */
+    offered: ASSET_TYPE_KEYS.filter((t) => !hidden.has(t)),
+    fields: (type: AssetType): readonly FieldDef[] => assetTypeFields(type, settings),
+    /** Types to show as tiles: used ones, or the offered ones while nothing exists yet */
+    shown: (counts: Partial<Record<AssetType, number>> | undefined) => {
+      const used = ASSET_TYPE_KEYS.filter((t) => (counts?.[t] ?? 0) > 0);
+      return used.length ? used : ASSET_TYPE_KEYS.filter((t) => !hidden.has(t));
+    },
+  };
 }

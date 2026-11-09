@@ -23,6 +23,8 @@ function suggest(type: AssetType): { relation: RelationType; targetType?: AssetT
     case 'vm':
       return { relation: 'runs_on', targetType: 'server' };
     case 'server':
+    case 'storage':
+    case 'pdu':
       return { relation: 'powered_by', targetType: 'ups' };
     case 'switch':
       return { relation: 'uplink', targetType: 'switch' };

@@ -45,6 +45,7 @@ import { usePlants } from '../../lib/queries';
 import { useSession } from '../../lib/session';
 import { PageHeader } from '../../components/PageHeader';
 import { EntraSettingsTab } from './EntraSettingsTab';
+import { DeviceTypesTab } from './DeviceTypesTab';
 import { AssetTypeTag, WarrantyDate } from '../../components/Tags';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -555,7 +556,7 @@ export function SettingsPage() {
     <div>
       <PageHeader
         title="Settings & notifications"
-        subtitle="E-mail server, warranty reminders and sign-in with Microsoft. All changes are recorded in the audit log."
+        subtitle="E-mail server, warranty reminders, device types and sign-in with Microsoft. All changes are recorded in the audit log."
         crumbs={[{ title: 'Administration' }, { title: 'Settings & notifications' }]}
       />
       <Card styles={{ body: { paddingTop: 0 } }}>
@@ -571,6 +572,7 @@ export function SettingsPage() {
             { key: 'email', label: 'E-mail server (SMTP)', children: <SmtpTab /> },
             { key: 'warranty', label: 'Warranty notifications', children: <WarrantyTab /> },
             { key: 'history', label: 'History', children: <HistoryTab /> },
+            { key: 'types', label: 'Device types', children: <DeviceTypesTab /> },
             { key: 'entra', label: 'Microsoft Entra ID', children: <EntraSettingsTab /> },
           ]}
         />

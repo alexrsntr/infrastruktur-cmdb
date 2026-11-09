@@ -1,7 +1,7 @@
 import { Router, type Request } from 'express';
 import archiver from 'archiver';
 import type { Pool } from 'pg';
-import { ASSET_TYPE_KEYS, ASSET_TYPES, RACK_ITEM_KIND_META, can, formatRackUnits, type AssetType, type CurrentUser } from '../../shared/model';
+import { ASSET_TYPE_KEYS, ASSET_TYPES, RACK_ITEM_KIND_META, can, formatRackUnits, type AssetType, type AssetTypeSettings, type CurrentUser } from '../../shared/model';
 import { requirePermission } from '../auth/context';
 import { audit } from '../lib/audit';
 import { badRequest, forbidden, notFound, queryString, requireUuid, SqlBuilder } from '../lib/http';
@@ -34,6 +34,7 @@ import { ATTACHMENT_CATEGORY_META, formatBytes, type AttachmentCategory } from '
 import { ENTITY_TYPES, type EntityType } from '../../shared/model';
 import { ATTACHMENT_FROM, ATTACHMENT_PLANT_SQL, ATTACHMENT_SELECT, attachmentContext } from '../services/attachments';
 import { log } from '../lib/log';
+import { loadAssetTypeSettings } from '../services/assetTypes';
 
 /** One row per data center site */
 const DATACENTER_COLUMNS: Column[] = [
@@ -192,12 +193,13 @@ async function loadRackContents(pool: Pool, user: CurrentUser, f: { plantId?: st
   return rows.map((r) => ({ ...r, units: r.u ? formatRackUnits(r.u, r.height) : 'not positioned', u_top: r.u ? r.u + r.height - 1 : null }));
 }
 
-function assetSheets(rows: Record<string, unknown>[], perType: boolean): Sheet[] {
-  const sheets: Sheet[] = [{ name: 'All assets', columns: assetColumns([]), rows }];
+function assetSheets(rows: Record<string, unknown>[], perType: boolean, settings: AssetTypeSettings): Sheet[] {
+  const sheets: Sheet[] = [{ name: 'All assets', columns: assetColumns([], settings), rows }];
   if (perType) {
     for (const t of ASSET_TYPE_KEYS) {
       const subset = rows.filter((r) => r.type === t);
-      sheets.push({ name: ASSET_TYPES[t].plural, columns: assetColumns([t]), rows: subset });
+      if (!subset.length) continue;
+      sheets.push({ name: ASSET_TYPES[t].plural, columns: assetColumns([t], settings), rows: subset });
     }
   }
   return sheets;
@@ -274,7 +276,7 @@ export function exportsRouter(pool: Pool): Router {
     const { rows, types } = await loadAssets(pool, req.user!, req.query);
     const title = types.length === 1 ? ASSET_TYPES[types[0]].plural : 'Assets';
     await done(req, 'assets', format, rows.length);
-    await sendExport(res, format, title, [{ name: title, columns: assetColumns(types), rows }], {
+    await sendExport(res, format, title, [{ name: title, columns: assetColumns(types, await loadAssetTypeSettings(pool)), rows }], {
       title: `CMDB export – ${title}`,
       user: req.user!.displayName,
       delimiter: delimiterOf(req),
@@ -490,7 +492,7 @@ export function exportsRouter(pool: Pool): Router {
       { name: 'Racks', columns: RACK_COLUMNS, rows: racks },
       { name: 'Rack contents', columns: RACK_CONTENT_COLUMNS, rows: rackContents },
       { name: 'Data centers', columns: DATACENTER_COLUMNS, rows: await loadDatacenterExportRows(pool, user, plantId) },
-      ...assetSheets(assets.rows, true),
+      ...assetSheets(assets.rows, true, await loadAssetTypeSettings(pool)),
       { name: 'Relations', columns: RELATION_COLUMNS, rows: relations },
       { name: 'Activities', columns: ACTIVITY_COLUMNS, rows: activities },
       { name: 'Notes', columns: NOTE_COLUMNS, rows: notes },
@@ -518,7 +520,7 @@ export function exportsRouter(pool: Pool): Router {
       loadActivities(pool, req.user, { entityType: 'asset', entityId: id }),
       pool.query(`SELECT ${AUDIT_SELECT} FROM audit_log l WHERE l.entity_type = 'asset' AND l.entity_id = $1 ORDER BY l.at DESC`, [id]),
     ]);
-    const cols = assetColumns([asset.type]);
+    const cols = assetColumns([asset.type], await loadAssetTypeSettings(pool));
     const details = cols.map((c) => ({ field: c.header, value: c.get ? c.get(asset) : asset[c.key] }));
     await done(req, 'asset-dossier', format, 1, { asset: asset.name });
     await sendExport(

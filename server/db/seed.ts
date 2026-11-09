@@ -294,6 +294,18 @@ export async function seed(pool: Pool, opts: { force?: boolean } = {}) {
       });
       await relate(core.id, ups.id, 'powered_by');
       for (const h of hosts) await relate(h.id, ups.id, 'powered_by');
+
+      // ---- firewall between the plant network and the WAN (own random sequence as well)
+      const frand = rng(6000 + pi);
+      const fw = await insertAsset({
+        type: 'firewall', name: `${code}-fw01`, status: 'active', criticality: 'critical',
+        plant_id: plant.id, building_id: dcFloor.buildingId, floor_id: dcFloor.id, ...pointIn(DATACENTER_LAYOUT[0], frand),
+        room: 'Server room', rack_id: rackSrv, rack_u: 38, rack_height_u: 1, manufacturer: 'Fortinet', model: 'FortiGate 100F', serial_number: `FG100F${Math.floor(frand() * 1e8)}`,
+        asset_tag: `IT-${p.code}-1600`, ip_address: `${net}.0.1`, mac_address: mac(frand), os: 'FortiOS 7.4', owner: 'Network Team',
+        cost_center: `${4000 + pi}`, purchase_date: dateOffset(-800), warranty_end: dateOffset(300 + frand() * 400), tags: ['security'],
+        attributes: { ha_mode: 'Standalone', throughput_gbps: 20, zones: 'Office, OT, Server, DMZ', vpn: true, firmware: '7.4.4', license_end: dateOffset(200 + frand() * 300) },
+      });
+      await relate(core.id, fw.id, 'uplink', 'Te1/1/8', 'port1');
     }
 
     // ---- demo site plan for the headquarters (only with the database storage driver)

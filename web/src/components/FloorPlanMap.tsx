@@ -11,8 +11,6 @@ import { useAssets, useInvalidate } from '../lib/queries';
 import { useSession } from '../lib/session';
 import { AssetStatusTag, AssetTypeTag } from './Tags';
 
-const SHORT_LABEL: Record<AssetType, string> = { switch: 'SW', access_point: 'AP', server: 'SRV', ups: 'UPS', vm: 'VM' };
-
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
 const iconCache = new Map<string, L.DivIcon>();
@@ -23,7 +21,7 @@ function assetIcon(a: Asset, highlighted: boolean) {
   const cached = iconCache.get(key);
   if (cached) return cached;
   const def = ASSET_TYPES[a.type];
-  const label = SHORT_LABEL[a.type];
+  const label = def.short;
   const icon = L.divIcon({
     className: '',
     html: `<div class="asset-marker status-${a.status}${highlighted ? ' selected' : ''}" style="background:${def.color};font-size:${label.length > 2 ? 9 : 10}px;font-weight:700">${label}</div>`,

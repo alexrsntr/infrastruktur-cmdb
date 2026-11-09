@@ -87,7 +87,7 @@ export function PlantPopupContent({ plant }: { plant: Plant }) {
             <td className="muted">Buildings</td>
             <td style={{ textAlign: 'right' }}>{plant.building_count ?? 0}</td>
           </tr>
-          {ASSET_TYPE_KEYS.map((t) => (
+          {ASSET_TYPE_KEYS.filter((t) => (plant.asset_counts?.[t] ?? 0) > 0).map((t) => (
             <tr key={t}>
               <td className="muted">{ASSET_TYPES[t].plural}</td>
               <td style={{ textAlign: 'right' }}>{plant.asset_counts?.[t] ?? 0}</td>

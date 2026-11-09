@@ -10,7 +10,6 @@ import {
   RELATION_TYPE_KEYS,
   ROLES,
   type AssetType,
-  assetTypeFields,
 } from '../../shared/model';
 
 export const optText = (max = 500) =>
@@ -127,43 +126,9 @@ export const assetSchema = z
       .nullish()
       .transform((v) => [...new Set(v ?? [])]),
     attributes: z.record(z.string(), z.unknown()).nullish().transform((v) => v ?? {}),
-  })
-  .transform((a) => ({ ...a, attributes: cleanAttributes(a.type, a.attributes) }));
+  });
+/** Attributes are cleaned per type afterwards (cleanAttributes in services/assetTypes, which knows the administrator fields). */
 export type AssetInput = z.infer<typeof assetSchema>;
-
-/** Keep only attributes defined for the asset type and coerce them to the declared field type. */
-export function cleanAttributes(type: AssetType, attrs: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const field of assetTypeFields(type)) {
-    const raw = attrs[field.key];
-    if (raw === undefined || raw === null || raw === '') continue;
-    switch (field.type) {
-      case 'number': {
-        const n = typeof raw === 'number' ? raw : Number(String(raw).replace(',', '.'));
-        if (Number.isFinite(n)) out[field.key] = n;
-        break;
-      }
-      case 'boolean':
-        out[field.key] = typeof raw === 'boolean' ? raw : ['true', '1', 'yes', 'ja', 'x'].includes(String(raw).toLowerCase());
-        break;
-      case 'date': {
-        // stored as YYYY-MM-DD; accepts ISO dates, DD.MM.YYYY (German Excel) and Date objects (Excel import)
-        if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
-          out[field.key] = raw.toISOString().slice(0, 10);
-          break;
-        }
-        const s = String(raw).trim();
-        const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-        const de = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
-        out[field.key] = iso ? `${iso[1]}-${iso[2]}-${iso[3]}` : de ? `${de[3]}-${de[2].padStart(2, '0')}-${de[1].padStart(2, '0')}` : s.slice(0, 500);
-        break;
-      }
-      default:
-        out[field.key] = String(raw).trim().slice(0, 500);
-    }
-  }
-  return out;
-}
 
 export const assetStatusSchema = z.object({ status: z.enum(ASSET_STATUSES) });
 

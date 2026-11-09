@@ -134,12 +134,12 @@ async function loadDetail(db: DbClient, id: string, user: CurrentUser) {
      ORDER BY a.rack_u DESC NULLS LAST, a.name`,
     [rackIds],
   );
-  // Switches/servers/UPS documented in the site's room but not mounted in a rack
+  // Network, server, storage and power devices documented in the site's room but not mounted in a rack
   const { rows: loose } = await db.query(
     `SELECT s.id AS site_id, a.id, a.name, a.type, a.status, a.model, a.ip_address, NULL::uuid AS rack_id, NULL::int AS rack_u, a.rack_height_u,
             a.attributes->>'cluster' AS cluster, a.attributes->>'role' AS role
      FROM datacenter_site s JOIN asset a
-       ON a.building_id = s.building_id AND a.rack_id IS NULL AND a.type IN ('switch','server','ups')
+       ON a.building_id = s.building_id AND a.rack_id IS NULL AND a.type IN ('switch','router','firewall','wlan_controller','server','storage','ups','pdu')
       AND s.room IS NOT NULL AND lower(btrim(coalesce(a.room, ''))) = lower(btrim(s.room))
      WHERE s.datacenter_id = $1 ORDER BY a.name`,
     [id],

@@ -94,12 +94,31 @@ export interface FieldDef {
   placeholder?: string;
 }
 
+export const ASSET_CATEGORIES = {
+  network: { label: 'Network' },
+  compute: { label: 'Compute & storage' },
+  power: { label: 'Power' },
+  ot: { label: 'Production (OT)' },
+  endpoint: { label: 'Endpoints' },
+  other: { label: 'Other' },
+} as const;
+export type AssetCategory = keyof typeof ASSET_CATEGORIES;
+
 export interface AssetTypeDef {
   label: string;
   plural: string;
   slug: string; // URL segment
-  /** Whether the asset is physical (has a location / can be placed on a floor plan) */
+  /** Short label for map markers ("SW", "AP" …) */
+  short: string;
+  category: AssetCategory;
+  /** One line shown when choosing the type in the "Add device" wizard */
+  hint: string;
+  /** Example host name (placeholder in forms) */
+  example: string;
+  /** Whether the asset is physical (has a location / can be placed on a floor plan / mounted in a rack) */
   physical: boolean;
+  /** Typical height in a rack (U) */
+  rackHeight: number;
   color: string;
   fields: FieldDef[];
 }
@@ -109,6 +128,11 @@ export const ASSET_TYPES = {
     label: 'Switch',
     plural: 'Switches',
     slug: 'switches',
+    short: 'SW',
+    category: 'network',
+    hint: 'Network switch in a rack or cabinet',
+    example: 'muc-b01-sw03',
+    rackHeight: 1,
     physical: true,
     color: '#1677ff',
     fields: [
@@ -122,10 +146,57 @@ export const ASSET_TYPES = {
       { key: 'firmware', label: 'Firmware', type: 'text' },
     ],
   },
+  router: {
+    label: 'Router',
+    plural: 'Routers',
+    slug: 'routers',
+    short: 'RT',
+    category: 'network',
+    hint: 'WAN / internet router or layer-3 gateway',
+    example: 'muc-rt01',
+    physical: true,
+    rackHeight: 1,
+    color: '#2f54eb',
+    fields: [
+      { key: 'router_role', label: 'Router role', type: 'select', options: ['WAN edge', 'Internet', 'Core', 'Branch', 'Industrial / cellular'] },
+      { key: 'wan_links', label: 'WAN links', type: 'text', placeholder: 'e.g. MPLS 100M, Internet 1G' },
+      { key: 'carrier', label: 'Carrier / circuit ID', type: 'text' },
+      { key: 'routing', label: 'Routing protocols', type: 'text', placeholder: 'e.g. BGP, OSPF' },
+      { key: 'interfaces', label: 'Interfaces', type: 'text' },
+      { key: 'firmware', label: 'Firmware', type: 'text' },
+    ],
+  },
+  firewall: {
+    label: 'Firewall',
+    plural: 'Firewalls',
+    slug: 'firewalls',
+    short: 'FW',
+    category: 'network',
+    hint: 'Firewall or security gateway, e.g. between office and production network',
+    example: 'muc-fw01',
+    physical: true,
+    rackHeight: 1,
+    color: '#cf1322',
+    fields: [
+      { key: 'ha_mode', label: 'High availability', type: 'select', options: ['Standalone', 'Active / passive', 'Active / active', 'Cluster'] },
+      { key: 'ha_peer', label: 'HA peer', type: 'text' },
+      { key: 'throughput_gbps', label: 'Throughput', type: 'number', unit: 'Gbit/s' },
+      { key: 'zones', label: 'Zones / segments', type: 'text', placeholder: 'e.g. Office, OT, DMZ' },
+      { key: 'vpn', label: 'VPN termination', type: 'boolean' },
+      { key: 'firmware', label: 'Firmware', type: 'text' },
+      { key: 'management', label: 'Central management', type: 'text', placeholder: 'e.g. FortiManager, Panorama' },
+      { key: 'license_end', label: 'Security license until', type: 'date' },
+    ],
+  },
   access_point: {
     label: 'Access Point',
     plural: 'Access Points',
     slug: 'access-points',
+    short: 'AP',
+    category: 'network',
+    hint: 'Wi-Fi access point on a ceiling or wall',
+    example: 'muc-ap-042',
+    rackHeight: 1,
     physical: true,
     color: '#13a8a8',
     fields: [
@@ -138,10 +209,35 @@ export const ASSET_TYPES = {
       { key: 'firmware', label: 'Firmware', type: 'text' },
     ],
   },
+  wlan_controller: {
+    label: 'WLAN Controller',
+    plural: 'WLAN Controllers',
+    slug: 'wlan-controllers',
+    short: 'WLC',
+    category: 'network',
+    hint: 'Controller or gateway that manages the access points',
+    example: 'muc-wlc01',
+    physical: true,
+    rackHeight: 1,
+    color: '#08979c',
+    fields: [
+      { key: 'deployment', label: 'Deployment', type: 'select', options: ['Appliance', 'Virtual', 'Cloud'] },
+      { key: 'licensed_aps', label: 'Licensed APs', type: 'number' },
+      { key: 'max_aps', label: 'Max. APs', type: 'number' },
+      { key: 'ha_peer', label: 'HA peer', type: 'text' },
+      { key: 'ssids', label: 'SSIDs', type: 'text' },
+      { key: 'firmware', label: 'Firmware', type: 'text' },
+    ],
+  },
   server: {
     label: 'Server',
     plural: 'Servers',
     slug: 'servers',
+    short: 'SRV',
+    category: 'compute',
+    hint: 'Physical server or hypervisor host',
+    example: 'muc-srv-backup01',
+    rackHeight: 2,
     physical: true,
     color: '#722ed1',
     fields: [
@@ -155,10 +251,57 @@ export const ASSET_TYPES = {
       { key: 'oob_ip', label: 'iDRAC / iLO IP', type: 'text' },
     ],
   },
+  storage: {
+    label: 'Storage',
+    plural: 'Storage',
+    slug: 'storage',
+    short: 'STO',
+    category: 'compute',
+    hint: 'SAN, NAS, backup appliance or tape library',
+    example: 'muc-nas01',
+    physical: true,
+    rackHeight: 2,
+    color: '#531dab',
+    fields: [
+      { key: 'kind', label: 'Kind', type: 'select', options: ['SAN', 'NAS', 'Hyper-converged', 'Backup appliance', 'Tape library'] },
+      { key: 'raw_tb', label: 'Raw capacity', type: 'number', unit: 'TB' },
+      { key: 'usable_tb', label: 'Usable capacity', type: 'number', unit: 'TB' },
+      { key: 'protocols', label: 'Protocols', type: 'text', placeholder: 'e.g. iSCSI, NFS, SMB, FC' },
+      { key: 'raid', label: 'RAID / protection', type: 'text' },
+      { key: 'controllers', label: 'Controllers', type: 'number' },
+      { key: 'firmware', label: 'Firmware', type: 'text' },
+    ],
+  },
+  vm: {
+    label: 'Virtual Machine',
+    plural: 'Virtual Machines',
+    slug: 'vms',
+    short: 'VM',
+    category: 'compute',
+    hint: 'Virtual machine on a host or cluster',
+    example: 'muc-app10',
+    rackHeight: 1,
+    physical: false,
+    color: '#fa8c16',
+    fields: [
+      { key: 'vcpu', label: 'vCPU', type: 'number' },
+      { key: 'ram_gb', label: 'RAM', type: 'number', unit: 'GB' },
+      { key: 'disk_gb', label: 'Disk', type: 'number', unit: 'GB' },
+      { key: 'cluster', label: 'Cluster / host group', type: 'text' },
+      { key: 'environment', label: 'Environment', type: 'select', options: ['Production', 'Test', 'Development', 'Disaster recovery'] },
+      { key: 'application', label: 'Application / service', type: 'text' },
+      { key: 'backup', label: 'Backup enabled', type: 'boolean' },
+    ],
+  },
   ups: {
     label: 'UPS',
     plural: 'UPS',
     slug: 'ups',
+    short: 'UPS',
+    category: 'power',
+    hint: 'Emergency power (UPS) in a rack or room',
+    example: 'muc-ups02',
+    rackHeight: 2,
     physical: true,
     color: '#c41d7f',
     fields: [
@@ -177,20 +320,101 @@ export const ASSET_TYPES = {
       { key: 'firmware', label: 'Firmware', type: 'text' },
     ],
   },
-  vm: {
-    label: 'Virtual Machine',
-    plural: 'Virtual Machines',
-    slug: 'vms',
-    physical: false,
-    color: '#fa8c16',
+  pdu: {
+    label: 'PDU',
+    plural: 'PDUs',
+    slug: 'pdus',
+    short: 'PDU',
+    category: 'power',
+    hint: 'Power distribution unit in a rack (basic, metered or switched)',
+    example: 'muc-pdu-r01a',
+    physical: true,
+    rackHeight: 1,
+    color: '#d4380d',
     fields: [
-      { key: 'vcpu', label: 'vCPU', type: 'number' },
-      { key: 'ram_gb', label: 'RAM', type: 'number', unit: 'GB' },
-      { key: 'disk_gb', label: 'Disk', type: 'number', unit: 'GB' },
-      { key: 'cluster', label: 'Cluster / host group', type: 'text' },
-      { key: 'environment', label: 'Environment', type: 'select', options: ['Production', 'Test', 'Development', 'Disaster recovery'] },
-      { key: 'application', label: 'Application / service', type: 'text' },
-      { key: 'backup', label: 'Backup enabled', type: 'boolean' },
+      { key: 'kind', label: 'Kind', type: 'select', options: ['Basic', 'Metered', 'Switched', 'Metered + switched', 'Transfer switch (ATS)'] },
+      { key: 'phases', label: 'Phases', type: 'select', options: ['1-phase', '3-phase'] },
+      { key: 'max_current_a', label: 'Max. current', type: 'number', unit: 'A' },
+      { key: 'input_plug', label: 'Input plug', type: 'text', placeholder: 'e.g. CEE 32 A 5-pin' },
+      { key: 'outlets', label: 'Outlets', type: 'text', placeholder: 'e.g. 20x C13, 4x C19' },
+      { key: 'feed', label: 'Power feed', type: 'select', options: ['A', 'B', 'A + B'] },
+      { key: 'firmware', label: 'Firmware', type: 'text' },
+    ],
+  },
+  ot_device: {
+    label: 'OT Device',
+    plural: 'OT Devices',
+    slug: 'ot-devices',
+    short: 'OT',
+    category: 'ot',
+    hint: 'PLC, industrial PC, HMI panel or other machine controller',
+    example: 'muc-l3-plc01',
+    physical: true,
+    rackHeight: 1,
+    color: '#7c6f00',
+    fields: [
+      { key: 'kind', label: 'Kind', type: 'select', options: ['PLC', 'Industrial PC', 'HMI / panel', 'Drive / inverter', 'Robot controller', 'Remote I/O / gateway', 'Other'] },
+      { key: 'machine', label: 'Machine / line', type: 'text', placeholder: 'e.g. Press line 3' },
+      { key: 'fieldbus', label: 'Fieldbus / protocol', type: 'select', options: ['PROFINET', 'EtherNet/IP', 'Modbus TCP', 'EtherCAT', 'OPC UA', 'PROFIBUS', 'Other'] },
+      { key: 'program_version', label: 'Program version', type: 'text' },
+      { key: 'firmware', label: 'Firmware', type: 'text' },
+      { key: 'maintainer', label: 'Maintained by', type: 'text', placeholder: 'e.g. machine builder, plant engineering' },
+      { key: 'remote_access', label: 'Remote access', type: 'text', placeholder: 'e.g. vendor VPN box' },
+    ],
+  },
+  printer: {
+    label: 'Printer',
+    plural: 'Printers',
+    slug: 'printers',
+    short: 'PRN',
+    category: 'endpoint',
+    hint: 'Office, label or multifunction printer',
+    example: 'muc-prn-b01-01',
+    physical: true,
+    rackHeight: 1,
+    color: '#5b8c00',
+    fields: [
+      { key: 'kind', label: 'Kind', type: 'select', options: ['Laser', 'Inkjet', 'Multifunction', 'Label printer', 'Plotter'] },
+      { key: 'color', label: 'Colour', type: 'boolean' },
+      { key: 'queue', label: 'Print queue', type: 'text', placeholder: 'e.g. \\\\printsrv\\B01-OG1' },
+      { key: 'print_server', label: 'Print server', type: 'text' },
+      { key: 'firmware', label: 'Firmware', type: 'text' },
+    ],
+  },
+  camera: {
+    label: 'Camera',
+    plural: 'Cameras',
+    slug: 'cameras',
+    short: 'CAM',
+    category: 'endpoint',
+    hint: 'IP / security camera or industrial vision camera',
+    example: 'muc-cam-gate01',
+    physical: true,
+    rackHeight: 1,
+    color: '#ad6800',
+    fields: [
+      { key: 'kind', label: 'Kind', type: 'select', options: ['Fixed / bullet', 'Dome', 'PTZ', 'Thermal', 'Machine vision'] },
+      { key: 'resolution', label: 'Resolution', type: 'text', placeholder: 'e.g. 4 MP' },
+      { key: 'recorder', label: 'Recorder / VMS', type: 'text' },
+      { key: 'retention_days', label: 'Retention', type: 'number', unit: 'days' },
+      { key: 'poe', label: 'PoE', type: 'boolean' },
+      { key: 'firmware', label: 'Firmware', type: 'text' },
+    ],
+  },
+  other: {
+    label: 'Other Device',
+    plural: 'Other Devices',
+    slug: 'other',
+    short: 'DEV',
+    category: 'other',
+    hint: 'Anything else with a network connection or a place in a rack',
+    example: 'muc-dev01',
+    physical: true,
+    rackHeight: 1,
+    color: '#595959',
+    fields: [
+      { key: 'kind', label: 'Kind', type: 'text', placeholder: 'e.g. Time server, KVM switch, media converter' },
+      { key: 'firmware', label: 'Firmware', type: 'text' },
     ],
   },
 } as const satisfies Record<string, AssetTypeDef>;
@@ -208,8 +432,33 @@ export function assetTypeNoun(type: AssetType): string {
   return label === label.toUpperCase() ? label : label.toLowerCase();
 }
 
-export function assetTypeFields(type: AssetType): readonly FieldDef[] {
-  return ASSET_TYPES[type].fields;
+/** Built-in fields of a type plus the fields an administrator added (settings "Device types"). */
+export function assetTypeFields(type: AssetType, settings?: AssetTypeSettings | null): readonly FieldDef[] {
+  const custom = settings?.customFields?.[type] ?? [];
+  return custom.length ? [...ASSET_TYPES[type].fields, ...custom] : ASSET_TYPES[type].fields;
+}
+
+/** Administrator settings for device types (app_setting "asset_types") */
+export interface AssetTypeSettings {
+  /** Types not offered when adding devices (existing devices stay visible) */
+  hidden: AssetType[];
+  /** Additional fields per type; values are stored in asset.attributes */
+  customFields: Partial<Record<AssetType, FieldDef[]>>;
+}
+
+export const EMPTY_ASSET_TYPE_SETTINGS: AssetTypeSettings = { hidden: [], customFields: {} };
+
+/** Key for an administrator-defined field: "custom_" + label in snake case */
+export function customFieldKey(label: string): string {
+  const base = label
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/ß/g, 'ss')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 40);
+  return `custom_${base || 'field'}`;
 }
 
 // ---------------------------------------------------------------------------

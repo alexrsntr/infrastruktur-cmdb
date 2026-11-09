@@ -359,7 +359,7 @@ describe('dashboard & search', () => {
   it('returns dashboard aggregates', async () => {
     const res = await editor.get('/api/dashboard').expect(200);
     expect(res.body.totals.plants).toBe(6);
-    expect(res.body.byType.length).toBe(5);
+    expect(res.body.byType.length).toBe(6);
     expect(res.body.warrantyExpiring.length).toBeGreaterThan(0);
   });
 

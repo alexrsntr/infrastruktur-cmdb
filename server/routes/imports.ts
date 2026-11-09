@@ -9,6 +9,7 @@ import {
   ASSET_TYPE_KEYS,
   CRITICALITY_META,
   type AssetType,
+  type AssetTypeSettings,
   type ImportReport,
 } from '../../shared/model';
 import { requirePermission } from '../auth/context';
@@ -18,6 +19,7 @@ import { assetSchema } from '../lib/schemas';
 import { hasPlantAccess } from '../lib/scope';
 import { insertAsset, resolveAssetLocation, updateAsset } from '../services/assets';
 import { attributeFields, assetColumns } from '../services/tabular';
+import { cleanAttributes, loadAssetTypeSettings } from '../services/assetTypes';
 
 const MAX_ROWS = 10_000;
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024, files: 1 } });
@@ -27,13 +29,13 @@ type RawRow = Record<string, unknown>;
 const norm = (s: string) => s.toLowerCase().replace(/[\s_\-/().]+/g, '');
 
 /** Maps spreadsheet headers (export headers or field keys) to internal keys. */
-function headerMap(): Map<string, string> {
+function headerMap(settings: AssetTypeSettings): Map<string, string> {
   const map = new Map<string, string>();
-  for (const c of assetColumns([])) {
+  for (const c of assetColumns([], settings)) {
     map.set(norm(c.header), c.key);
     map.set(norm(c.key), c.key);
   }
-  for (const f of attributeFields([])) {
+  for (const f of attributeFields([], settings)) {
     map.set(norm(f.label), `attr:${f.key}`);
     if (f.unit) map.set(norm(`${f.label} (${f.unit})`), `attr:${f.key}`);
     map.set(norm(f.key), `attr:${f.key}`);
@@ -259,7 +261,8 @@ export function importsRouter(pool: Pool): Router {
     if (rows.length > MAX_ROWS) throw badRequest(`Too many rows (${rows.length}). The limit is ${MAX_ROWS} per file.`);
 
     const report: ImportReport = { dryRun, total: rows.length, created: 0, updated: 0, skipped: 0, errors: [] };
-    const headers = headerMap();
+    const settings = await loadAssetTypeSettings(pool);
+    const headers = headerMap(settings);
     const user = req.user!;
     const db = await pool.connect();
     try {
@@ -272,7 +275,7 @@ export function importsRouter(pool: Pool): Router {
           const mapped = mapRow(rows[i], headers, lookups, defaultType);
           const parsed = assetSchema.safeParse(mapped.input);
           if (!parsed.success) throw new Error(parsed.error.issues.map((x) => `${x.path.join('.') || 'row'}: ${x.message}`).join('; '));
-          const input = parsed.data;
+          const input = { ...parsed.data, attributes: cleanAttributes(parsed.data.type, parsed.data.attributes, settings) };
           let existing = null;
           if (mapped.id) existing = (await db.query('SELECT * FROM asset WHERE id = $1 FOR UPDATE', [mapped.id])).rows[0];
           if (!existing) existing = (await db.query('SELECT * FROM asset WHERE type = $1 AND lower(name) = lower($2) FOR UPDATE', [input.type, input.name])).rows[0];

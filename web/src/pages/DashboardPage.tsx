@@ -2,8 +2,8 @@ import { Link } from 'react-router';
 import { Card, Col, Empty, Row, Skeleton, Tag, Typography } from 'antd';
 import { BankOutlined, SafetyCertificateOutlined, ScheduleOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { ACTIVITY_KIND_META, ASSET_TYPES, ASSET_TYPE_KEYS } from '../../../shared/model';
-import { useDashboard } from '../lib/queries';
+import { ACTIVITY_KIND_META, ASSET_TYPES, type AssetType } from '../../../shared/model';
+import { useAssetTypes, useDashboard } from '../lib/queries';
 import { useSession } from '../lib/session';
 import { daysUntil, fmtDate } from '../lib/format';
 import { PageHeader } from '../components/PageHeader';
@@ -20,6 +20,7 @@ function greeting() {
 export function DashboardPage() {
   const { me, scoped } = useSession();
   const { data, isLoading } = useDashboard();
+  const types = useAssetTypes();
   const byType = Object.fromEntries((data?.byType ?? []).map((t) => [t.type, t.count])) as Record<string, number>;
   const firstName = me.user.displayName.split(' ')[0];
 
@@ -35,7 +36,7 @@ export function DashboardPage() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div className="tile-grid">
-            {ASSET_TYPE_KEYS.map((t) => (
+            {types.shown(byType as Partial<Record<AssetType, number>>).map((t) => (
               <StatTile key={t} to={`/inventory/${ASSET_TYPES[t].slug}`} icon={ASSET_TYPE_ICONS[t]} color={ASSET_TYPES[t].color} value={byType[t] ?? 0} label={ASSET_TYPES[t].plural} />
             ))}
             <StatTile to="/activities" icon={<ScheduleOutlined />} color="#b26a00" value={data.totals.openActivities} label="Open activities" />

@@ -114,8 +114,6 @@ interface AssetOption {
   building_name: string | null;
 }
 
-const DEFAULT_HEIGHT: Record<AssetType, number> = { switch: 1, access_point: 1, server: 2, ups: 2, vm: 1 };
-
 export function MountModal({
   open,
   onClose,
@@ -226,7 +224,7 @@ export function MountModal({
               notFoundContent={options.isFetching ? <Spin size="small" /> : 'No devices found'}
               onChange={(id) => {
                 const o = options.data?.find((x) => x.id === id);
-                if (o) form.setFieldValue('height', o.rack_height_u > 1 ? o.rack_height_u : DEFAULT_HEIGHT[o.type]);
+                if (o) form.setFieldValue('height', o.rack_height_u > 1 ? o.rack_height_u : ASSET_TYPES[o.type].rackHeight);
               }}
               options={(options.data ?? []).map((o) => ({
                 value: o.id,

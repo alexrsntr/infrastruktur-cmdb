@@ -18,6 +18,7 @@ import {
   writeSetting,
   type StoredSmtpSettings,
 } from '../services/mailer';
+import { ASSET_TYPES_KEY, assetTypeSettingsSchema, loadAssetTypeSettings, normaliseAssetTypeSettings } from '../services/assetTypes';
 import { WARRANTY_KEY, isValidTimezone, loadWarrantySettings, localParts, nextRunAt, previewWarranty, runWarrantyJob } from '../services/warrantyNotifications';
 
 const email = z.string().trim().toLowerCase().email('Invalid e-mail address').max(254);
@@ -51,7 +52,22 @@ const RUN_SELECT = `id::text, kind, started_at, finished_at, trigger, local_date
 
 export function settingsRouter(pool: Pool, config: Config): Router {
   const r = Router();
+
+  // ------------------------------------------------------------ device types
+  // readable by everyone: forms and lists need the hidden types and the additional fields
+  r.get('/asset-types', async (_req, res) => {
+    res.json(await loadAssetTypeSettings(pool));
+  });
   r.use(['/settings', '/notifications'], requirePermission('settings.manage'));
+
+  r.put('/settings/asset-types', async (req, res) => {
+    const next = normaliseAssetTypeSettings(parse(assetTypeSettingsSchema, req.body));
+    const before = await loadAssetTypeSettings(pool);
+    await writeSetting(pool, ASSET_TYPES_KEY, next, req.user!.id);
+    const changes = diff(before as unknown as Record<string, unknown>, next as unknown as Record<string, unknown>);
+    if (Object.keys(changes).length) await audit(pool, req, { action: 'settings.update', entityType: 'settings', entityLabel: 'Device types', changes });
+    res.json(await loadAssetTypeSettings(pool));
+  });
 
   // ------------------------------------------------------------ e-mail (SMTP)
   r.get('/settings/email', async (_req, res) => {
