@@ -18,6 +18,7 @@ import { PlantPage } from './pages/PlantPage';
 import { BuildingPage } from './pages/BuildingPage';
 import { AssetsPage } from './pages/AssetsPage';
 import { AssetPage } from './pages/AssetPage';
+import { ApplicationPage, ApplicationsPage } from './pages/ApplicationsPage';
 import { ActivitiesPage } from './pages/ActivitiesPage';
 import { DataExchangePage } from './pages/DataExchangePage';
 import { UsersPage } from './pages/admin/UsersPage';
@@ -103,6 +104,8 @@ export function Root() {
             <Route path="inventory/:typeSlug" element={<AssetsPage />} />
             <Route path="assets/:assetId" element={<AssetPage />} />
             <Route path="activities" element={<ActivitiesPage />} />
+            <Route path="applications" element={<ApplicationsPage />} />
+            <Route path="applications/:applicationId" element={<ApplicationPage />} />
             <Route path="data" element={<DataExchangePage />} />
             <Route path="admin/users" element={<UsersPage />} />
             <Route path="admin/audit" element={<AuditPage />} />

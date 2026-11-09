@@ -322,6 +322,29 @@ export async function seed(pool: Pool, opts: { force?: boolean } = {}) {
       }
     }
 
+    // ---- applications and the devices they run on (for "If this device fails")
+    await client.query(`
+      INSERT INTO application (name, status, criticality, plant_id, owner, description)
+      SELECT 'MES ' || p.code, 'production', 'critical', p.id, 'Production IT', 'Manufacturing execution system of the plant' FROM plant p;
+      INSERT INTO application (name, status, criticality, plant_id, owner, description)
+      SELECT 'File services ' || p.code, 'production', 'high', p.id, 'Server Team', 'Department shares and home drives' FROM plant p;
+      INSERT INTO application (name, status, criticality, owner, description) VALUES
+        ('Active Directory', 'production', 'critical', 'Server Team', 'Sign-in, DNS and group policies for all plants'),
+        ('SAP ERP', 'production', 'critical', 'SAP Competence Center', 'Central ERP system (finance, purchasing, logistics)');
+
+      INSERT INTO application_asset (application_id, asset_id, role)
+      SELECT ap.id, a.id, 'Application server' FROM application ap JOIN plant p ON ap.plant_id = p.id AND ap.name = 'MES ' || p.code
+      JOIN asset a ON a.name = lower(p.code) || '-mes01';
+      INSERT INTO application_asset (application_id, asset_id, role)
+      SELECT ap.id, a.id, 'File server' FROM application ap JOIN plant p ON ap.plant_id = p.id AND ap.name = 'File services ' || p.code
+      JOIN asset a ON a.name = lower(p.code) || '-fs01';
+      INSERT INTO application_asset (application_id, asset_id, role)
+      SELECT ap.id, a.id, 'Domain controller' FROM application ap JOIN asset a ON a.name LIKE '%-dc01' WHERE ap.name = 'Active Directory';
+      INSERT INTO application_asset (application_id, asset_id, role)
+      SELECT ap.id, a.id, CASE WHEN a.name LIKE '%qas%' THEN 'Quality assurance system' ELSE 'Application server' END
+      FROM application ap JOIN asset a ON a.name IN ('muc-sap-app01', 'muc-sap-qas01') WHERE ap.name = 'SAP ERP';
+    `);
+
     // ---- ports and cables from the documented uplinks (relations with port names on both ends)
     await client.query(`
       INSERT INTO asset_port (asset_id, name, kind)

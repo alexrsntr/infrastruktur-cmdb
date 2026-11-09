@@ -13,6 +13,7 @@ import { planMarkerRacksMigration } from './migrations/010_plan_marker_racks';
 import { assetTypesMigration } from './migrations/011_asset_types';
 import { lifecycleMigration } from './migrations/012_lifecycle';
 import { networkMigration } from './migrations/013_network';
+import { applicationsMigration } from './migrations/014_applications';
 
 export interface Migration {
   id: string;
@@ -216,4 +217,5 @@ export const migrations: Migration[] = [
   assetTypesMigration,
   lifecycleMigration,
   networkMigration,
+  applicationsMigration,
 ];

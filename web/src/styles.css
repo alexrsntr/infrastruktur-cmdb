@@ -155,7 +155,17 @@ body {
 }
 
 .header-search {
-  width: clamp(220px, 26vw, 420px);
+  width: clamp(180px, 20vw, 420px);
+  min-width: 180px;
+  flex: 0 1 auto;
+}
+
+/* six navigation items: tighter on laptop screens so the search box keeps its width */
+@media (max-width: 1599px) {
+  .top-nav-item:not(.vertical) {
+    padding: 0 10px;
+    font-size: 15px;
+  }
 }
 
 .header-icon-btn,

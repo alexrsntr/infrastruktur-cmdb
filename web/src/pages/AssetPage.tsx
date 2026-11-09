@@ -35,6 +35,7 @@ import { RelationFormModal } from '../components/RelationFormModal';
 import { FloorPlanPreview } from '../components/FloorPlanPreview';
 import { journalTabs } from '../components/Journal';
 import { PortsPanel, usePorts } from '../components/PortsPanel';
+import { ImpactCard } from '../components/ImpactCard';
 import { WarrantyDate } from '../components/Tags';
 import { StatusDot, TypeIcon } from '../components/Simple';
 
@@ -311,6 +312,7 @@ export function AssetPage() {
                 </div>
               )}
             </Card>
+            <ImpactCard assetId={a.id} assetName={a.name} />
           </div>
         </Col>
 
