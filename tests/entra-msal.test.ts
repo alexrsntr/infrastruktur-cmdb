@@ -146,6 +146,13 @@ describe('Test sign-in and sign-in with Microsoft through MSAL', () => {
     expect(me.user).toMatchObject({ displayName: CLD.name, role: 'admin', roleSource: 'entra' });
     const { rows } = await pool.query('SELECT count(*)::int AS n, min(email) AS email FROM app_user WHERE oid = $1', [CLD.oid]);
     expect(rows[0]).toEqual({ n: 1, email: ADMIN.email });
+
+    // signed in with Microsoft: no "Change password", even though the account also has a password
+    expect(me.canChangePassword).toBe(false);
+    const res = await api(agent, me.csrfToken).post('/api/me/password', { current_password: ADMIN.password, new_password: 'another password 1' }).expect(403);
+    expect(res.body.error).toMatch(/Microsoft/);
+    // signed in with the password: allowed
+    expect((await admin.get('/api/me').expect(200)).body.canChangePassword).toBe(true);
   });
 
   it('signs in a new cloud-only account with its UPN as e-mail address', async () => {
@@ -153,7 +160,9 @@ describe('Test sign-in and sign-in with Microsoft through MSAL', () => {
     const oid = 'cccccccc-0000-4000-8000-00000000c1d1';
     const cb = await signIn(agent, '/auth/login', { oid, preferred_username: 'cld.editor@contoso4.onmicrosoft.com', name: 'CLD Editor', roles: ['CMDB.Editor'] });
     expect(cb.headers.location).toBe('/');
-    expect((await agent.get('/api/me').expect(200)).body.user).toMatchObject({ role: 'editor', roleSource: 'entra' });
+    const me = (await agent.get('/api/me').expect(200)).body;
+    expect(me.user).toMatchObject({ role: 'editor', roleSource: 'entra' });
+    expect(me.canChangePassword).toBe(false);
     const { rows } = await pool.query('SELECT email, display_name FROM app_user WHERE oid = $1', [oid]);
     expect(rows[0]).toMatchObject({ email: 'cld.editor@contoso4.onmicrosoft.com', display_name: 'CLD Editor' });
   });

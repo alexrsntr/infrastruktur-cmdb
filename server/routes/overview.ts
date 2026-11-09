@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Request } from 'express';
 import type { Pool } from 'pg';
 import { ROLE_PERMISSIONS, type AppConfig, type MeResponse } from '../../shared/model';
 import type { Config } from '../config';
@@ -24,16 +24,30 @@ export async function publicConfig(config: Config, entra: EntraService): Promise
   };
 }
 
+/**
+ * Only accounts that signed in with their CMDB password can change it here – not users signed in with Microsoft
+ * (their password belongs to Microsoft Entra ID), not accounts without a password, not while password sign-in is off.
+ */
+export async function canChangeOwnPassword(pool: Pool, req: Request, cfg: Pick<AppConfig, 'localLogin'>): Promise<boolean> {
+  const user = req.user;
+  if (!user || req.session.authMethod !== 'local') return false;
+  if (!(cfg.localLogin === 'all' || (cfg.localLogin === 'admins' && user.role === 'admin'))) return false;
+  const { rows } = await pool.query<{ has: boolean }>('SELECT password_hash IS NOT NULL AS has FROM app_user WHERE id = $1', [user.id]);
+  return !!rows[0]?.has;
+}
+
 export function overviewRouter(pool: Pool, config: Config, entra: EntraService): Router {
   const r = Router();
 
   r.get('/me', async (req, res) => {
     const user = req.user!;
+    const cfg = await publicConfig(config, entra);
     const body: MeResponse = {
       user,
       permissions: ROLE_PERMISSIONS[user.role],
       csrfToken: ensureCsrfToken(req),
-      config: await publicConfig(config, entra),
+      config: cfg,
+      canChangePassword: await canChangeOwnPassword(pool, req, cfg),
     };
     res.json(body);
   });

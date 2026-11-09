@@ -16,21 +16,35 @@ import { useSession } from '../lib/session';
 
 interface SiteRow {
   id?: string | null;
+  /** only shown when editing – new sites get "Server room", "Site A", "Site B" or "Witness" */
   name: string;
   role: DcSiteRole;
   building_id?: string;
+  /** set (also to '') when a new building is entered by name */
+  newBuilding?: string | null;
   room?: string | null;
 }
 
+const NEW_BUILDING = '__new__';
+
 const DEFAULT_SITES: Record<DatacenterKind, SiteRow[]> = {
-  single: [{ name: 'Main room', role: 'primary' }],
+  single: [{ name: '', role: 'primary' }],
   stretched: [
-    { name: 'Site A', role: 'primary' },
-    { name: 'Site B', role: 'secondary' },
+    { name: '', role: 'primary' },
+    { name: '', role: 'secondary' },
   ],
 };
 
-/** Create or edit a data center with its sites (rooms). */
+function siteTitle(kind: DatacenterKind, s: SiteRow, i: number) {
+  if (s.role === 'witness') return 'Witness site (optional)';
+  if (kind === 'single') return 'Where is the server room?';
+  return i === 0 ? 'Site A' : 'Site B';
+}
+
+/**
+ * Create or edit a data center. Creating needs just a building (an existing one or a new one by name) –
+ * name, site names and description are optional.
+ */
 export function DatacenterFormModal({
   open,
   onClose,
@@ -51,10 +65,17 @@ export function DatacenterFormModal({
   const plants = usePlants();
   const buildings = useBuildings();
   const [saving, setSaving] = useState(false);
-  const [kind, setKind] = useState<DatacenterKind>('stretched');
-  const [sites, setSites] = useState<SiteRow[]>(DEFAULT_SITES.stretched);
+  const [kind, setKind] = useState<DatacenterKind>('single');
+  const [sites, setSites] = useState<SiteRow[]>(DEFAULT_SITES.single);
   const plantId = Form.useWatch('plant_id', form) as string | undefined;
   const racks = useRacks({ plantId }, open && !!plantId);
+  const editing = !!datacenter;
+
+  const scopedPlant = me.user.plantScope.length === 1 ? me.user.plantScope[0] : undefined;
+  const onlyPlant = plants.data?.length === 1 ? plants.data[0].id : undefined;
+  const fixedPlant = datacenter?.plant_id ?? defaultPlantId ?? scopedPlant ?? onlyPlant;
+  const plant = (plants.data ?? []).find((p) => p.id === plantId);
+  const plantBuildings = useMemo(() => (buildings.data ?? []).filter((b) => b.plant_id === plantId), [buildings.data, plantId]);
 
   useEffect(() => {
     if (!open) return;
@@ -64,14 +85,25 @@ export function DatacenterFormModal({
       setKind(datacenter.kind);
       setSites(datacenter.sites.map((s) => ({ id: s.id, name: s.name, role: s.role, building_id: s.building_id, room: s.room })));
     } else {
-      const scopedPlant = me.user.plantScope.length === 1 ? me.user.plantScope[0] : undefined;
-      form.setFieldsValue({ plant_id: defaultPlantId ?? scopedPlant });
-      setKind('stretched');
-      setSites(DEFAULT_SITES.stretched.map((s) => ({ ...s })));
+      form.setFieldsValue({ plant_id: fixedPlant });
+      setKind('single');
+      setSites(DEFAULT_SITES.single.map((s) => ({ ...s })));
     }
   }, [open, datacenter?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const plantBuildings = useMemo(() => (buildings.data ?? []).filter((b) => b.plant_id === plantId), [buildings.data, plantId]);
+  // New data center: preselect the building when the plant has exactly one, ask for a new one when it has none
+  useEffect(() => {
+    if (!open || editing || !plantId || buildings.isLoading) return;
+    setSites((list) =>
+      list.map((s, i) => {
+        if (i > 0 || s.building_id || s.newBuilding != null) return s;
+        if (plantBuildings.length === 1) return { ...s, building_id: plantBuildings[0].id };
+        if (plantBuildings.length === 0) return { ...s, newBuilding: '' };
+        return s;
+      }),
+    );
+  }, [open, editing, plantId, plantBuildings, buildings.isLoading]);
+
   /** Rooms that already have racks – offered as suggestions per building */
   const roomsByBuilding = useMemo(() => {
     const m = new Map<string, Set<string>>();
@@ -82,31 +114,38 @@ export function DatacenterFormModal({
   const changeKind = (k: DatacenterKind) => {
     setKind(k);
     if (k === 'single') setSites((s) => [{ ...(s[0] ?? DEFAULT_SITES.single[0]), role: 'primary' }]);
-    else setSites((s) => [s[0] ?? DEFAULT_SITES.stretched[0], s.find((x, i) => i > 0 && x.role !== 'witness') ?? { ...DEFAULT_SITES.stretched[1] }, ...s.filter((x) => x.role === 'witness')]);
+    else setSites((s) => [s[0] ?? { ...DEFAULT_SITES.stretched[0] }, s.find((x, i) => i > 0 && x.role !== 'witness') ?? { ...DEFAULT_SITES.stretched[1] }, ...s.filter((x) => x.role === 'witness')]);
   };
   const updateSite = (i: number, patch: Partial<SiteRow>) => setSites((list) => list.map((s, j) => (j === i ? { ...s, ...patch } : s)));
   const hasWitness = sites.some((s) => s.role === 'witness');
 
   const submit = async () => {
     const v = await form.validateFields();
-    const missing = sites.findIndex((s) => !s.building_id || !s.name.trim());
+    const missing = sites.findIndex((s) => (s.newBuilding != null ? !s.newBuilding.trim() : !s.building_id));
     if (missing >= 0) {
-      message.error(`Choose a building for ${sites[missing].name || 'every site'}`);
+      message.error(sites[missing].newBuilding != null ? 'Enter the name of the new building' : `Choose a building for ${siteTitle(kind, sites[missing], missing).replace(/\?$/, '').toLowerCase()}`);
       return;
     }
     const body: DatacenterInput = {
       plant_id: v.plant_id,
-      name: v.name,
+      name: v.name?.trim() || null,
       kind,
       description: v.description ?? null,
-      sites: sites.map((s) => ({ id: s.id ?? null, name: s.name.trim(), role: s.role, building_id: s.building_id!, room: s.room?.trim() || null })),
+      sites: sites.map((s) => ({
+        id: s.id ?? null,
+        name: s.name.trim() || null,
+        role: s.role,
+        building_id: s.newBuilding != null ? null : s.building_id!,
+        new_building_name: s.newBuilding != null ? s.newBuilding.trim() : null,
+        room: s.room?.trim() || null,
+      })),
     };
     setSaving(true);
     try {
       const saved = datacenter
         ? await http.put<DatacenterDetail>(`/api/datacenters/${datacenter.id}`, body)
         : await http.post<DatacenterDetail>('/api/datacenters', body);
-      message.success(datacenter ? 'Data center saved' : 'Data center created');
+      message.success(datacenter ? 'Data center saved' : `${saved.name} created`);
       await invalidate();
       onSaved?.(saved);
       onClose();
@@ -119,9 +158,9 @@ export function DatacenterFormModal({
 
   const siteEditor = (s: SiteRow, i: number) => (
     <div key={i} className="dcf-site">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
         <Typography.Text strong style={{ fontSize: 15 }}>
-          {s.role === 'witness' ? 'Witness site (optional)' : kind === 'single' ? 'Server room' : i === 0 ? 'Site A – primary' : 'Site B – secondary'}
+          {siteTitle(kind, s, i)}
         </Typography.Text>
         {s.role === 'witness' && (
           <Button type="text" danger icon={<DeleteOutlined />} onClick={() => setSites((list) => list.filter((_, j) => j !== i))}>
@@ -130,32 +169,54 @@ export function DatacenterFormModal({
         )}
       </div>
       <Row gutter={12}>
-        <Col xs={24} md={7}>
-          <Input value={s.name} onChange={(e) => updateSite(i, { name: e.target.value })} placeholder="Name, e.g. Site A" maxLength={60} aria-label="Site name" />
+        <Col xs={24} md={12}>
+          {s.newBuilding != null ? (
+            <Input
+              value={s.newBuilding}
+              onChange={(e) => updateSite(i, { newBuilding: e.target.value })}
+              placeholder="Name of the new building, e.g. Main building"
+              maxLength={200}
+              aria-label="New building"
+              addonAfter={
+                plantBuildings.length > 0 ? (
+                  <Typography.Link onClick={() => updateSite(i, { newBuilding: null })} style={{ fontSize: 13 }}>
+                    choose existing
+                  </Typography.Link>
+                ) : undefined
+              }
+            />
+          ) : (
+            <Select
+              style={{ width: '100%' }}
+              value={s.building_id}
+              onChange={(id: string) => (id === NEW_BUILDING ? updateSite(i, { building_id: undefined, newBuilding: '', room: null }) : updateSite(i, { building_id: id, room: null }))}
+              placeholder={plantId ? 'Building' : 'Choose the plant first'}
+              disabled={!plantId}
+              showSearch
+              optionFilterProp="label"
+              options={[
+                ...plantBuildings.map((b) => ({ value: b.id, label: `${b.code} – ${b.name}` })),
+                { value: NEW_BUILDING, label: '+ New building …' },
+              ]}
+              aria-label="Building"
+            />
+          )}
         </Col>
-        <Col xs={24} md={9}>
-          <Select
-            style={{ width: '100%' }}
-            value={s.building_id}
-            onChange={(id) => updateSite(i, { building_id: id, room: null })}
-            placeholder={plantId ? 'Building' : 'Choose the plant first'}
-            disabled={!plantId}
-            showSearch
-            optionFilterProp="label"
-            options={plantBuildings.map((b) => ({ value: b.id, label: `${b.code} – ${b.name}` }))}
-            aria-label="Building"
-          />
-        </Col>
-        <Col xs={24} md={8}>
+        <Col xs={24} md={12}>
           <AutoComplete
             style={{ width: '100%' }}
             value={s.room ?? ''}
             onChange={(room) => updateSite(i, { room })}
-            placeholder="Room, e.g. Server room"
+            placeholder="Room (optional), e.g. Server room 1"
             options={[...(s.building_id ? (roomsByBuilding.get(s.building_id) ?? []) : [])].map((r) => ({ value: r }))}
             aria-label="Room"
           />
         </Col>
+        {editing && (
+          <Col xs={24} md={12} style={{ marginTop: 8 }}>
+            <Input value={s.name} onChange={(e) => updateSite(i, { name: e.target.value })} placeholder="Site name, e.g. Site A" maxLength={60} aria-label="Site name" addonBefore="Name" />
+          </Col>
+        )}
       </Row>
     </div>
   );
@@ -167,56 +228,50 @@ export function DatacenterFormModal({
       onOk={submit}
       confirmLoading={saving}
       okText={datacenter ? 'Save' : 'Create data center'}
-      title={datacenter ? `Edit ${datacenter.name}` : 'New data center'}
-      width={760}
+      title={datacenter ? `Edit ${datacenter.name}` : `New data center${fixedPlant && plant ? ` in ${plant.code}` : ''}`}
+      width={680}
       destroyOnHidden
     >
       <Form form={form} layout="vertical">
-        <Row gutter={16}>
-          <Col xs={24} md={14}>
-            <Form.Item name="name" label="Name" rules={[{ required: true, whitespace: true, max: 100 }]}>
-              <Input placeholder="e.g. DC Munich" autoFocus />
-            </Form.Item>
-          </Col>
-          <Col xs={24} md={10}>
-            <Form.Item name="plant_id" label="Plant" rules={[{ required: true, message: 'Choose a plant' }]}>
-              <Select
-                disabled={!!datacenter}
-                showSearch
-                optionFilterProp="label"
-                options={(plants.data ?? []).map((p) => ({ value: p.id, label: `${p.code} – ${p.name}` }))}
-                onChange={() => setSites((list) => list.map((s) => ({ ...s, building_id: undefined, room: null })))}
-              />
-            </Form.Item>
-          </Col>
-        </Row>
-        <Form.Item label="How is this data center built?">
-          <Segmented
-            block
-            size="large"
-            value={kind}
-            onChange={(k) => changeKind(k as DatacenterKind)}
-            options={[
-              { value: 'single', label: 'One room' },
-              { value: 'stretched', label: 'Stretched – two buildings' },
-            ]}
+        <Form.Item name="plant_id" label="Plant" rules={[{ required: true, message: 'Choose a plant' }]} hidden={!!fixedPlant}>
+          <Select
+            showSearch
+            optionFilterProp="label"
+            options={(plants.data ?? []).map((p) => ({ value: p.id, label: `${p.code} – ${p.name}` }))}
+            onChange={() => setSites((list) => list.map((s) => ({ ...s, building_id: undefined, newBuilding: null, room: null })))}
           />
-          <Typography.Text type="secondary" style={{ display: 'block', marginTop: 6, fontSize: 13.5 }}>
-            {kind === 'stretched'
-              ? 'Two server rooms in different buildings that work as one data center (e.g. a cluster with hosts in both rooms).'
-              : 'All racks of this data center are in one room.'}{' '}
-            Racks are assigned automatically by building and room.
-          </Typography.Text>
         </Form.Item>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>{sites.map(siteEditor)}</div>
+        <Segmented
+          block
+          size="large"
+          value={kind}
+          onChange={(k) => changeKind(k as DatacenterKind)}
+          options={[
+            { value: 'single', label: 'One server room' },
+            { value: 'stretched', label: 'Two buildings (stretched)' },
+          ]}
+          style={{ marginBottom: 8 }}
+        />
+        <Typography.Paragraph type="secondary" style={{ fontSize: 13.5, marginBottom: 14 }}>
+          {kind === 'stretched'
+            ? 'Two server rooms in different buildings that work as one data center, e.g. a cluster with hosts in both rooms.'
+            : 'All racks of the data center are in one room.'}{' '}
+          Racks in the building and room are assigned automatically.
+        </Typography.Paragraph>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 12 }}>{sites.map(siteEditor)}</div>
         {kind === 'stretched' && !hasWitness && (
-          <Button icon={<PlusOutlined />} onClick={() => setSites((list) => [...list, { name: 'Witness', role: 'witness' }])} style={{ marginBottom: 16 }}>
+          <Button type="link" icon={<PlusOutlined />} onClick={() => setSites((list) => [...list, { name: '', role: 'witness' }])} style={{ paddingInline: 0, marginBottom: 8 }}>
             Add witness site
           </Button>
         )}
-        <Form.Item name="description" label="Description (optional)">
-          <Input.TextArea autoSize={{ minRows: 2, maxRows: 5 }} placeholder="e.g. how the rooms are connected, which systems run where" />
+        <Form.Item name="name" label="Name (optional)" rules={[{ max: 100 }]} style={{ marginBottom: editing ? undefined : 0 }}>
+          <Input placeholder={plant ? `${plant.code} data center` : 'e.g. DC Munich'} />
         </Form.Item>
+        {editing && (
+          <Form.Item name="description" label="Description (optional)">
+            <Input.TextArea autoSize={{ minRows: 2, maxRows: 5 }} placeholder="e.g. how the rooms are connected, which systems run where" />
+          </Form.Item>
+        )}
       </Form>
       <style>{`.dcf-site { background: var(--cmdb-surface-2); border: 1px solid var(--cmdb-border); border-radius: 10px; padding: 12px 14px; }`}</style>
     </Modal>

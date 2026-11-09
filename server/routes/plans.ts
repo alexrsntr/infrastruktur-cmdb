@@ -5,14 +5,14 @@ import type { CurrentUser } from '../../shared/model';
 import { requirePermission } from '../auth/context';
 import { withTransaction, type DbClient } from '../db/pool';
 import { audit } from '../lib/audit';
-import { badRequest, notFound, parse, queryString, requireUuid, SqlBuilder } from '../lib/http';
+import { badRequest, conflict, notFound, parse, queryString, requireUuid, SqlBuilder } from '../lib/http';
 import { optUuid } from '../lib/schemas';
 import { applyScope, assertPlantAccess, resolveEntity } from '../lib/scope';
 import { ENTITY_LABEL_SQL } from './journal';
 
 /**
  * Plans = image attachments flagged `is_plan` (site plans, aerial photos, hall pictures …).
- * Devices, buildings or free labels are placed on them as markers with normalised coordinates.
+ * Devices, whole racks, buildings or free labels are placed on them as markers with normalised coordinates.
  */
 
 const PLAN_SELECT = `
@@ -22,15 +22,19 @@ const PLAN_SELECT = `
 const PLAN_FROM = `FROM attachment a LEFT JOIN app_user u ON u.id = a.created_by`;
 
 const MARKER_SELECT = `
-  m.id, m.attachment_id, m.asset_id, m.building_id, m.label, m.x, m.y,
+  m.id, m.attachment_id, m.asset_id, m.building_id, m.rack_id, m.label, m.x, m.y,
   s.name AS asset_name, s.type AS asset_type, s.status AS asset_status, s.ip_address AS asset_ip, s.model AS asset_model,
-  b.name AS building_name, b.code AS building_code`;
-const MARKER_FROM = `FROM plan_marker m LEFT JOIN asset s ON s.id = m.asset_id LEFT JOIN building b ON b.id = m.building_id`;
+  b.name AS building_name, b.code AS building_code,
+  r.name AS rack_name, r.room AS rack_room, r.height_u AS rack_height_u, rb.code AS rack_building_code, rb.name AS rack_building_name,
+  (SELECT count(*)::int FROM asset ra WHERE ra.rack_id = r.id) AS rack_device_count`;
+const MARKER_FROM = `FROM plan_marker m LEFT JOIN asset s ON s.id = m.asset_id LEFT JOIN building b ON b.id = m.building_id
+  LEFT JOIN rack r ON r.id = m.rack_id LEFT JOIN building rb ON rb.id = r.building_id`;
 
 const markerSchema = z
   .object({
     asset_id: optUuid,
     building_id: optUuid,
+    rack_id: optUuid,
     label: z
       .string()
       .trim()
@@ -40,7 +44,7 @@ const markerSchema = z
     x: z.number().min(0).max(1),
     y: z.number().min(0).max(1),
   })
-  .refine((m) => [m.asset_id, m.building_id, m.label].filter(Boolean).length === 1, 'A marker needs exactly one of: device, building or label');
+  .refine((m) => [m.asset_id, m.building_id, m.rack_id, m.label].filter(Boolean).length === 1, 'A marker needs exactly one of: device, rack, building or label');
 
 const markerUpdateSchema = z.object({
   x: z.number().min(0).max(1),
@@ -69,15 +73,18 @@ async function loadMarker(db: DbClient, id: string) {
   return rows[0];
 }
 
-function markerLabel(m: { asset_name?: string | null; building_name?: string | null; label?: string | null }) {
-  return m.asset_name ?? m.building_name ?? m.label ?? 'marker';
+function markerLabel(m: { asset_name?: string | null; building_name?: string | null; rack_name?: string | null; label?: string | null }) {
+  return m.asset_name ?? (m.rack_name ? `Rack ${m.rack_name}` : null) ?? m.building_name ?? m.label ?? 'marker';
 }
 
-/** Audit marker changes on the device (so it shows in its history) or else on the object owning the plan */
-async function auditMarker(db: DbClient, req: Parameters<typeof audit>[1], action: string, plan: { entity_type: string; entity_id: string; plant_id: string | null; title: string }, marker: { asset_id?: string | null; asset_name?: string | null; building_name?: string | null; label?: string | null }, extra?: Record<string, unknown>) {
+/** Audit marker changes on the device or rack (so it shows in its history) or else on the object owning the plan */
+async function auditMarker(db: DbClient, req: Parameters<typeof audit>[1], action: string, plan: { entity_type: string; entity_id: string; plant_id: string | null; title: string }, marker: { asset_id?: string | null; asset_name?: string | null; rack_id?: string | null; rack_name?: string | null; rack_building_name?: string | null; building_name?: string | null; label?: string | null }, extra?: Record<string, unknown>) {
   const changes = { plan: plan.title, marker: markerLabel(marker), ...extra };
   if (marker.asset_id) {
     await audit(db, req, { action, entityType: 'asset', entityId: marker.asset_id, entityLabel: marker.asset_name ?? null, plantId: plan.plant_id, changes });
+  } else if (marker.rack_id) {
+    const label = [marker.rack_building_name, marker.rack_name].filter(Boolean).join(' / ');
+    await audit(db, req, { action, entityType: 'rack', entityId: marker.rack_id, entityLabel: label || null, plantId: plan.plant_id, changes });
   } else {
     const ref = await resolveEntity(db, plan.entity_type as never, plan.entity_id).catch(() => null);
     await audit(db, req, { action, entityType: plan.entity_type, entityId: plan.entity_id, entityLabel: ref?.label ?? null, plantId: plan.plant_id, changes });
@@ -130,9 +137,20 @@ export function plansRouter(pool: Pool): Router {
         if (!rows[0]) throw badRequest('Building does not exist');
         if (plan.plant_id && rows[0].plant_id !== plan.plant_id) throw badRequest(`${rows[0].name} belongs to another plant`);
       }
+      if (input.rack_id) {
+        const { rows } = await db.query('SELECT r.id, r.name, b.plant_id FROM rack r JOIN building b ON b.id = r.building_id WHERE r.id = $1', [input.rack_id]);
+        if (!rows[0]) throw badRequest('Rack does not exist');
+        assertPlantAccess(req.user!, rows[0].plant_id);
+        if (plan.plant_id && rows[0].plant_id !== plan.plant_id) throw badRequest(`Rack ${rows[0].name} belongs to another plant`);
+      }
+      const dup = await db.query(
+        'SELECT 1 FROM plan_marker WHERE attachment_id = $1 AND (asset_id = $2 OR building_id = $3 OR rack_id = $4)',
+        [id, input.asset_id, input.building_id, input.rack_id],
+      );
+      if (dup.rows[0]) throw conflict('This is already on the picture – drag the existing marker instead.');
       const { rows } = await db.query(
-        `INSERT INTO plan_marker (attachment_id, asset_id, building_id, label, x, y, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
-        [id, input.asset_id, input.building_id, input.label, input.x, input.y, req.user!.id],
+        `INSERT INTO plan_marker (attachment_id, asset_id, building_id, rack_id, label, x, y, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+        [id, input.asset_id, input.building_id, input.rack_id, input.label, input.x, input.y, req.user!.id],
       );
       const full = await loadMarker(db, rows[0].id);
       await auditMarker(db, req, 'plan.marker.add', { ...plan, title }, full);
@@ -172,6 +190,20 @@ export function plansRouter(pool: Pool): Router {
       await auditMarker(db, req, 'plan.marker.remove', { entity_type: m.plan_entity_type, entity_id: m.plan_entity_id, plant_id: m.plan_plant_id, title: m.plan_title }, m);
     });
     res.status(204).end();
+  });
+
+  /** Plans on which a rack is shown (rack page) */
+  r.get('/racks/:id/plans', async (req, res) => {
+    const id = requireUuid(req.params.id);
+    const { rows: racks } = await pool.query('SELECT b.plant_id FROM rack r JOIN building b ON b.id = r.building_id WHERE r.id = $1', [id]);
+    if (!racks[0]) throw notFound('Rack');
+    assertPlantAccess(req.user!, racks[0].plant_id);
+    const { rows } = await pool.query(
+      `SELECT m.id AS marker_id, a.id, COALESCE(a.title, a.file_name) AS title, a.entity_type, ${ENTITY_LABEL_SQL('a')} AS entity_label
+       FROM plan_marker m JOIN attachment a ON a.id = m.attachment_id WHERE m.rack_id = $1 ORDER BY 3`,
+      [id],
+    );
+    res.json(rows);
   });
 
   /** Plans on which a device is shown (asset page) */

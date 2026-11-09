@@ -6,6 +6,7 @@ import { withTransaction, type DbClient } from '../db/pool';
 import { audit, diff, snapshot } from '../lib/audit';
 import { badRequest, forbidden, notFound, parse, requireUuid, SqlBuilder } from '../lib/http';
 import { buildingSchema, floorSchema, plantSchema } from '../lib/schemas';
+import { uniqueBuildingCode } from '../lib/buildings';
 import { applyScope, assertPlantAccess, isUnscoped } from '../lib/scope';
 import { readImageSize } from '../lib/image';
 import { deleteAttachmentsFor, deleteAttachmentsForPlant, purgeBlobs } from '../services/attachments';
@@ -164,10 +165,11 @@ export function locationsRouter(pool: Pool): Router {
     const input = parse(buildingSchema, req.body);
     assertPlantAccess(req.user!, input.plant_id);
     const row = await withTransaction(pool, async (db) => {
+      const code = input.code ?? (await uniqueBuildingCode(db, input.plant_id, input.name));
       const { rows } = await db.query(
         `INSERT INTO building (plant_id, code, name, description, latitude, longitude, created_by, updated_by)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$7) RETURNING *`,
-        [input.plant_id, input.code, input.name, input.description, input.latitude, input.longitude, req.user!.id],
+        [input.plant_id, code, input.name, input.description, input.latitude, input.longitude, req.user!.id],
       );
       await audit(db, req, { action: 'create', entityType: 'building', entityId: rows[0].id, entityLabel: input.name, plantId: input.plant_id, changes: snapshot(rows[0]) });
       return rows[0];
@@ -186,7 +188,7 @@ export function locationsRouter(pool: Pool): Router {
       const { rows } = await db.query(
         `UPDATE building SET plant_id=$2, code=$3, name=$4, description=$5, latitude=$6, longitude=$7, updated_by=$8, updated_at=now()
          WHERE id=$1 RETURNING *`,
-        [id, input.plant_id, input.code, input.name, input.description, input.latitude, input.longitude, req.user!.id],
+        [id, input.plant_id, input.code ?? before.rows[0].code, input.name, input.description, input.latitude, input.longitude, req.user!.id],
       );
       if (before.rows[0].plant_id !== input.plant_id) {
         // Keep denormalised plant references of contained assets/notes/activities consistent

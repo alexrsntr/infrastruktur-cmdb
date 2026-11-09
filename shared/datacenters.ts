@@ -117,15 +117,20 @@ export interface DatacenterDetail extends Omit<DatacenterSummary, 'sites'> {
 
 export interface DatacenterSiteInput {
   id?: string | null;
-  name: string;
+  /** optional – "Server room", "Site A", "Site B" or "Witness" by default */
+  name?: string | null;
   role: DcSiteRole;
-  building_id: string;
+  /** an existing building … */
+  building_id?: string | null;
+  /** … or the name of a new building, created together with the data center */
+  new_building_name?: string | null;
   room?: string | null;
 }
 
 export interface DatacenterInput {
   plant_id: string;
-  name: string;
+  /** optional – "<plant code> data center" by default */
+  name?: string | null;
   kind: DatacenterKind;
   description?: string | null;
   sites: DatacenterSiteInput[];

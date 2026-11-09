@@ -262,6 +262,19 @@ button.stat-tile {
   width: 100%;
 }
 
+/* Keyboard focus on tiles: a rounded ring in the primary colour instead of the browser's default frame */
+button.stat-tile:focus-visible {
+  outline: 2px solid var(--ant-color-primary, #2563eb);
+  outline-offset: 2px;
+}
+
+/* Dialogs focus their close button when they open; some browsers then draw a square focus frame around it.
+   Show a soft background instead (still visible for keyboard users). */
+.ant-modal .ant-modal-close:focus-visible {
+  outline: none;
+  background: var(--ant-color-fill-secondary, rgba(127, 127, 127, 0.16));
+}
+
 .stat-tile.active {
   border-color: var(--ant-color-primary, #2563eb);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--ant-color-primary, #2563eb) 20%, transparent);

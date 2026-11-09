@@ -249,10 +249,16 @@ export function BuildingFormModal({
             <Form.Item name="plant_id" label="Plant" rules={[{ required: true }]} extra={building ? 'Moving a building also moves its assets to the new plant.' : undefined}>
               <Select showSearch optionFilterProp="label" options={(plants.data ?? []).map((p) => ({ value: p.id, label: `${p.code} – ${p.name}` }))} />
             </Form.Item>
-            <Form.Item name="code" label="Code" rules={[{ required: true, whitespace: true, max: 30 }]} tooltip="Unique within the plant, e.g. B01, H2, DC">
-              <Input />
-            </Form.Item>
             <Form.Item name="name" label="Name" rules={[{ required: true, whitespace: true, max: 200 }]}>
+              <Input placeholder="e.g. Production hall 2" autoFocus={!building} />
+            </Form.Item>
+            <Form.Item
+              name="code"
+              label="Short code"
+              rules={[{ required: !!building, whitespace: true, max: 30 }]}
+              tooltip="Unique within the plant, e.g. B01, H2, DC"
+              extra={building ? undefined : 'Leave empty – it is made from the name (e.g. “Production hall 2” → PH2).'}
+            >
               <Input />
             </Form.Item>
             <Row gutter={12}>

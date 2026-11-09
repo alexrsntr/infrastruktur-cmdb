@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Request } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
 import type { CurrentUser } from '../../shared/model';
@@ -7,7 +7,8 @@ import { requirePermission } from '../auth/context';
 import { withTransaction, type DbClient } from '../db/pool';
 import { audit, diff, snapshot } from '../lib/audit';
 import { badRequest, notFound, parse, queryString, requireUuid, SqlBuilder } from '../lib/http';
-import { optText, reqText } from '../lib/schemas';
+import { optText, optUuid, reqText } from '../lib/schemas';
+import { uniqueBuildingCode } from '../lib/buildings';
 import { applyScope, assertPlantAccess, isUnscoped } from '../lib/scope';
 
 /**
@@ -17,23 +18,29 @@ import { applyScope, assertPlantAccess, isUnscoped } from '../lib/scope';
 
 // ---------------------------------------------------------------- schemas
 
-const siteSchema = z.object({
-  id: z
-    .string()
-    .uuid()
-    .nullish()
-    .transform((v) => v ?? null),
-  name: reqText(60),
-  role: z.enum(DC_SITE_ROLES),
-  building_id: z.string().uuid(),
-  room: optText(100),
-});
+const siteSchema = z
+  .object({
+    id: z
+      .string()
+      .uuid()
+      .nullish()
+      .transform((v) => v ?? null),
+    /** optional – "Server room", "Site A", "Site B" or "Witness" by default */
+    name: optText(60),
+    role: z.enum(DC_SITE_ROLES),
+    building_id: optUuid,
+    /** creates the building in the same step (or uses the building of the plant with this name) */
+    new_building_name: optText(200),
+    room: optText(100),
+  })
+  .refine((s) => !!s.building_id !== !!s.new_building_name, { message: 'Choose a building for every site', path: ['building_id'] });
 
 const datacenterSchema = z
   .object({
     plant_id: z.string().uuid(),
-    name: reqText(100),
-    kind: z.enum(DATACENTER_KINDS).default('stretched'),
+    /** optional – "<plant code> data center" by default */
+    name: optText(100),
+    kind: z.enum(DATACENTER_KINDS).default('single'),
     description: optText(4000),
     sites: z.array(siteSchema).min(1, 'At least one site is required').max(3, 'At most three sites'),
   })
@@ -47,7 +54,7 @@ const datacenterSchema = z
     if (dc.kind === 'stretched' && main !== 2) {
       ctx.addIssue({ code: 'custom', path: ['sites'], message: 'A stretched data center has two main sites (plus an optional witness)' });
     }
-    const keys = dc.sites.map((s) => `${s.building_id}|${(s.room ?? '').trim().toLowerCase()}`);
+    const keys = dc.sites.map((s) => `${s.building_id ?? `new:${(s.new_building_name ?? '').toLowerCase()}`}|${(s.room ?? '').trim().toLowerCase()}`);
     if (new Set(keys).size !== keys.length) ctx.addIssue({ code: 'custom', path: ['sites'], message: 'Each site must be a different building or room' });
   });
 export type DatacenterBody = z.infer<typeof datacenterSchema>;
@@ -186,7 +193,48 @@ async function loadDetail(db: DbClient, id: string, user: CurrentUser) {
   return { ...dc, sites: siteDetails, links, connections, clusters };
 }
 
-async function checkBuildings(db: DbClient, plantId: string, sites: DatacenterBody['sites']) {
+function defaultSiteName(kind: DatacenterBody['kind'], role: DatacenterBody['sites'][number]['role']) {
+  if (role === 'witness') return 'Witness';
+  if (kind === 'single') return 'Server room';
+  return role === 'primary' ? 'Site A' : 'Site B';
+}
+
+type ResolvedSite = Omit<DatacenterBody['sites'][number], 'building_id' | 'name'> & { building_id: string; name: string };
+
+/** Creates the buildings entered by name (or uses an existing one with that name) and fills in default site names. */
+async function resolveSites(db: DbClient, req: Request, plantId: string, input: DatacenterBody): Promise<ResolvedSite[]> {
+  const out: ResolvedSite[] = [];
+  for (const s of input.sites) {
+    let buildingId = s.building_id;
+    if (!buildingId) {
+      const name = s.new_building_name!;
+      const existing = await db.query<{ id: string }>('SELECT id FROM building WHERE plant_id = $1 AND lower(name) = lower($2) LIMIT 1', [plantId, name]);
+      buildingId = existing.rows[0]?.id ?? null;
+      if (!buildingId) {
+        const code = await uniqueBuildingCode(db, plantId, name);
+        const { rows } = await db.query(
+          'INSERT INTO building (plant_id, code, name, created_by, updated_by) VALUES ($1,$2,$3,$4,$4) RETURNING *',
+          [plantId, code, name, req.user!.id],
+        );
+        buildingId = rows[0].id as string;
+        await audit(db, req, { action: 'create', entityType: 'building', entityId: buildingId, entityLabel: name, plantId, changes: snapshot(rows[0]) });
+      }
+    }
+    out.push({ ...s, building_id: buildingId, name: s.name ?? defaultSiteName(input.kind, s.role) });
+  }
+  return out;
+}
+
+/** "<plant code> data center", numbered when the plant already has one with that name */
+async function defaultDatacenterName(db: DbClient, plantId: string, plantCode: string): Promise<string> {
+  const { rows } = await db.query<{ name: string }>('SELECT lower(name) AS name FROM datacenter WHERE plant_id = $1', [plantId]);
+  const taken = new Set(rows.map((r) => r.name));
+  const base = `${plantCode} data center`;
+  if (!taken.has(base.toLowerCase())) return base;
+  for (let i = 2; ; i++) if (!taken.has(`${base} ${i}`.toLowerCase())) return `${base} ${i}`;
+}
+
+async function checkBuildings(db: DbClient, plantId: string, sites: { building_id: string }[]) {
   const ids = [...new Set(sites.map((s) => s.building_id))];
   const { rows } = await db.query<{ id: string; plant_id: string; name: string }>('SELECT id, plant_id, name FROM building WHERE id = ANY($1::uuid[])', [ids]);
   for (const id of ids) {
@@ -220,22 +268,24 @@ export function datacentersRouter(pool: Pool): Router {
     const id = await withTransaction(pool, async (db) => {
       const plant = await db.query('SELECT code FROM plant WHERE id = $1', [input.plant_id]);
       if (!plant.rows[0]) throw badRequest('Plant does not exist');
-      await checkBuildings(db, input.plant_id, input.sites);
+      await checkBuildings(db, input.plant_id, input.sites.filter((s): s is typeof s & { building_id: string } => !!s.building_id));
+      const sites = await resolveSites(db, req, input.plant_id, input);
+      const name = input.name ?? (await defaultDatacenterName(db, input.plant_id, plant.rows[0].code));
       const { rows } = await db.query(
         `INSERT INTO datacenter (plant_id, name, kind, description, created_by, updated_by) VALUES ($1,$2,$3,$4,$5,$5) RETURNING *`,
-        [input.plant_id, input.name, input.kind, input.description, req.user!.id],
+        [input.plant_id, name, input.kind, input.description, req.user!.id],
       );
       const dcId = rows[0].id as string;
-      for (const [i, s] of input.sites.entries()) {
+      for (const [i, s] of sites.entries()) {
         await db.query('INSERT INTO datacenter_site (datacenter_id, name, role, building_id, room, position) VALUES ($1,$2,$3,$4,$5,$6)', [dcId, s.name, s.role, s.building_id, s.room, i]);
       }
       await audit(db, req, {
         action: 'create',
         entityType: 'datacenter',
         entityId: dcId,
-        entityLabel: dcLabel({ name: input.name, plant_code: plant.rows[0].code }),
+        entityLabel: dcLabel({ name, plant_code: plant.rows[0].code }),
         plantId: input.plant_id,
-        changes: { ...snapshot(rows[0]), sites: input.sites.map((s) => `${s.name} (${s.role})`) },
+        changes: { ...snapshot(rows[0]), sites: sites.map((s) => `${s.name} (${s.role})`) },
       });
       return dcId;
     });
@@ -248,19 +298,21 @@ export function datacentersRouter(pool: Pool): Router {
     await withTransaction(pool, async (db) => {
       const before = await loadDatacenter(db, id, req.user!);
       if (input.plant_id !== before.plant_id) throw badRequest('A data center cannot be moved to another plant');
-      await checkBuildings(db, input.plant_id, input.sites);
+      await checkBuildings(db, input.plant_id, input.sites.filter((s): s is typeof s & { building_id: string } => !!s.building_id));
       const { rows: beforeSites } = await db.query('SELECT id, name, role, building_id, room FROM datacenter_site WHERE datacenter_id = $1 ORDER BY position', [id]);
       for (const s of input.sites) {
         if (s.id && !beforeSites.some((b) => b.id === s.id)) throw badRequest('Site does not belong to this data center');
       }
+      const sites = await resolveSites(db, req, input.plant_id, input);
+      const name = input.name ?? before.name;
       const { rows } = await db.query(
         `UPDATE datacenter SET name=$2, kind=$3, description=$4, updated_by=$5, updated_at=now() WHERE id=$1 RETURNING *`,
-        [id, input.name, input.kind, input.description, req.user!.id],
+        [id, name, input.kind, input.description, req.user!.id],
       );
       // Replace the site list: keep sites that come back with their id (so links stay), add new ones, drop the rest
-      const keep = input.sites.filter((s) => s.id).map((s) => s.id!);
+      const keep = sites.filter((s) => s.id).map((s) => s.id!);
       await db.query('DELETE FROM datacenter_site WHERE datacenter_id = $1 AND NOT (id = ANY($2::uuid[]))', [id, keep]);
-      for (const [i, s] of input.sites.entries()) {
+      for (const [i, s] of sites.entries()) {
         if (s.id) {
           await db.query('UPDATE datacenter_site SET name=$2, role=$3, building_id=$4, room=$5, position=$6 WHERE id=$1', [s.id, s.name, s.role, s.building_id, s.room, i]);
         } else {
@@ -269,9 +321,9 @@ export function datacentersRouter(pool: Pool): Router {
       }
       const changes: Record<string, unknown> = diff(before, rows[0]);
       const siteText = (list: { name: string; role: string; room: string | null }[]) => list.map((s) => `${s.name} (${s.role}${s.room ? `, ${s.room}` : ''})`).join('; ');
-      if (siteText(beforeSites) !== siteText(input.sites)) changes.sites = { from: siteText(beforeSites), to: siteText(input.sites) };
+      if (siteText(beforeSites) !== siteText(sites)) changes.sites = { from: siteText(beforeSites), to: siteText(sites) };
       if (Object.keys(changes).length)
-        await audit(db, req, { action: 'update', entityType: 'datacenter', entityId: id, entityLabel: dcLabel({ name: input.name, plant_code: before.plant_code }), plantId: before.plant_id, changes });
+        await audit(db, req, { action: 'update', entityType: 'datacenter', entityId: id, entityLabel: dcLabel({ name, plant_code: before.plant_code }), plantId: before.plant_id, changes });
     });
     res.json(await loadDetail(pool, id, req.user!));
   });

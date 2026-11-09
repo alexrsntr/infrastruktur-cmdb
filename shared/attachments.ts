@@ -45,6 +45,7 @@ export interface PlanMarker {
   attachment_id: string;
   asset_id: string | null;
   building_id: string | null;
+  rack_id: string | null;
   label: string | null;
   x: number;
   y: number;
@@ -55,6 +56,12 @@ export interface PlanMarker {
   asset_model?: string | null;
   building_name?: string | null;
   building_code?: string | null;
+  rack_name?: string | null;
+  rack_room?: string | null;
+  rack_height_u?: number | null;
+  rack_building_code?: string | null;
+  rack_building_name?: string | null;
+  rack_device_count?: number | null;
 }
 
 /** A plan image together with its markers */

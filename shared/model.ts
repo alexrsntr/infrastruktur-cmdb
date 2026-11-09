@@ -305,6 +305,8 @@ export interface MeResponse {
   permissions: Permission[];
   csrfToken: string;
   config: AppConfig;
+  /** signed in with the CMDB password (not with Microsoft) and allowed to use it – shows "Change password" */
+  canChangePassword: boolean;
 }
 
 export interface Plant {

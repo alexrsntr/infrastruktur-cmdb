@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { Pool } from 'pg';
 import { requirePermission } from '../auth/context';
 import { audit, diff } from '../lib/audit';
-import { badRequest, clampInt, likePattern, notFound, parse, queryString, requireUuid, SqlBuilder } from '../lib/http';
+import { badRequest, clampInt, forbidden, likePattern, notFound, parse, queryString, requireUuid, SqlBuilder } from '../lib/http';
 import { ownPasswordSchema, userCreateSchema, userPasswordSchema, userUpdateSchema } from '../lib/schemas';
 import { hashPassword, verifyPassword } from '../auth/password';
 
@@ -99,8 +99,9 @@ export function adminRouter(pool: Pool): Router {
     res.json({ ok: true });
   });
 
-  /** Every signed-in user with a local account can change their own password. */
+  /** Every user signed in with their password can change it (Microsoft accounts manage theirs in Microsoft Entra ID). */
   r.post('/me/password', async (req, res) => {
+    if (req.session.authMethod !== 'local') throw forbidden('You signed in with Microsoft – your password is managed in Microsoft Entra ID.');
     const input = parse(ownPasswordSchema, req.body);
     const { rows } = await pool.query<{ password_hash: string | null }>('SELECT password_hash FROM app_user WHERE id = $1', [req.user!.id]);
     if (!rows[0]?.password_hash) throw badRequest('Your account signs in with Microsoft Entra ID and has no password here.');

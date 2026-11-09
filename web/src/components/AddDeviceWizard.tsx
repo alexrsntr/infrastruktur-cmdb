@@ -15,7 +15,7 @@ const TYPE_HINT: Record<AssetType, string> = {
   switch: 'Network switch in a rack or cabinet',
   access_point: 'Wi-Fi access point on a ceiling or wall',
   server: 'Physical server or hypervisor host',
-  ups: 'Uninterruptible power supply (emergency power) in a rack or room',
+  ups: 'Emergency power (UPS) in a rack or room',
   vm: 'Virtual machine on a host or cluster',
 };
 
@@ -167,11 +167,11 @@ function AddDeviceWizard({ open, defaults, onClose }: { open: boolean; defaults:
       {step === 0 && (
         <Row gutter={[14, 14]}>
           {ASSET_TYPE_KEYS.map((t) => (
-            <Col xs={24} sm={12} key={t}>
+            <Col xs={24} sm={12} key={t} style={{ display: 'flex' }}>
               <button
                 type="button"
                 className="stat-tile"
-                style={{ width: '100%' }}
+                style={{ width: '100%', height: '100%' }}
                 onClick={() => {
                   setType(t);
                   form.setFieldValue('rack_height_u', t === 'server' || t === 'ups' ? 2 : 1);

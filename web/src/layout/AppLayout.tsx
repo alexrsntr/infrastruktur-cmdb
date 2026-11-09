@@ -90,7 +90,8 @@ export function AppLayout() {
       },
       { type: 'divider' },
       ...(adminItems.length ? [...adminItems, { type: 'divider' as const }] : []),
-      ...(config.authMode === 'local' ? [{ key: 'password', icon: <KeyOutlined />, label: 'Change password' }] : []),
+      // only for password sign-ins – Microsoft accounts change their password in Microsoft
+      ...(me.canChangePassword ? [{ key: 'password', icon: <KeyOutlined />, label: 'Change password' }] : []),
       { key: 'logout', icon: <LogoutOutlined />, label: 'Sign out', danger: true },
     ],
     onClick: ({ key }) => {

@@ -222,4 +222,53 @@ describe('data centers', () => {
     await editor.del(`/api/datacenters/${dc.id}`).expect(204);
     await viewer.get(`/api/datacenters/${dc.id}`).expect(404);
   });
+
+  it('creates a data center in one step: only a building is needed, a new one can be entered by name', async () => {
+    // only the building – name, kind and site name are filled in
+    const simple = (await editor.post('/api/datacenters', { plant_id: ham.id, sites: [{ role: 'primary', building_id: bld(hamBuildings, 'DC') }] }).expect(201)).body as DatacenterDetail;
+    expect(simple).toMatchObject({ name: 'HAM data center', kind: 'single' });
+    expect(simple.sites.map((s) => s.name)).toEqual(['Server room']);
+    const second = (await editor.post('/api/datacenters', { plant_id: ham.id, sites: [{ role: 'primary', building_id: bld(hamBuildings, 'DC'), room: 'Room 2' }] }).expect(201)).body;
+    expect(second.name).toBe('HAM data center 2');
+
+    // a new building by name: created with a code made from its name, audited, and reused instead of duplicated
+    const stretched = (
+      await editor
+        .post('/api/datacenters', {
+          plant_id: ham.id,
+          kind: 'stretched',
+          sites: [
+            { role: 'primary', building_id: bld(hamBuildings, 'DC'), room: 'Room 3' },
+            { role: 'secondary', new_building_name: 'Backup Container 2', room: 'IT' },
+          ],
+        })
+        .expect(201)
+    ).body as DatacenterDetail;
+    expect(stretched.sites.map((s) => s.name)).toEqual(['Site A', 'Site B']);
+    const created = (await viewer.get(`/api/plants/${ham.id}`).expect(200)).body.buildings.find((b: { name: string }) => b.name === 'Backup Container 2');
+    expect(created).toMatchObject({ code: 'BC2' });
+    expect(stretched.sites[1].building_id).toBe(created.id);
+    const audit = await pool.query(`SELECT 1 FROM audit_log WHERE entity_type = 'building' AND entity_id = $1 AND action = 'create'`, [created.id]);
+    expect(audit.rowCount).toBe(1);
+    const again = (await editor.post('/api/datacenters', { plant_id: ham.id, sites: [{ role: 'primary', new_building_name: 'backup container 2', room: 'Other' }] }).expect(201)).body;
+    expect(again.sites[0].building_id).toBe(created.id);
+
+    // exactly one of building / new building per site
+    await editor.post('/api/datacenters', { plant_id: ham.id, sites: [{ role: 'primary' }] }).expect(400);
+    await editor.post('/api/datacenters', { plant_id: ham.id, sites: [{ role: 'primary', building_id: bld(hamBuildings, 'DC'), new_building_name: 'X' }] }).expect(400);
+    // operators cannot create buildings this way
+    await operator.post('/api/datacenters', { plant_id: muc.id, sites: [{ role: 'primary', new_building_name: 'Sneaky' }] }).expect(403);
+  });
+
+  it('generates the building code when it is left empty', async () => {
+    const b = (await editor.post('/api/buildings', { plant_id: ham.id, name: 'Production hall 7' }).expect(201)).body;
+    expect(b.code).toBe('PH7');
+    const b2 = (await editor.post('/api/buildings', { plant_id: ham.id, name: 'Production hall 7 annex' }).expect(201)).body;
+    expect(b2.code).toBe('PH7A');
+    const b3 = (await editor.post('/api/buildings', { plant_id: ham.id, name: 'Production hall 7' }).expect(201)).body;
+    expect(b3.code).toBe('PH72');
+    // editing without a code keeps the code
+    const edited = (await editor.put(`/api/buildings/${b.id}`, { plant_id: ham.id, name: 'Production hall seven' }).expect(200)).body;
+    expect(edited.code).toBe('PH7');
+  });
 });

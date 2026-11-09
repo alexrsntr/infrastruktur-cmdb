@@ -128,4 +128,27 @@ describe('plans & markers', () => {
     await editor.del(`/api/plan-markers/${del.id}`).expect(204);
     expect((await viewer.get(`/api/plans/${mucPlan}`).expect(200)).body.markers).toHaveLength(2);
   });
+
+  it('places whole racks on a plan', async () => {
+    const plant = (await editor.get(`/api/plants/${muc.id}`).expect(200)).body;
+    const rack = (await editor.post('/api/racks', { building_id: plant.buildings[0].id, name: 'PLAN-R1', room: 'Hall' }).expect(201)).body;
+    const res = await editor.post(`/api/plans/${mucPlan}/markers`, { rack_id: rack.id, x: 0.4, y: 0.6 }).expect(201);
+    expect(res.body).toMatchObject({ rack_id: rack.id, rack_name: 'PLAN-R1', rack_room: 'Hall', rack_device_count: 0, asset_id: null, building_id: null, label: null });
+
+    await editor.post(`/api/plans/${mucPlan}/markers`, { rack_id: rack.id, x: 0.1, y: 0.1 }).expect(409); // already on this plan
+    await editor.post(`/api/plans/${mucPlan}/markers`, { rack_id: rack.id, label: 'x', x: 0.1, y: 0.1 }).expect(400);
+    const hamPlant = (await admin.get(`/api/plants/${ham.id}`).expect(200)).body;
+    const hamRack = (await admin.post('/api/racks', { building_id: hamPlant.buildings[0].id, name: 'PLAN-HAM' }).expect(201)).body;
+    expect((await editor.post(`/api/plans/${mucPlan}/markers`, { rack_id: hamRack.id, x: 0.1, y: 0.1 }).expect(400)).body.error).toMatch(/another plant/);
+
+    // the rack knows the plans it is on, and its history shows the placement
+    expect((await viewer.get(`/api/racks/${rack.id}/plans`).expect(200)).body).toEqual([expect.objectContaining({ id: mucPlan, title: 'Aerial view MUC' })]);
+    const history = (await viewer.get(`/api/history?entityType=rack&entityId=${rack.id}`).expect(200)).body;
+    expect(history.map((h: { action: string }) => h.action)).toContain('plan.marker.add');
+    await operator.get(`/api/racks/${hamRack.id}/plans`).expect(403);
+
+    // deleting the rack removes its marker
+    await editor.del(`/api/racks/${rack.id}`).expect(204);
+    expect((await viewer.get(`/api/plans/${mucPlan}`).expect(200)).body.markers.some((m: { rack_id: string | null }) => m.rack_id === rack.id)).toBe(false);
+  });
 });

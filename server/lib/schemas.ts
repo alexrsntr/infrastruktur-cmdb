@@ -62,7 +62,8 @@ export type PlantInput = z.infer<typeof plantSchema>;
 
 export const buildingSchema = z.object({
   plant_id: z.string().uuid(),
-  code: reqText(30),
+  /** optional – generated from the name when empty */
+  code: optText(30),
   name: reqText(200),
   description: optText(4000),
   latitude: optNumber(-90, 90),

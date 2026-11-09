@@ -25,6 +25,7 @@ import { StatTile } from '../components/Simple';
 import { SiteMap } from '../components/WorldMap';
 import { PlansGallery } from '../components/PlansGallery';
 import { useAddDevice } from '../components/AddDeviceWizard';
+import { DatacenterFormModal } from '../components/DatacenterForms';
 import { ApiError, errorText, http } from '../lib/api';
 import { useInvalidate, usePlans, usePlant, useRacks } from '../lib/queries';
 import { useSession } from '../lib/session';
@@ -95,6 +96,7 @@ export function PlantPage() {
   const { open: openAddDevice } = useAddDevice();
   const [editing, setEditing] = useState(false);
   const [buildingModal, setBuildingModal] = useState(false);
+  const [dcModal, setDcModal] = useState(false);
 
   if (plant.isLoading) return <Skeleton active paragraph={{ rows: 10 }} />;
   if (plant.error || !plant.data) {
@@ -129,19 +131,19 @@ export function PlantPage() {
 
   const overview = (
     <div>
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+      {/* all device types in one row on wide screens, two per row on phones */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 16, marginBottom: 24 }}>
         {ASSET_TYPE_KEYS.map((t) => (
-          <Col xs={12} lg={6} key={t}>
-            <StatTile
-              to={`/inventory/${ASSET_TYPES[t].slug}?plantId=${p.id}`}
-              icon={ASSET_TYPE_ICONS[t]}
-              color={ASSET_TYPES[t].color}
-              value={p.asset_counts?.[t] ?? 0}
-              label={ASSET_TYPES[t].plural}
-            />
-          </Col>
+          <StatTile
+            key={t}
+            to={`/inventory/${ASSET_TYPES[t].slug}?plantId=${p.id}`}
+            icon={ASSET_TYPE_ICONS[t]}
+            color={ASSET_TYPES[t].color}
+            value={p.asset_counts?.[t] ?? 0}
+            label={ASSET_TYPES[t].plural}
+          />
         ))}
-      </Row>
+      </div>
 
       <Row gutter={[24, 24]}>
         <Col xs={24} xl={16}>
@@ -175,10 +177,30 @@ export function PlantPage() {
             </Card>
           )}
 
-          {dcs.length > 0 && (
+          {(dcs.length > 0 || can('location.write')) && (
             <>
               <div style={{ height: 24 }} />
-              <SectionHead title={`Data centers (${dcs.length})`} extra={<Link to={`/datacenters?plantId=${p.id}`}>Show all</Link>} />
+              <SectionHead
+                title={`Data centers (${dcs.length})`}
+                extra={
+                  <span style={{ display: 'inline-flex', gap: 12, alignItems: 'center' }}>
+                    {dcs.length > 0 && <Link to={`/datacenters?plantId=${p.id}`}>Show all</Link>}
+                    {can('location.write') && (
+                      <Button icon={<PlusOutlined />} onClick={() => setDcModal(true)}>
+                        Add data center
+                      </Button>
+                    )}
+                  </span>
+                }
+              />
+              {dcs.length === 0 && (
+                <Card styles={{ body: { padding: 18 } }}>
+                  <Typography.Text type="secondary">
+                    No data center yet. Document the server room of this plant in one step – choose the building, done. Racks in that room are added
+                    automatically.
+                  </Typography.Text>
+                </Card>
+              )}
               <Row gutter={[16, 16]}>
                 {dcs.map((dc) => (
                   <Col key={dc.id} xs={24} md={12}>
@@ -256,6 +278,7 @@ export function PlantPage() {
               items={[
                 { key: 'edit', icon: <EditOutlined />, label: 'Edit plant', onClick: () => setEditing(true), hidden: !can('location.write') },
                 { key: 'building', icon: <ClusterOutlined />, label: 'Add building', onClick: () => setBuildingModal(true), hidden: !can('location.write') },
+                { key: 'datacenter', icon: <DatabaseOutlined />, label: 'Add data center', onClick: () => setDcModal(true), hidden: !can('location.write') },
                 { key: 'racks', icon: <HddOutlined />, label: 'Racks of this plant', onClick: () => navigate(`/racks?plantId=${p.id}`) },
                 { key: 'xlsx', icon: <FileExcelOutlined />, label: 'Export plant (Excel)', onClick: () => download(exportUrl('full', 'xlsx', { plantId: p.id })), hidden: !can('export'), divider: true },
                 { key: 'json', icon: <CodeOutlined />, label: 'Export plant (JSON)', onClick: () => download(exportUrl('full', 'json', { plantId: p.id })), hidden: !can('export') },
@@ -311,6 +334,7 @@ export function PlantPage() {
       />
       <PlantFormModal open={editing} plant={p} onClose={() => setEditing(false)} />
       <BuildingFormModal open={buildingModal} plantId={p.id} onClose={() => setBuildingModal(false)} onSaved={(b) => navigate(`/buildings/${b.id}`)} />
+      <DatacenterFormModal open={dcModal} defaultPlantId={p.id} onClose={() => setDcModal(false)} onSaved={(dc) => navigate(`/datacenters/${dc.id}`)} />
     </div>
   );
 }
