@@ -18,6 +18,7 @@ import { ASSET_TYPES, ASSET_TYPE_KEYS, type Building } from '../../../shared/mod
 import { AssetTable } from '../components/AssetTable';
 import { ASSET_TYPE_ICONS } from '../components/icons';
 import { journalTabs } from '../components/Journal';
+import { NetworkTab } from '../components/NetworkTab';
 import { BuildingFormModal, PlantFormModal } from '../components/LocationForms';
 import { PageHeader } from '../components/PageHeader';
 import { AboutCard, download, exportUrl, MoreMenu, SectionHead } from '../components/PageParts';
@@ -320,6 +321,11 @@ export function PlantPage() {
                 <AssetTable fixed={{ plantId: p.id }} createDefaults={{ plant_id: p.id }} storageKey="plant" />
               </Card>
             ),
+          },
+          {
+            key: 'network',
+            label: 'Network',
+            children: <NetworkTab plantId={p.id} />,
           },
           {
             key: 'plans',

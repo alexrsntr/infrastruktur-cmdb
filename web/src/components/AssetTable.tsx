@@ -213,9 +213,10 @@ export function AssetTable({ fixed = {}, createDefaults, syncUrl = false, pageSi
         <Select
           allowClear
           mode="multiple"
-          maxTagCount="responsive"
+          maxTagCount={1}
+          maxTagTextLength={22}
           placeholder="Needs attention"
-          style={{ minWidth: 190, maxWidth: 360 }}
+          style={{ minWidth: 250 }}
           value={get('attention') ? get('attention').split(',') : []}
           onChange={(v: string[]) => set({ attention: v.length ? v.join(',') : undefined })}
           options={ATTENTION_KINDS.map((k) => ({ value: k, label: ATTENTION_META[k].label, title: ATTENTION_META[k].description }))}

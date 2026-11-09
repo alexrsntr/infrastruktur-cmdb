@@ -12,6 +12,7 @@ import { entraSettingsMigration } from './migrations/009_entra_settings';
 import { planMarkerRacksMigration } from './migrations/010_plan_marker_racks';
 import { assetTypesMigration } from './migrations/011_asset_types';
 import { lifecycleMigration } from './migrations/012_lifecycle';
+import { networkMigration } from './migrations/013_network';
 
 export interface Migration {
   id: string;
@@ -214,4 +215,5 @@ export const migrations: Migration[] = [
   planMarkerRacksMigration,
   assetTypesMigration,
   lifecycleMigration,
+  networkMigration,
 ];

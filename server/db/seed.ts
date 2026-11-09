@@ -301,12 +301,51 @@ export async function seed(pool: Pool, opts: { force?: boolean } = {}) {
         type: 'firewall', name: `${code}-fw01`, status: 'active', criticality: 'critical',
         plant_id: plant.id, building_id: dcFloor.buildingId, floor_id: dcFloor.id, ...pointIn(DATACENTER_LAYOUT[0], frand),
         room: 'Server room', rack_id: rackSrv, rack_u: 38, rack_height_u: 1, manufacturer: 'Fortinet', model: 'FortiGate 100F', serial_number: `FG100F${Math.floor(frand() * 1e8)}`,
-        asset_tag: `IT-${p.code}-1600`, ip_address: `${net}.0.1`, mac_address: mac(frand), os: 'FortiOS 7.4', owner: 'Network Team',
+        asset_tag: `IT-${p.code}-1600`, ip_address: `${net}.0.254`, mac_address: mac(frand), os: 'FortiOS 7.4', owner: 'Network Team',
         cost_center: `${4000 + pi}`, purchase_date: dateOffset(-800), warranty_end: dateOffset(300 + frand() * 400), tags: ['security'],
         attributes: { ha_mode: 'Standalone', throughput_gbps: 20, zones: 'Office, OT, Server, DMZ', vpn: true, firmware: '7.4.4', license_end: dateOffset(200 + frand() * 300) },
       });
       await relate(core.id, fw.id, 'uplink', 'Te1/1/8', 'port1');
+
+      // ---- VLANs and IP subnets (IPAM) – the addresses above are taken from these networks
+      const nets: [number, string, string, string][] = [
+        [10, 'Network management', `${net}.0.0/24`, `${net}.0.254`],
+        [100, 'Servers', `${net}.1.0/24`, `${net}.1.1`],
+        [101, 'Out-of-band management', `${net}.2.0/24`, `${net}.2.1`],
+        [110, 'Virtual machines', `${net}.5.0/24`, `${net}.5.1`],
+        [20, 'Wi-Fi access points', `${net}.20.0/24`, `${net}.20.1`],
+        [200, 'Production (OT)', `${net}.40.0/23`, `${net}.40.1`],
+      ];
+      for (const [vid, name, cidr, gateway] of nets) {
+        const v = await one(client, 'INSERT INTO vlan (plant_id, vid, name) VALUES ($1,$2,$3) RETURNING id', [plant.id, vid, name]);
+        await client.query('INSERT INTO subnet (plant_id, cidr, name, vlan_id, gateway) VALUES ($1,$2,$3,$4,$5)', [plant.id, cidr, name, (v as { id: string }).id, gateway]);
+      }
     }
+
+    // ---- ports and cables from the documented uplinks (relations with port names on both ends)
+    await client.query(`
+      INSERT INTO asset_port (asset_id, name, kind)
+      SELECT DISTINCT ON (x.asset_id, lower(x.name)) x.asset_id, x.name,
+             CASE WHEN x.name ~* '^(te|hu|twe|fo|xe|port1)' THEN 'sfp' ELSE 'ethernet' END
+      FROM (SELECT source_id AS asset_id, source_port AS name FROM asset_relation WHERE source_port IS NOT NULL AND target_port IS NOT NULL
+            UNION ALL
+            SELECT target_id, target_port FROM asset_relation WHERE source_port IS NOT NULL AND target_port IS NOT NULL) x
+      ON CONFLICT DO NOTHING;
+
+      WITH pairs AS (
+        SELECT DISTINCT ON (s.id) s.id AS a, t.id AS b, pl.code,
+               row_number() OVER (PARTITION BY sa.plant_id ORDER BY sa.name, s.name) AS n
+        FROM asset_relation r
+        JOIN asset_port s ON s.asset_id = r.source_id AND lower(s.name) = lower(r.source_port)
+        JOIN asset_port t ON t.asset_id = r.target_id AND lower(t.name) = lower(r.target_port)
+        JOIN asset sa ON sa.id = r.source_id LEFT JOIN plant pl ON pl.id = sa.plant_id
+      ), ends AS (
+        SELECT a AS id, b AS peer, code || '-C' || lpad(n::text, 4, '0') AS label FROM pairs
+        UNION ALL
+        SELECT b, a, code || '-C' || lpad(n::text, 4, '0') FROM pairs
+      )
+      UPDATE asset_port p SET connected_port_id = e.peer, cable_label = e.label FROM ends e WHERE p.id = e.id;
+    `);
 
     // ---- lifecycle data: vendor support and end of life of the network gear, last seen on the network
     await client.query(`

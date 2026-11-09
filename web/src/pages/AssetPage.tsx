@@ -34,6 +34,7 @@ import { AssetFormModal } from '../components/AssetFormModal';
 import { RelationFormModal } from '../components/RelationFormModal';
 import { FloorPlanPreview } from '../components/FloorPlanPreview';
 import { journalTabs } from '../components/Journal';
+import { PortsPanel, usePorts } from '../components/PortsPanel';
 import { WarrantyDate } from '../components/Tags';
 import { StatusDot, TypeIcon } from '../components/Simple';
 
@@ -62,6 +63,7 @@ export function AssetPage() {
   const invalidate = useInvalidate();
   const asset = useAsset(assetId);
   const types = useAssetTypes();
+  const ports = usePorts(assetId ?? '');
   const onPlans = useQuery({
     queryKey: ['asset-plans', assetId],
     queryFn: () => http.get<{ id: string; title: string }[]>(`/api/assets/${assetId}/plans`),
@@ -322,7 +324,12 @@ export function AssetPage() {
                 else next.set('tab', key);
                 setParams(next, { replace: true });
               }}
-              items={journalTabs('asset', a.id, a.name)}
+              items={[
+                ...journalTabs('asset', a.id, a.name),
+                ...(typeDef.physical || (ports.data?.length ?? 0) > 0
+                  ? [{ key: 'ports', label: `Ports${ports.data?.length ? ` (${ports.data.length})` : ''}`, children: <PortsPanel assetId={a.id} assetName={a.name} /> }]
+                  : []),
+              ]}
             />
           </Card>
         </Col>

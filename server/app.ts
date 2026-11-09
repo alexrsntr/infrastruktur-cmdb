@@ -24,6 +24,7 @@ import { attachmentsRouter } from './routes/attachments';
 import { plansRouter } from './routes/plans';
 import { datacentersRouter } from './routes/datacenters';
 import { entraRouter } from './routes/entra';
+import { networkRouter } from './routes/network';
 import { EntraService, type EntraDeps } from './entra/service';
 
 function tileHosts(tileUrl: string): string[] {
@@ -140,6 +141,7 @@ export function createApp(pool: Pool, config: Config, deps: AppDeps = {}) {
   api.use(attachmentsRouter(pool, config));
   api.use(plansRouter(pool));
   api.use(datacentersRouter(pool));
+  api.use(networkRouter(pool));
   api.use((_req, _res, next) => next(new HttpError(404, 'API endpoint not found')));
   app.use('/api', api);
 
