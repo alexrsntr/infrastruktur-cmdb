@@ -175,6 +175,9 @@ export const activitySchema = z.object({
 
 export const activityUpdateSchema = activitySchema.omit({ entity_type: true, entity_id: true });
 
+/** "Mark done" / "Cancel": only the status changes */
+export const activityStatusSchema = z.object({ status: z.enum(ACTIVITY_STATUSES) });
+
 export const userUpdateSchema = z.object({
   role: z.enum(ROLES),
   plant_scope: z.array(z.string().uuid()).max(500).default([]),

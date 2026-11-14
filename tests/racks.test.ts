@@ -179,4 +179,19 @@ describe('racks', () => {
     const notes = await pool.query(`SELECT count(*) AS n FROM note WHERE entity_type = 'rack' AND entity_id = $1`, [rackId]);
     expect(notes.rows[0].n).toBe(0);
   });
+
+  it('lets only one of several simultaneous mounts into the same unit win', async () => {
+    const rack = (await editor.post('/api/racks', { building_id: b01.id, name: 'R-RACE', height_u: 10 }).expect(201)).body;
+    const devices: { id: string }[] = [];
+    for (const n of [1, 2, 3, 4]) devices.push((await editor.post('/api/assets', { type: 'switch', name: `muc-race-sw0${n}`, building_id: b01.id }).expect(201)).body);
+    // all at once: without the lock on the rack every request sees U5 as free
+    const results = await Promise.all(devices.map((d) => editor.patch(`/api/assets/${d.id}/rack`, { rack_id: rack.id, rack_u: 5, rack_height_u: 1 })));
+    expect(results.map((r) => r.status).sort()).toEqual([200, 409, 409, 409]);
+    const detail = (await editor.get(`/api/racks/${rack.id}`).expect(200)).body;
+    expect(detail.assets.filter((a: { rack_u: number }) => a.rack_u === 5)).toHaveLength(1);
+
+    // the same for other rack equipment
+    const items = await Promise.all([1, 2, 3].map((n) => editor.post(`/api/racks/${rack.id}/items`, { kind: 'shelf', label: `Shelf ${n}`, position_u: 8 })));
+    expect(items.map((r) => r.status).sort()).toEqual([201, 409, 409]);
+  });
 });

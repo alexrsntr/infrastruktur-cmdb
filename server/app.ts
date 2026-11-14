@@ -65,7 +65,8 @@ export function createApp(pool: Pool, config: Config, deps: AppDeps = {}) {
   const entra = new EntraService(pool, config, deps.entra);
   const app = express();
   app.disable('x-powered-by');
-  app.set('trust proxy', 1); // Azure App Service front end
+  // Whose X-Forwarded-For is believed (TRUST_PROXY): 1 on Azure App Service, nobody when clients connect directly
+  app.set('trust proxy', config.trustProxy);
 
   app.use(
     helmet({

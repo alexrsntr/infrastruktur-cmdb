@@ -21,12 +21,28 @@ function int(name: string, fallback: number): number {
   return Number.isFinite(v) ? v : fallback;
 }
 
+/**
+ * TRUST_PROXY: the reverse proxies in front of the app whose X-Forwarded-For header tells the client address –
+ * their number (1 for Azure App Service or one nginx / Caddy / Traefik) or their addresses ("loopback",
+ * "10.0.0.0/8, 172.16.0.0/12"). Default: 1 on Azure App Service, otherwise none. A client that connects directly
+ * must not be able to pick its own address with that header: the address is the key of the sign-in rate limit
+ * and is written to the audit log.
+ */
+function trustProxy(): number | string | false {
+  const raw = str('TRUST_PROXY');
+  if (!raw) return has('WEBSITE_SITE_NAME') ? 1 : false;
+  if (['false', 'off', 'no', 'none', '0'].includes(raw.toLowerCase())) return false;
+  return /^\d+$/.test(raw) ? Number(raw) : raw;
+}
+
 export interface Config {
   env: string;
   isProduction: boolean;
   port: number;
   /** Network interface to listen on (empty = all; 127.0.0.1 = this computer only) */
   host: string;
+  /** Express "trust proxy": number of reverse proxies in front of the app, their addresses, or false (none) */
+  trustProxy: number | string | false;
   baseUrl: string;
   /** Production behind HTTPS (APP_BASE_URL starts with https://): secure cookies, HSTS, upgrade-insecure-requests */
   httpsOnly: boolean;
@@ -100,6 +116,7 @@ export function loadConfig(): Config {
     isProduction,
     port: int('PORT', 3000),
     host: str('HOST'),
+    trustProxy: trustProxy(),
     baseUrl,
     httpsOnly: isProduction && baseUrl.startsWith('https://'),
     sessionSecret,
@@ -167,6 +184,8 @@ function validate(c: Config) {
   if (c.isProduction && c.authMode === 'dev') errors.push('AUTH_MODE=dev is not allowed when NODE_ENV=production');
   if (!c.sessionSecret || (c.isProduction && c.sessionSecret.length < 32))
     errors.push('SESSION_SECRET must be set (at least 32 characters in production)');
+  if (typeof c.trustProxy === 'string' && ['true', 'yes', 'on', 'all'].includes(c.trustProxy.toLowerCase()))
+    errors.push('TRUST_PROXY must be the number of reverse proxies (e.g. 1), a list of their addresses or false – "true" would let every client choose its own address');
   if (!ROLES.includes(c.defaultRole)) errors.push(`DEFAULT_ROLE must be one of ${ROLES.join(', ')}`);
   if (!['password', 'entra'].includes(c.db.auth)) errors.push('DB_AUTH must be "password" or "entra"');
   if (!['database', 'azure-blob'].includes(c.storage.driver)) errors.push('STORAGE_DRIVER must be "database" or "azure-blob"');

@@ -221,6 +221,8 @@ export function ActivityFormModal({
       destroyOnHidden
       width={620}
       afterOpenChange={(o) => {
+        // reset first: the form keeps the values of the activity that was open before (description, assignee)
+        form.resetFields();
         if (o)
           form.setFieldsValue(
             activity
@@ -280,7 +282,7 @@ export function ActivitiesTable({
 
   const quickStatus = async (a: Activity, status: Activity['status']) => {
     try {
-      await http.put(`/api/activities/${a.id}`, { kind: a.kind, status, title: a.title, description: a.description, assignee: a.assignee, due_date: a.due_date });
+      await http.patch(`/api/activities/${a.id}/status`, { status });
       await invalidate();
     } catch (e) {
       message.error(errorText(e));

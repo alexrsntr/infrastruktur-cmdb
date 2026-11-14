@@ -4,7 +4,7 @@ import { ACTIVITY_KINDS, ACTIVITY_STATUSES, ENTITY_TYPES, can, type EntityType }
 import { requirePermission } from '../auth/context';
 import { audit, diff } from '../lib/audit';
 import { badRequest, clampInt, forbidden, isUuid, likePattern, notFound, parse, queryList, queryString, requireUuid, SqlBuilder } from '../lib/http';
-import { activitySchema, activityUpdateSchema, noteSchema, noteUpdateSchema } from '../lib/schemas';
+import { activitySchema, activityStatusSchema, activityUpdateSchema, noteSchema, noteUpdateSchema } from '../lib/schemas';
 import { applyScope, assertPlantAccess, isUnscoped, resolveEntityWithAccess } from '../lib/scope';
 import type { CurrentUser } from '../../shared/model';
 
@@ -161,6 +161,30 @@ export function journalRouter(pool: Pool): Router {
     const changes = diff(before, input);
     if (Object.keys(changes).length)
       await audit(pool, req, { action: 'activity.update', entityType: before.entity_type, entityId: before.entity_id, entityLabel: input.title, plantId: before.plant_id, changes });
+    const full = await pool.query(`SELECT ${ACTIVITY_SELECT} ${ACTIVITY_FROM} WHERE act.id = $1`, [id]);
+    res.json(full.rows[0]);
+  });
+
+  /**
+   * Changes only the status ("Mark done", "Cancel"). The quick actions use this instead of PUT, which replaces
+   * the whole activity: a list that does not know every field (e.g. the assignee) would otherwise delete it.
+   */
+  r.patch('/activities/:id/status', requirePermission('activity.write'), async (req, res) => {
+    const id = requireUuid(req.params.id);
+    const { status } = parse(activityStatusSchema, req.body);
+    const { rows: beforeRows } = await pool.query('SELECT * FROM activity WHERE id = $1', [id]);
+    const before = beforeRows[0];
+    if (!before) throw notFound('Activity');
+    assertPlantAccess(req.user!, before.plant_id);
+    await pool.query(
+      `UPDATE activity SET status=$2, updated_at=now(),
+         completed_at = CASE WHEN $2 = 'done' THEN COALESCE(completed_at, now()) ELSE NULL END
+       WHERE id = $1`,
+      [id, status],
+    );
+    const changes = diff({ status: before.status }, { status });
+    if (Object.keys(changes).length)
+      await audit(pool, req, { action: 'activity.update', entityType: before.entity_type, entityId: before.entity_id, entityLabel: before.title, plantId: before.plant_id, changes });
     const full = await pool.query(`SELECT ${ACTIVITY_SELECT} ${ACTIVITY_FROM} WHERE act.id = $1`, [id]);
     res.json(full.rows[0]);
   });

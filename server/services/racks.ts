@@ -8,6 +8,10 @@ export function unitLabel(u: number, height: number): string {
 /**
  * Ensures that units [u, u + height - 1] exist in the rack and are not used by another
  * device or rack item. `assetId` / `itemId` exclude the object that is being moved.
+ *
+ * Call it inside the transaction that writes the position: the rack row is locked until that transaction
+ * ends, so two people mounting something into the same rack at the same moment are checked one after the
+ * other. Without the lock both would see the units as free and both would be saved.
  */
 export async function assertRackSlot(
   db: DbClient,
@@ -16,7 +20,7 @@ export async function assertRackSlot(
   height: number,
   opts: { assetId?: string | null; itemId?: string | null } = {},
 ) {
-  const { rows: racks } = await db.query<{ name: string; height_u: number }>('SELECT name, height_u FROM rack WHERE id = $1', [rackId]);
+  const { rows: racks } = await db.query<{ name: string; height_u: number }>('SELECT name, height_u FROM rack WHERE id = $1 FOR NO KEY UPDATE', [rackId]);
   const rack = racks[0];
   if (!rack) throw badRequest('Rack does not exist');
   const top = u + height - 1;

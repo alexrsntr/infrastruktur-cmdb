@@ -66,7 +66,8 @@ function cellToValue(v: ExcelJS.CellValue): unknown {
   return v;
 }
 
-async function readRows(file: Express.Multer.File): Promise<RawRow[]> {
+/** Rows of the file plus its column headers (also those of columns that are empty in every row) */
+async function readRows(file: Express.Multer.File): Promise<{ rows: RawRow[]; columns: string[] }> {
   const name = file.originalname.toLowerCase();
   if (name.endsWith('.xlsx')) {
     const wb = new ExcelJS.Workbook();
@@ -84,13 +85,13 @@ async function readRows(file: Express.Multer.File): Promise<RawRow[]> {
       });
       rows.push(obj);
     });
-    return rows;
+    return { rows, columns: headers.filter(Boolean) };
   }
   if (name.endsWith('.csv') || name.endsWith('.txt')) {
     const text = file.buffer.toString('utf8').replace(/^﻿/, '');
     const parsed = Papa.parse<RawRow>(text, { header: true, skipEmptyLines: 'greedy', transformHeader: (h) => h.trim() });
     if (parsed.errors.length && !parsed.data.length) throw badRequest(`CSV could not be parsed: ${parsed.errors[0].message}`);
-    return parsed.data;
+    return { rows: parsed.data, columns: parsed.meta.fields ?? [] };
   }
   throw badRequest('Unsupported file type. Upload an .xlsx or .csv file.');
 }
@@ -252,6 +253,40 @@ function mapRow(raw: RawRow, headers: Map<string, string>, lookups: Lookups, def
   };
 }
 
+/** Asset fields that are filled from exactly one column with the same key */
+const PLAIN_FIELDS = [
+  'name', 'status', 'criticality', 'room', 'manufacturer', 'model', 'serial_number', 'asset_tag', 'ip_address', 'mac_address', 'fqdn', 'os',
+  'owner', 'cost_center', 'purchase_date', 'warranty_end', 'support_end', 'end_of_life', 'support_contract', 'description', 'tags',
+] as const;
+
+/**
+ * An import changes only what the file contains: for an existing asset every field whose column is missing
+ * in the file keeps its current value. A column that is there counts, also with an empty cell (= clear the value).
+ * Without this a file with a few columns (e.g. Type, Name, Owner) would reset everything else of the asset.
+ * Location levels are only carried over while the level above is unchanged (another building → not the old floor or rack).
+ */
+function keepMissingColumns(input: Record<string, unknown>, existing: Record<string, unknown>, present: Set<string>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...input };
+  for (const field of PLAIN_FIELDS) if (!present.has(field)) out[field] = existing[field];
+
+  if (!present.has('plant_code') && !present.has('plant_name')) out.plant_id = existing.plant_id;
+  if (!present.has('building_code') && !present.has('building_name')) out.building_id = out.plant_id === existing.plant_id ? existing.building_id : null;
+  const sameBuilding = out.building_id === existing.building_id;
+  if (!present.has('floor_name')) out.floor_id = sameBuilding ? existing.floor_id : null;
+  if (!present.has('rack_name')) out.rack_id = sameBuilding ? existing.rack_id : null;
+  if (!present.has('rack_unit')) {
+    const sameRack = out.rack_id === existing.rack_id;
+    out.rack_u = sameRack ? existing.rack_u : null;
+    out.rack_height_u = sameRack ? existing.rack_height_u : 1;
+  }
+  for (const axis of ['map_x', 'map_y']) if (!present.has(axis)) out[axis] = out.floor_id === existing.floor_id ? existing[axis] : null;
+
+  const attributes: Record<string, unknown> = { ...((existing.attributes as Record<string, unknown> | null) ?? {}) };
+  for (const key of present) if (key.startsWith('attr:')) delete attributes[key.slice(5)];
+  out.attributes = { ...attributes, ...(input.attributes as Record<string, unknown>) };
+  return out;
+}
+
 export function importsRouter(pool: Pool): Router {
   const r = Router();
 
@@ -260,12 +295,14 @@ export function importsRouter(pool: Pool): Router {
     const dryRun = queryString(req.query.dryRun) !== 'false';
     const defaultTypeParam = queryString(req.query.type);
     const defaultType = ASSET_TYPE_KEYS.find((k) => k === defaultTypeParam);
-    const rows = await readRows(req.file);
+    const { rows, columns } = await readRows(req.file);
     if (rows.length > MAX_ROWS) throw badRequest(`Too many rows (${rows.length}). The limit is ${MAX_ROWS} per file.`);
 
     const report: ImportReport = { dryRun, total: rows.length, created: 0, updated: 0, skipped: 0, errors: [] };
     const settings = await loadAssetTypeSettings(pool);
     const headers = headerMap(settings);
+    // internal keys of the columns this file has (see keepMissingColumns)
+    const present = new Set(columns.map((c) => headers.get(norm(c))).filter((k): k is string => !!k));
     const user = req.user!;
     const db = await pool.connect();
     try {
@@ -276,12 +313,13 @@ export function importsRouter(pool: Pool): Router {
         await db.query('SAVEPOINT row_sp');
         try {
           const mapped = mapRow(rows[i], headers, lookups, defaultType);
-          const parsed = assetSchema.safeParse(mapped.input);
-          if (!parsed.success) throw new Error(parsed.error.issues.map((x) => `${x.path.join('.') || 'row'}: ${x.message}`).join('; '));
-          const input = { ...parsed.data, attributes: cleanAttributes(parsed.data.type, parsed.data.attributes, settings) };
           let existing = null;
           if (mapped.id) existing = (await db.query('SELECT * FROM asset WHERE id = $1 FOR UPDATE', [mapped.id])).rows[0];
-          if (!existing) existing = (await db.query('SELECT * FROM asset WHERE type = $1 AND lower(name) = lower($2) FOR UPDATE', [input.type, input.name])).rows[0];
+          if (!existing && mapped.input.name)
+            existing = (await db.query('SELECT * FROM asset WHERE type = $1 AND lower(name) = lower($2) FOR UPDATE', [mapped.input.type, mapped.input.name])).rows[0];
+          const parsed = assetSchema.safeParse(existing ? keepMissingColumns(mapped.input, existing, present) : mapped.input);
+          if (!parsed.success) throw new Error(parsed.error.issues.map((x) => `${x.path.join('.') || 'row'}: ${x.message}`).join('; '));
+          const input = { ...parsed.data, attributes: cleanAttributes(parsed.data.type, parsed.data.attributes, settings) };
           const loc = await resolveAssetLocation(db, input, existing?.id);
           if (!hasPlantAccess(user, loc.plant_id)) throw new Error('Plant is outside of your plant scope');
 

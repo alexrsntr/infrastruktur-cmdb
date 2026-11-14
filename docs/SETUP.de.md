@@ -56,7 +56,8 @@ zum Neuanfang löschen). Die CMDB ist nur auf diesem Computer erreichbar – fü
 
 > **Von anderen Rechnern aus nutzen:** Kollegen öffnen `http://<name-dieses-rechners>:8080`. In
 > `docker-compose.yml` dann `APP_BASE_URL` auf diese Adresse ändern (wird für Links in E-Mails verwendet). Die
-> Verbindung ist unverschlüsselt – nur im Firmennetz nutzen oder einen HTTPS-Reverse-Proxy davorschalten.
+> Verbindung ist unverschlüsselt – nur im Firmennetz nutzen oder einen HTTPS-Reverse-Proxy davorschalten (dann zusätzlich
+> `TRUST_PROXY: 1` neben `APP_BASE_URL` setzen, damit die CMDB die echten Client-Adressen sieht).
 
 ### Weg C: Microsoft Azure mit wenigen Klicks
 

@@ -152,7 +152,8 @@ export function ActivityLog({ entityType, entityId, compact = false }: { entityT
 
   const setActivityStatus = async (item: TimelineItem, status: 'done' | 'cancelled') => {
     try {
-      await http.put(`/api/activities/${item.id}`, { kind: item.activity_kind, status, title: item.title, description: item.body, due_date: item.due_date });
+      // status only: the timeline entry does not carry every field of the activity (e.g. the assignee)
+      await http.patch(`/api/activities/${item.id}/status`, { status });
       await invalidate();
     } catch (e) {
       message.error(errorText(e));

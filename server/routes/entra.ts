@@ -18,6 +18,7 @@ import type { Config } from '../config';
 import { requireAdmin } from '../auth/context';
 import { audit } from '../lib/audit';
 import { HttpError, badRequest, parse } from '../lib/http';
+import { clientKey } from '../lib/rateLimit';
 import { encryptSecret } from '../lib/secrets';
 import { explainEntraError } from '../entra/errors';
 import type { EntraService, GraphUser } from '../entra/service';
@@ -72,11 +73,12 @@ export function entraRouter(pool: Pool, config: Config, entra: EntraService): Ro
   const testLimiter = rateLimit({
     windowMs: 60_000,
     limit: 6,
+    keyGenerator: clientKey,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
     message: { error: 'Too many tests. Please wait a minute.' },
   });
-  const directoryLimiter = rateLimit({ windowMs: 60_000, limit: 90, standardHeaders: 'draft-8', legacyHeaders: false });
+  const directoryLimiter = rateLimit({ windowMs: 60_000, limit: 90, keyGenerator: clientKey, standardHeaders: 'draft-8', legacyHeaders: false });
 
   async function counts() {
     const { rows } = await pool.query<{ entra_admins: number; local_admins: number }>(

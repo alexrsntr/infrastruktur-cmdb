@@ -90,7 +90,11 @@ function EditUserModal({ user, onClose }: { user: AppUser | null; onClose: () =>
   const localAccounts = config.authMode === 'local';
 
   useEffect(() => {
-    if (user) form.setFieldsValue({ role: user.role, plant_scope: user.plant_scope ?? [], active: user.active });
+    if (!user) return;
+    // The form keeps its values while the dialog is closed. Without the reset a password typed for
+    // one user would still be in the field – and be saved – when the next user is edited.
+    form.resetFields();
+    form.setFieldsValue({ role: user.role, plant_scope: user.plant_scope ?? [], active: user.active });
   }, [user, form]);
 
   const submit = async () => {
@@ -115,7 +119,18 @@ function EditUserModal({ user, onClose }: { user: AppUser | null; onClose: () =>
   const groupManaged = user?.role_source === 'group';
 
   return (
-    <Modal open={!!user} title={user ? `Edit ${user.display_name}` : ''} onCancel={onClose} onOk={submit} okText="Save" confirmLoading={saving} destroyOnHidden width={560}>
+    <Modal
+      open={!!user}
+      title={user ? `Edit ${user.display_name}` : ''}
+      onCancel={onClose}
+      onOk={submit}
+      okText="Save"
+      confirmLoading={saving}
+      destroyOnHidden
+      width={560}
+      // do not keep a typed password around once the dialog is gone (after the closing animation, so nothing flickers)
+      afterClose={() => form.resetFields()}
+    >
       {user && (
         <Form form={form} layout="vertical">
           <Typography.Paragraph type="secondary" style={{ marginTop: -4 }}>

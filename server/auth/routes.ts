@@ -9,6 +9,7 @@ import type { Config } from '../config';
 import { audit } from '../lib/audit';
 import { log } from '../lib/log';
 import { HttpError } from '../lib/http';
+import { clientKey } from '../lib/rateLimit';
 import { explainEntraError } from '../entra/errors';
 import { decideRole, groupRoleFor, type GroupRoleResult } from '../entra/roles';
 import type { EntraService } from '../entra/service';
@@ -154,7 +155,7 @@ function errorPage(res: Response, status: number, title: string, message: string
 
 export function authRouter(pool: Pool, config: Config, entra: EntraService): Router {
   const router = Router();
-  router.use(rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: 'draft-8', legacyHeaders: false }));
+  router.use(rateLimit({ windowMs: 60_000, limit: 60, keyGenerator: clientKey, standardHeaders: 'draft-8', legacyHeaders: false }));
 
   router.post('/logout', async (req, res) => {
     const viaMicrosoft = config.authMode === 'entra' || req.session.authMethod === 'entra';
@@ -381,6 +382,7 @@ function mountLocal(router: Router, pool: Pool, config: Config, entra: EntraServ
   const loginLimiter = rateLimit({
     windowMs: 15 * 60_000,
     limit: 10,
+    keyGenerator: clientKey,
     skipSuccessfulRequests: true,
     standardHeaders: 'draft-8',
     legacyHeaders: false,

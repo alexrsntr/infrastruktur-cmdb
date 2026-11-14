@@ -105,10 +105,11 @@ describe('local accounts (AUTH_MODE=local)', () => {
     await request(app).post('/auth/local-login').send({ email: 'ed@example.local', password: 'reset by admin 1' }).expect(403);
   });
 
-  it('rate-limits repeated failed sign-ins', async () => {
+  it('rate-limits repeated failed sign-ins – a made-up X-Forwarded-For header does not reset the counter', async () => {
     let status = 0;
     for (let i = 0; i < 12 && status !== 429; i++) {
-      status = (await request(app).post('/auth/local-login').send({ email: ADMIN.email, password: `guess number ${i}` })).status;
+      // no reverse proxy is configured (TRUST_PROXY): the header of a directly connected client must be ignored
+      status = (await request(app).post('/auth/local-login').set('X-Forwarded-For', `203.0.113.${i + 1}`).send({ email: ADMIN.email, password: `guess number ${i}` })).status;
     }
     expect(status).toBe(429);
   });

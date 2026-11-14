@@ -236,6 +236,19 @@ describe('notes & activities', () => {
     const list = await viewer.get(`/api/activities?plantId=${muc.id}&kind=incident`).expect(200);
     expect(list.body.items.some((a: { id: string }) => a.id === act.body.id)).toBe(true);
   });
+
+  it('changes only the status with the quick action and keeps assignee, description and due date', async () => {
+    const act = await operator
+      .post('/api/activities', { entity_type: 'plant', entity_id: muc.id, kind: 'maintenance', title: 'Replace UPS battery', description: 'Battery pack 2', assignee: 'Tina Technician', due_date: '2030-02-01' })
+      .expect(201);
+    const done = await operator.patch(`/api/activities/${act.body.id}/status`, { status: 'done' }).expect(200);
+    expect(done.body).toMatchObject({ status: 'done', title: 'Replace UPS battery', description: 'Battery pack 2', assignee: 'Tina Technician', due_date: '2030-02-01' });
+    expect(done.body.completed_at).not.toBeNull();
+    const reopened = await operator.patch(`/api/activities/${act.body.id}/status`, { status: 'open' }).expect(200);
+    expect(reopened.body).toMatchObject({ status: 'open', assignee: 'Tina Technician', completed_at: null });
+    await operator.patch(`/api/activities/${act.body.id}/status`, { status: 'nonsense' }).expect(400);
+    await viewer.patch(`/api/activities/${act.body.id}/status`, { status: 'done' }).expect(403);
+  });
 });
 
 describe('exports', () => {
@@ -311,6 +324,32 @@ describe('import', () => {
     expect(created.attributes).toEqual({ port_count: 24, poe: true });
   });
 
+  it('changes only the columns that are in the file and keeps everything else of an existing device', async () => {
+    const find = async () => ((await viewer.get('/api/assets?q=muc-core-sw01').expect(200)).body.items as Record<string, unknown>[]).find((a) => a.name === 'muc-core-sw01')!;
+    const upload = (text: string) =>
+      editor.agent.post('/api/import/assets?dryRun=false').set('x-csrf-token', editor.csrf).attach('file', Buffer.from(text), 'partial.csv').expect(200);
+    const before = await find();
+    // otherwise this test proves nothing
+    expect(before.model).toBeTruthy();
+    expect(before.rack_name).toBeTruthy();
+    expect(Object.keys(before.attributes as object).length).toBeGreaterThan(0);
+
+    const res = await upload(['Type;Name;Owner', 'Switch;muc-core-sw01;Network team'].join('\n'));
+    expect(res.body).toMatchObject({ created: 0, updated: 1, errors: [] });
+    const after = await find();
+    expect(after.owner).toBe('Network team');
+    const kept = ['status', 'criticality', 'plant_code', 'building_code', 'floor_name', 'room', 'rack_name', 'rack_u', 'rack_height_u', 'manufacturer', 'model', 'serial_number', 'ip_address', 'tags', 'attributes'];
+    for (const field of kept) expect(after[field], field).toEqual(before[field]);
+
+    // one type-specific column: the other attributes stay
+    await upload(['Type;Name;Ports', 'Switch;muc-core-sw01;52'].join('\n'));
+    expect((await find()).attributes).toEqual({ ...(before.attributes as object), port_count: 52 });
+
+    // a column that is in the file clears the value when its cell is empty
+    await upload(['Type;Name;Owner', 'Switch;muc-core-sw01;'].join('\n'));
+    expect((await find()).owner).toBeNull();
+  });
+
   it('round-trips an Excel export through the import without changes', async () => {
     const exported = await editor.get(`/api/export/assets?format=xlsx&plantId=${muc.id}`).buffer(true).parse(binary).expect(200);
     const res = await editor.agent
@@ -361,6 +400,19 @@ describe('dashboard & search', () => {
     expect(res.body.totals.plants).toBe(6);
     expect(res.body.byType.length).toBe(6);
     expect(res.body.warrantyExpiring.length).toBeGreaterThan(0);
+  });
+
+  it('lists only changes to CMDB objects as recent changes, not user administration or settings', async () => {
+    // the newest audit entries are now about a user …
+    await admin.post('/api/users', { email: 'dashboard.test@example.local', display_name: 'Dashboard Test', role: 'viewer', plant_scope: [] }).expect(201);
+    const audit = (await admin.get('/api/audit?pageSize=5').expect(200)).body.items as { entity_type: string }[];
+    expect(audit.some((e) => e.entity_type === 'user')).toBe(true);
+    // … but users without the audit permission do not get them through the dashboard
+    for (const session of [editor, operator, admin]) {
+      const recent = (await session.get('/api/dashboard').expect(200)).body.recentChanges as { entity_type: string }[];
+      if (session === editor) expect(recent.length).toBeGreaterThan(0);
+      expect(recent.filter((e) => !['plant', 'building', 'floor', 'rack', 'asset', 'datacenter', 'application', 'vlan', 'subnet'].includes(e.entity_type))).toEqual([]);
+    }
   });
 
   it('searches across plants, buildings and assets', async () => {

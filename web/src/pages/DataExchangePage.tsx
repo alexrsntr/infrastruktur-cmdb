@@ -383,6 +383,7 @@ function ImportSection() {
     () => [
       'Excel (.xlsx – first worksheet) or CSV (comma or semicolon, UTF-8). Column headers as in the device export.',
       'Existing devices are matched by ID, otherwise by type + name, and updated. All other rows create new devices.',
+      'For existing devices only the columns in the file are changed: an empty cell clears the value, a column that is missing keeps it.',
       'Plant and building are referenced by their code (or name), the floor by its name.',
       'Status/criticality/type accept labels or keys (e.g. "Active" or "active"). Dates as YYYY-MM-DD or DD.MM.YYYY.',
       'Tags are separated by commas. Type-specific columns use the field labels, e.g. "Ports", "RAM (GB)", "Wi-Fi standard".',

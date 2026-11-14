@@ -70,7 +70,8 @@ to start from scratch). Only this computer can open the CMDB – for several use
 
 > **Use it from other computers:** colleagues open `http://<name-of-this-computer>:8080`. Change
 > `APP_BASE_URL` in `docker-compose.yml` to that address (used for links in e-mails). The connection is not
-> encrypted – use this only in your company network, or put an HTTPS reverse proxy in front.
+> encrypted – use this only in your company network, or put an HTTPS reverse proxy in front (then also set
+> `TRUST_PROXY: 1` next to `APP_BASE_URL`, so that the CMDB sees the real client addresses).
 
 ### Way 3: Microsoft Azure in a few clicks
 
@@ -263,6 +264,7 @@ The most important ones for Azure:
 | `NODE_ENV` | `production` | |
 | `APP_BASE_URL` | `https://cmdb-prod.azurewebsites.net` | used for the OIDC redirect URI `…/auth/callback` |
 | `SESSION_SECRET` | Key Vault reference | ≥ 32 characters |
+| `TRUST_PROXY` | `1` | number (or addresses) of the reverse proxies in front of the app; default: `1` on Azure App Service, otherwise none. Set it when you put nginx, Caddy, Traefik … in front – without it all users share one sign-in rate limit, with a wrong value clients can fake their address |
 | `AUTH_MODE` | `entra` | `entra` (Microsoft sign-in) or `local` (e-mail + password) |
 | `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` | | app registration (with `AUTH_MODE=local` optional: configured in the app; a variable that is set always wins) |
 | `ENTRA_USE_MANAGED_IDENTITY` | `true` | secretless: managed identity as federated credential (else `ENTRA_CLIENT_SECRET`) |
@@ -297,6 +299,8 @@ The most important ones for Azure:
   The full export, plant dossier and asset dossier contain an *Attachments* sheet.
 * `POST /api/import/assets?dryRun=true|false` (multipart `file`, `.xlsx`/`.csv`) – columns as in the export;
   plants/buildings by code, floors and racks by name, rack unit as `12` or `12-13`; dates `YYYY-MM-DD` or `DD.MM.YYYY`.
+  For existing devices only the columns that are in the file are changed (an empty cell clears the value); columns
+  that are missing keep their current values.
 
 All exports respect the user's plant scope and are written to the audit log.
 

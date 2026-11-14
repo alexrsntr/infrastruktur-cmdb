@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Alert, App, Button, Card, Empty, Form, Input, Modal, Popconfirm, Segmented, Select, Space, Table, Tag, Tooltip, Typography } from 'antd';
 import { DeleteOutlined, EditOutlined, TeamOutlined, UserAddOutlined, UserOutlined } from '@ant-design/icons';
@@ -277,6 +277,12 @@ function ProvisionModal({ user, onClose }: { user: DirectoryUser | null; onClose
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
   const role = Form.useWatch('role', form);
+
+  useEffect(() => {
+    // The form keeps its values while the dialog is closed: start every person with the default role,
+    // not with the role chosen for the previous one
+    if (user) form.resetFields();
+  }, [user, form]);
 
   const submit = async () => {
     if (!user) return;
