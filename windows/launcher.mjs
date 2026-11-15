@@ -1,11 +1,13 @@
 // Infrastruktur CMDB – launcher of the portable Windows test package ("Start CMDB.cmd").
 //
-// First start: creates a PostgreSQL database in the "data" folder next to it and random passwords.
+// First start: creates a PostgreSQL database in the "data" folder next to it and random passwords, and fills it
+// with fictitious demo data (plants, buildings, racks, devices), so there is something to look at right away.
 // Every start: starts PostgreSQL and the CMDB (both only reachable from this computer) and opens the browser.
 // Ctrl+C or closing the window stops everything. "Stop CMDB.cmd" (= --stop) stops leftovers.
 //
-// Options: --no-browser   do not open the browser
-//          --stop         stop a running CMDB and its database
+// Options: --no-browser     do not open the browser
+//          --no-demo-data   first start with an empty database (also: CMDB_DEMO_DATA=0)
+//          --stop           stop a running CMDB and its database
 // Environment: CMDB_PORT (preferred web port, default 8080), CMDB_DATA_DIR (default: ..\data)
 
 import { spawn, spawnSync } from 'node:child_process';
@@ -24,6 +26,8 @@ const LOGS = path.join(DATA, 'logs');
 const SECRETS_FILE = path.join(DATA, 'secrets.json');
 const RUNTIME_FILE = path.join(DATA, 'runtime.json');
 const STOP_FLAG = path.join(DATA, 'stop-requested');
+/** Exists from the creation of the database until the CMDB has loaded the demo data (survives a failed first start) */
+const DEMO_FLAG = path.join(DATA, 'demo-data-pending');
 const PGBIN = path.join(APP_DIR, 'pgsql', 'bin');
 const CMDB_DIR = path.join(APP_DIR, 'cmdb');
 const IS_WINDOWS = process.platform === 'win32';
@@ -32,6 +36,7 @@ const DB_NAME = 'cmdb';
 
 const args = new Set(process.argv.slice(2));
 const openBrowser = !args.has('--no-browser') && process.env.CMDB_NO_BROWSER !== '1';
+const demoData = !args.has('--no-demo-data') && !['0', 'false', 'no', 'off'].includes((process.env.CMDB_DEMO_DATA ?? '').toLowerCase());
 
 const say = (msg) => console.log(`[cmdb] ${msg}`);
 const pgTool = (name) => path.join(PGBIN, IS_WINDOWS ? `${name}.exe` : name);
@@ -144,6 +149,7 @@ function openInBrowser(url) {
   if (openBrowser && IS_WINDOWS) spawn('explorer.exe', [url], { detached: true, stdio: 'ignore' }).unref();
 }
 
+/** Creates the CMDB database if it does not exist yet; true = it was created now (first start) */
 async function ensureDatabase(port, password) {
   const require = createRequire(path.join(CMDB_DIR, 'package.json'));
   const { Client } = require('pg');
@@ -154,7 +160,9 @@ async function ensureDatabase(port, password) {
     if (!rowCount) {
       say('Creating the CMDB database …');
       await client.query(`CREATE DATABASE ${DB_NAME}`);
+      return true;
     }
+    return false;
   } finally {
     await client.end();
   }
@@ -219,7 +227,11 @@ async function main() {
   } else {
     say(`The database is already running on 127.0.0.1:${pgPort}.`);
   }
-  await ensureDatabase(pgPort, secrets.dbPassword);
+  const created = await ensureDatabase(pgPort, secrets.dbPassword);
+  // demo data only for a new database – never into one that is already in use
+  if (created && demoData) fs.writeFileSync(DEMO_FLAG, '');
+  if (!demoData) fs.rmSync(DEMO_FLAG, { force: true });
+  const loadDemoData = fs.existsSync(DEMO_FLAG);
 
   // ---- CMDB
   fs.rmSync(RUNTIME_FILE, { force: true });
@@ -229,6 +241,7 @@ async function main() {
   const url = `http://localhost:${appPort}`;
   const env = { ...process.env };
   delete env.DATABASE_URL;
+  delete env.DEMO_DATA;
   Object.assign(env, {
     NODE_ENV: 'production',
     HOST: '127.0.0.1',
@@ -245,8 +258,9 @@ async function main() {
     SESSION_SECRET: secrets.sessionSecret,
     SETTINGS_ENCRYPTION_KEY: secrets.settingsKey,
     STORAGE_DRIVER: 'database',
+    ...(loadDemoData ? { DEMO_DATA: 'true' } : {}),
   });
-  say(`Starting the CMDB on ${url} …`);
+  say(loadDemoData ? `Starting the CMDB on ${url} and loading demo data …` : `Starting the CMDB on ${url} …`);
   const app = spawn(process.execPath, ['--enable-source-maps', path.join(CMDB_DIR, 'dist', 'server.mjs')], { cwd: CMDB_DIR, env, stdio: 'inherit', windowsHide: true });
   fs.writeFileSync(RUNTIME_FILE, JSON.stringify({ url, appPort, pgPort, appPid: app.pid, launcherPid: process.pid }, null, 2));
 
@@ -278,10 +292,15 @@ async function main() {
     shutdown(1);
     return;
   }
+  fs.rmSync(DEMO_FLAG, { force: true }); // loaded (or skipped by the CMDB because the database is in use)
   console.log('');
   console.log('  ==============================================================');
   console.log(`   Infrastruktur CMDB is running:  ${url}`);
   console.log('   First visit: create your administrator account.');
+  if (loadDemoData) {
+    console.log('   Demo data: 6 fictitious plants with buildings, racks and devices –');
+    console.log('   look around and change anything. To start empty: see README.txt.');
+  }
   console.log('   To stop: close this window or press Ctrl+C.');
   console.log('  ==============================================================');
   console.log('');

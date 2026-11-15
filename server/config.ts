@@ -86,6 +86,8 @@ export interface Config {
   settingsEncryptionKey: string;
   /** Run the in-process scheduler for e-mail notifications */
   notificationsScheduler: boolean;
+  /** DEMO_DATA=true: load the fictitious demo data into a new, empty database at start (once) */
+  demoData: boolean;
   /** Where attachment files are stored */
   storage: {
     driver: 'database' | 'azure-blob';
@@ -157,6 +159,7 @@ export function loadConfig(): Config {
     managedIdentityClientId: str('AZURE_CLIENT_ID'),
     settingsEncryptionKey: str('SETTINGS_ENCRYPTION_KEY'),
     notificationsScheduler: bool('NOTIFICATIONS_SCHEDULER', env !== 'test'),
+    demoData: bool('DEMO_DATA'),
     storage: {
       driver: str('STORAGE_DRIVER', 'database') as Config['storage']['driver'],
       accountUrl: str('AZURE_STORAGE_ACCOUNT_URL').replace(/\/$/, ''),

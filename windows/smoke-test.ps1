@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
   End-to-end test of the Windows test package: unpack the ZIP, start, first-run setup, sign-in,
-  stop, start again (existing data), stop.
+  demo data, stop, start again (existing data, no second copy of the demo data), stop.
 .EXAMPLE
   ./windows/smoke-test.ps1 -Zip C:\temp\cmdb-package\Infrastruktur-CMDB-Windows.zip
 #>
@@ -61,7 +61,11 @@ $me = Invoke-RestMethod "$($run.Base)/api/me" -WebSession $s1
 if ($me.user.role -ne 'admin') { throw "Expected admin, got $($me.user.role)" }
 $page = Invoke-WebRequest "$($run.Base)/" -UseBasicParsing
 if ($page.Content -notmatch 'id="root"') { throw 'The web UI is not served' }
-Write-Host '    setup, sign-in and web UI ok'
+$dash = Invoke-RestMethod "$($run.Base)/api/dashboard" -WebSession $s1
+if ($dash.totals.plants -ne 6 -or $dash.totals.assets -lt 100) { throw "Expected the demo data, got $($dash.totals.plants) plants and $($dash.totals.assets) devices" }
+$demoAssets = $dash.totals.assets
+if (Test-Path (Join-Path $dir 'data/demo-data-pending')) { throw 'The demo data marker was not removed after the first start' }
+Write-Host "    setup, sign-in, web UI and demo data ($($dash.totals.plants) plants, $demoAssets devices) ok"
 
 Write-Host '==> second double-click while running opens the existing instance'
 & $node $launcher --no-browser
@@ -78,7 +82,9 @@ $login = @{ email = 'smoke@example.local'; password = 'smoke-test-password' } | 
 Invoke-RestMethod "$($run.Base)/auth/local-login" -Method Post -ContentType 'application/json' -Body $login -SessionVariable s2 | Out-Null
 $me = Invoke-RestMethod "$($run.Base)/api/me" -WebSession $s2
 if ($me.user.role -ne 'admin') { throw 'Sign-in after restart failed' }
-Write-Host '    data kept, sign-in ok'
+$dash = Invoke-RestMethod "$($run.Base)/api/dashboard" -WebSession $s2
+if ($dash.totals.plants -ne 6 -or $dash.totals.assets -ne $demoAssets) { throw "The demo data changed on the second start: $($dash.totals.plants) plants, $($dash.totals.assets) devices" }
+Write-Host '    data kept, sign-in ok, demo data loaded only once'
 Stop-Cmdb $run
 
 Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue

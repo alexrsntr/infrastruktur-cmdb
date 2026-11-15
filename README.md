@@ -41,6 +41,10 @@ For trying it out on your own Windows PC: nothing to install, no administrator r
    *Run* (or *More info* → *Run anyway*).
 4. After about a minute your browser opens <http://localhost:8080> – create your administrator account. Done!
 
+The CMDB starts with **fictitious demo data** – 6 plants with buildings, floor plans, racks, about 180 devices,
+connections, activities and a stretched data center – so you can look around right away. Nothing in it is real.
+To start with an empty CMDB instead, see `README.txt` in the unpacked folder.
+
 **Stop:** close the black window. **Data** is kept in the folder `data` next to it (copy it as a backup, delete it
 to start from scratch). Only this computer can open the CMDB – for several users use way 2, 3 or 4.
 

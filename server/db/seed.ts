@@ -406,6 +406,20 @@ export async function seed(pool: Pool, opts: { force?: boolean } = {}) {
   }
 }
 
+/**
+ * DEMO_DATA=true (Windows test package): fills a new, empty database with the demo data – exactly once.
+ * Nothing happens when the database already has plants or demo data was loaded before, so the demo data
+ * never comes back after someone deleted it to start with their own data.
+ */
+export async function seedDemoDataOnce(pool: Pool) {
+  const { rows } = await pool.query(
+    `SELECT EXISTS (SELECT 1 FROM plant) AS has_plants, EXISTS (SELECT 1 FROM audit_log WHERE action = 'seed') AS seeded_before`,
+  );
+  if (rows[0].has_plants) return { skipped: true, reason: 'The database already contains plants' };
+  if (rows[0].seeded_before) return { skipped: true, reason: 'Demo data was loaded before' };
+  return seed(pool);
+}
+
 async function one(client: PoolClient, sql: string, params: unknown[]) {
   const { rows } = await client.query(sql, params);
   return rows[0];

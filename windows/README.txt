@@ -6,6 +6,12 @@ DEUTSCH
   Starten:   Doppelklick auf "Start CMDB.cmd". Der erste Start dauert etwa eine Minute.
              Danach öffnet sich der Browser (http://localhost:8080) - dort das
              Administratorkonto anlegen. Fertig.
+  Beispiel:  Beim ersten Start werden fiktive Beispieldaten geladen (6 Werke mit
+             Gebäuden, Racks und Geräten), damit man sich gleich umsehen kann.
+             Nichts davon ist echt - alles darf geändert und gelöscht werden.
+  Leer:      Ohne Beispieldaten anfangen: CMDB beenden, den Ordner "data" löschen,
+             in der Adresszeile des Explorers "cmd" eingeben, Enter drücken und
+             "Start CMDB.cmd" --no-demo-data   eingeben (mit den Anführungszeichen).
   Beenden:   das schwarze Fenster schließen (oder darin Strg+C drücken).
   Daten:     liegen im Ordner "data" neben dieser Datei. Zum Sichern den ganzen Ordner
              kopieren, während die CMDB beendet ist. Zum Neuanfang den Ordner löschen.
@@ -24,6 +30,12 @@ ENGLISH
   Start:     double-click "Start CMDB.cmd". The first start takes about a minute.
              Your browser then opens http://localhost:8080 - create your administrator
              account there. Done.
+  Demo data: the first start loads fictitious demo data (6 plants with buildings,
+             racks and devices), so you can look around right away. Nothing in it
+             is real - change or delete anything.
+  Empty:     to start without demo data: stop the CMDB, delete the folder "data",
+             type "cmd" into the address bar of Explorer, press Enter and run
+             "Start CMDB.cmd" --no-demo-data   (with the quotation marks).
   Stop:      close the black window (or press Ctrl+C in it).
   Data:      in the folder "data" next to this file. To back it up, copy the whole folder
              while the CMDB is stopped. To start from scratch, delete the folder.

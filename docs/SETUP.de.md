@@ -27,6 +27,10 @@ Zum Ausprobieren auf dem eigenen Windows-PC: nichts installieren, keine Administ
    *Ausführen* (bzw. *Weitere Informationen* → *Trotzdem ausführen*).
 4. Nach etwa einer Minute öffnet sich der Browser mit <http://localhost:8080> – Administratorkonto anlegen. Fertig!
 
+Die CMDB startet mit **fiktiven Beispieldaten** – 6 Werke mit Gebäuden, Grundrissen, Racks, etwa 180 Geräten,
+Verbindungen, Aktivitäten und einem gestreckten Rechenzentrum –, damit man sich sofort umsehen kann. Nichts davon ist
+echt. Wer lieber leer anfängt: siehe `README.txt` im entpackten Ordner.
+
 **Beenden:** das schwarze Fenster schließen. Die **Daten** liegen im Ordner `data` daneben (zum Sichern kopieren,
 zum Neuanfang löschen). Die CMDB ist nur auf diesem Computer erreichbar – für mehrere Benutzer Weg B, C oder D.
 

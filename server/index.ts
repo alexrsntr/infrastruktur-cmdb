@@ -1,6 +1,7 @@
 import { loadConfig } from './config';
 import { createPool } from './db/pool';
 import { migrate } from './db/migrate';
+import { seedDemoDataOnce } from './db/seed';
 import { createApp } from './app';
 import { log } from './lib/log';
 import { checkSecretsKey } from './lib/secrets';
@@ -15,6 +16,11 @@ async function main() {
   if (config.db.migrateOnStart) {
     const applied = await migrate(pool);
     if (applied.length) log.info('db: migrations applied', { applied });
+  }
+  if (config.demoData) {
+    const result = await seedDemoDataOnce(pool);
+    if (result.skipped) log.info(`db: demo data not loaded – ${'reason' in result ? result.reason : 'skipped'}`);
+    else log.info('db: demo data loaded (fictitious plants and devices)', result);
   }
 
   checkSecretsKey(config);
