@@ -156,7 +156,7 @@ export function overviewRouter(pool: Pool, config: Config, entra: EntraService):
     s6.and(`l.action NOT IN ('login','logout','export')`);
     // Every signed-in user gets this list: only changes to CMDB objects. User administration, settings
     // (SMTP, Entra ID, tokens …) and anything else stay in the audit log, which needs "audit.read".
-    s6.and(`l.entity_type IN ('plant','building','floor','rack','asset','datacenter','application','vlan','subnet')`);
+    s6.and(`l.entity_type IN ('plant','building','floor','rack','asset','datacenter','application','vlan','subnet','certificate')`);
     if (!isUnscoped(user)) s6.and('l.plant_id IS NOT NULL');
 
     const [byType, byStatus, byPlant, plants, buildings, openActs, warranty, upcoming, recent] = await Promise.all([

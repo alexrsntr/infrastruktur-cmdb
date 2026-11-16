@@ -1,10 +1,10 @@
-import type { CurrentUser, EntityType } from '../../shared/model';
+import { seesAllPlants, type CurrentUser, type EntityType } from '../../shared/model';
 import type { DbClient } from '../db/pool';
 import { forbidden, notFound, type SqlBuilder } from './http';
 
-/** True if the user can see every plant (admins, or users without a plant restriction). */
+/** True if the user can see every plant (admins, or users without a plant restriction – local administrators never). */
 export function isUnscoped(user: CurrentUser): boolean {
-  return user.role === 'admin' || user.plantScope.length === 0;
+  return seesAllPlants(user);
 }
 
 /**

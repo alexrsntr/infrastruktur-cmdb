@@ -8,8 +8,10 @@ import {
   ENTITY_TYPES,
   RACK_ITEM_KINDS,
   RELATION_TYPE_KEYS,
+  PLANT_BOUND_ROLES,
   ROLES,
   type AssetType,
+  type Role,
 } from '../../shared/model';
 
 export const optText = (max = 500) =>
@@ -178,20 +180,30 @@ export const activityUpdateSchema = activitySchema.omit({ entity_type: true, ent
 /** "Mark done" / "Cancel": only the status changes */
 export const activityStatusSchema = z.object({ status: z.enum(ACTIVITY_STATUSES) });
 
-export const userUpdateSchema = z.object({
-  role: z.enum(ROLES),
-  plant_scope: z.array(z.string().uuid()).max(500).default([]),
-  active: z.boolean().default(true),
-});
+/** Local administrators only see the plants assigned to them – without a plant they would see nothing */
+export const plantBoundRoleCheck: [(v: { role: Role; plant_scope: string[] }) => boolean, { message: string; path: string[] }] = [
+  (v) => !PLANT_BOUND_ROLES.includes(v.role) || v.plant_scope.length > 0,
+  { message: 'A local administrator needs at least one plant', path: ['plant_scope'] },
+];
 
-export const userCreateSchema = z.object({
-  email: z.string().trim().toLowerCase().email().max(254),
-  display_name: reqText(200),
-  role: z.enum(ROLES),
-  plant_scope: z.array(z.string().uuid()).max(500).default([]),
-  /** Initial password for local accounts (AUTH_MODE=local) */
-  password: z.string().min(10, 'The password must have at least 10 characters').max(200).optional(),
-});
+export const userUpdateSchema = z
+  .object({
+    role: z.enum(ROLES),
+    plant_scope: z.array(z.string().uuid()).max(500).default([]),
+    active: z.boolean().default(true),
+  })
+  .refine(...plantBoundRoleCheck);
+
+export const userCreateSchema = z
+  .object({
+    email: z.string().trim().toLowerCase().email().max(254),
+    display_name: reqText(200),
+    role: z.enum(ROLES),
+    plant_scope: z.array(z.string().uuid()).max(500).default([]),
+    /** Initial password for local accounts (AUTH_MODE=local) */
+    password: z.string().min(10, 'The password must have at least 10 characters').max(200).optional(),
+  })
+  .refine(...plantBoundRoleCheck);
 
 export const userPasswordSchema = z.object({
   password: z.string().min(10, 'The password must have at least 10 characters').max(200),

@@ -79,6 +79,24 @@ Examples with stages 90/30/7:
 * **Send now** runs the job immediately (marked as *manual*); devices sent now are not sent again by the schedule.
 * **History** shows every run (scheduled/manual, status, devices, e-mails, error) and every sent reminder.
 
+## 2b. Certificate reminders and overview
+
+*Settings & e-mail → Certificate notifications* (administrators). Certificates are documented under
+*Certificates* in the main navigation: expiry date, responsible person (name + e-mail), further addresses
+("also remind"), plant, application and device.
+
+* **Reminders**: once a day (send hour and time zone as configured) the responsible person and the further
+  addresses of a certificate receive one e-mail when a reminder stage is reached – default 60, 30, 14, 7 and 1 day
+  before expiry, and once after expiry. Each stage is sent once per expiry date: entering the new date after a
+  renewal starts the reminders again.
+* **Central recipients** (e.g. the PKI team) receive every reminder in addition.
+* **Overview**: on the configured weekday the central recipients get one e-mail with all certificates that have
+  expired or expire within the configured period (default 90 days), with their responsible person. It is only sent
+  when there is something to report.
+* Only certificates with the status *Active* or *Renewal in progress* are reminded; *Replaced* and *Retired* ones
+  are ignored.
+* *Preview* shows what the next run would send; *Send reminders* / *Send with overview* send immediately.
+
 ## 3. Reliability
 
 * The scheduler runs inside the web app process and checks every 10 minutes. App Service **Always On** must be

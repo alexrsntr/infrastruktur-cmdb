@@ -73,7 +73,7 @@ function databaseError(detail: ErrorDetail): ExplainedError | null {
   const known: Record<string, { error: string; hint?: string }> = {
     '42P01': { error: 'The database is not up to date (table missing).', hint: 'Restart the app so that the database migrations run.' },
     '42703': { error: 'The database is not up to date (column missing).', hint: 'Restart the app so that the database migrations run.' },
-    '23505': { error: 'This Microsoft account is already linked to another CMDB user.', hint: 'Check the users under Users & permissions.' },
+    '23505': { error: 'This Microsoft account is already linked to another user.', hint: 'Check the users under Users & permissions.' },
     '23514': { error: 'The database rejected a value (check constraint).', hint: 'Restart the app so that the database migrations run.' },
   };
   const k = known[detail.pgCode];

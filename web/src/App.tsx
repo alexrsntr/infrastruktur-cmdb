@@ -3,7 +3,7 @@ import { Route, Routes, useLocation } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { App as AntApp, ConfigProvider, Result, Spin, Button } from 'antd';
 import enGB from 'antd/locale/en_GB';
-import type { AppConfig, MeResponse, Permission } from '../../shared/model';
+import { seesAllPlants, type AppConfig, type MeResponse, type Permission } from '../../shared/model';
 import { ApiError, http, setCsrfToken } from './lib/api';
 import { SessionContext, type SessionValue } from './lib/session';
 import { buildTheme } from './theme';
@@ -19,6 +19,7 @@ import { BuildingPage } from './pages/BuildingPage';
 import { AssetsPage } from './pages/AssetsPage';
 import { AssetPage } from './pages/AssetPage';
 import { ApplicationPage, ApplicationsPage } from './pages/ApplicationsPage';
+import { CertificatesPage } from './pages/CertificatesPage';
 import { DiscoveryPage } from './pages/DiscoveryPage';
 import { LabelsPage } from './pages/LabelsPage';
 import { DataQualityPage } from './pages/DataQualityPage';
@@ -65,7 +66,7 @@ export function Root() {
       me: me.data,
       config: me.data.config,
       can: (p) => perms.has(p),
-      scoped: me.data.user.role !== 'admin' && me.data.user.plantScope.length > 0,
+      scoped: !seesAllPlants(me.data.user),
       logout: async () => {
         const res = await http.post<{ logoutUrl: string }>('/auth/logout');
         window.location.href = res.logoutUrl || '/';
@@ -87,7 +88,7 @@ export function Root() {
     ) : (
       <Result
         status="error"
-        title="The CMDB is currently not reachable"
+        title="IT Infrastructure is currently not reachable"
         subTitle={me.error instanceof Error ? me.error.message : undefined}
         extra={<Button onClick={() => window.location.reload()}>Retry</Button>}
       />
@@ -110,6 +111,7 @@ export function Root() {
             <Route path="activities" element={<ActivitiesPage />} />
             <Route path="applications" element={<ApplicationsPage />} />
             <Route path="applications/:applicationId" element={<ApplicationPage />} />
+            <Route path="certificates" element={<CertificatesPage />} />
             <Route path="data" element={<DataExchangePage />} />
             <Route path="discovery" element={<DiscoveryPage />} />
             <Route path="data-quality" element={<DataQualityPage />} />

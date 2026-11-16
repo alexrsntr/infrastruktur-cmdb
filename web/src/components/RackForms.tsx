@@ -208,7 +208,7 @@ export function MountModal({
           value={mode}
           onChange={(m) => setMode(m as 'device' | 'item')}
           options={[
-            { value: 'device', label: 'Device from the CMDB' },
+            { value: 'device', label: 'Documented device' },
             { value: 'item', label: 'Other equipment (patch panel, UPS …)' },
           ]}
         />

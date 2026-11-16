@@ -105,7 +105,7 @@ export function applicationsRouter(pool: Pool): Router {
     res.status(201).json(row);
   });
 
-  r.put('/applications/:id', requirePermission('asset.write'), async (req, res) => {
+  r.put('/applications/:id', requirePermission('asset.edit'), async (req, res) => {
     const id = requireUuid(req.params.id);
     const input = parse(applicationSchema, req.body);
     const row = await withTransaction(pool, async (db) => {

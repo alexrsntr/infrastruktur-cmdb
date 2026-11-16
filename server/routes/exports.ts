@@ -264,7 +264,7 @@ function zipSafe(s: string): string {
   return s.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '_').replace(/\s+/g, ' ').trim().slice(0, 120) || '_';
 }
 
-export function exportsRouter(pool: Pool): Router {
+export function exportsRouter(pool: Pool, appName = 'IT Infrastructure'): Router {
   const r = Router();
   r.use(requirePermission('export'));
 
@@ -277,7 +277,7 @@ export function exportsRouter(pool: Pool): Router {
     const title = types.length === 1 ? ASSET_TYPES[types[0]].plural : 'Assets';
     await done(req, 'assets', format, rows.length);
     await sendExport(res, format, title, [{ name: title, columns: assetColumns(types, await loadAssetTypeSettings(pool)), rows }], {
-      title: `CMDB export – ${title}`,
+      title: `${appName} export – ${title}`,
       user: req.user!.displayName,
       delimiter: delimiterOf(req),
     });
@@ -287,7 +287,7 @@ export function exportsRouter(pool: Pool): Router {
     const format = formatOf(req);
     const rows = await loadPlants(pool, req.user!);
     await done(req, 'plants', format, rows.length);
-    await sendExport(res, format, 'Plants', [{ name: 'Plants', columns: PLANT_COLUMNS, rows }], { title: 'CMDB export – Plants', user: req.user!.displayName, delimiter: delimiterOf(req) });
+    await sendExport(res, format, 'Plants', [{ name: 'Plants', columns: PLANT_COLUMNS, rows }], { title: `${appName} export – Plants`, user: req.user!.displayName, delimiter: delimiterOf(req) });
   });
 
   r.get('/export/buildings', async (req, res) => {
@@ -295,7 +295,7 @@ export function exportsRouter(pool: Pool): Router {
     const plantId = queryString(req.query.plantId);
     const rows = await loadBuildings(pool, req.user!, plantId ? requireUuid(plantId, 'plantId') : undefined);
     await done(req, 'buildings', format, rows.length);
-    await sendExport(res, format, 'Buildings', [{ name: 'Buildings', columns: BUILDING_COLUMNS, rows }], { title: 'CMDB export – Buildings', user: req.user!.displayName, delimiter: delimiterOf(req) });
+    await sendExport(res, format, 'Buildings', [{ name: 'Buildings', columns: BUILDING_COLUMNS, rows }], { title: `${appName} export – Buildings`, user: req.user!.displayName, delimiter: delimiterOf(req) });
   });
 
   r.get('/export/floors', async (req, res) => {
@@ -304,7 +304,7 @@ export function exportsRouter(pool: Pool): Router {
     const buildingId = queryString(req.query.buildingId);
     const rows = await loadFloors(pool, req.user!, plantId ? requireUuid(plantId) : undefined, buildingId ? requireUuid(buildingId) : undefined);
     await done(req, 'floors', format, rows.length);
-    await sendExport(res, format, 'Floors', [{ name: 'Floors', columns: FLOOR_COLUMNS, rows }], { title: 'CMDB export – Floors', user: req.user!.displayName, delimiter: delimiterOf(req) });
+    await sendExport(res, format, 'Floors', [{ name: 'Floors', columns: FLOOR_COLUMNS, rows }], { title: `${appName} export – Floors`, user: req.user!.displayName, delimiter: delimiterOf(req) });
   });
 
   r.get('/export/relations', async (req, res) => {
@@ -312,21 +312,21 @@ export function exportsRouter(pool: Pool): Router {
     const plantId = queryString(req.query.plantId);
     const rows = await loadRelations(pool, req.user!, plantId ? requireUuid(plantId) : undefined);
     await done(req, 'relations', format, rows.length);
-    await sendExport(res, format, 'Relations', [{ name: 'Relations', columns: RELATION_COLUMNS, rows }], { title: 'CMDB export – Relations', user: req.user!.displayName, delimiter: delimiterOf(req) });
+    await sendExport(res, format, 'Relations', [{ name: 'Relations', columns: RELATION_COLUMNS, rows }], { title: `${appName} export – Relations`, user: req.user!.displayName, delimiter: delimiterOf(req) });
   });
 
   r.get('/export/notes', async (req, res) => {
     const format = formatOf(req);
     const rows = await loadNotes(pool, req.user!, req.query);
     await done(req, 'notes', format, rows.length);
-    await sendExport(res, format, 'Notes', [{ name: 'Notes', columns: NOTE_COLUMNS, rows }], { title: 'CMDB export – Notes', user: req.user!.displayName, delimiter: delimiterOf(req) });
+    await sendExport(res, format, 'Notes', [{ name: 'Notes', columns: NOTE_COLUMNS, rows }], { title: `${appName} export – Notes`, user: req.user!.displayName, delimiter: delimiterOf(req) });
   });
 
   r.get('/export/activities', async (req, res) => {
     const format = formatOf(req);
     const rows = await loadActivities(pool, req.user!, req.query);
     await done(req, 'activities', format, rows.length);
-    await sendExport(res, format, 'Activities', [{ name: 'Activities', columns: ACTIVITY_COLUMNS, rows }], { title: 'CMDB export – Activities', user: req.user!.displayName, delimiter: delimiterOf(req) });
+    await sendExport(res, format, 'Activities', [{ name: 'Activities', columns: ACTIVITY_COLUMNS, rows }], { title: `${appName} export – Activities`, user: req.user!.displayName, delimiter: delimiterOf(req) });
   });
 
   r.get('/export/audit', requirePermission('audit.read'), async (req, res) => {
@@ -334,14 +334,14 @@ export function exportsRouter(pool: Pool): Router {
     const sql = buildAuditQuery(req.query);
     const { rows } = await pool.query(`SELECT ${AUDIT_SELECT} FROM audit_log l ${sql.whereSql()} ORDER BY l.at DESC LIMIT 100000`, sql.params);
     await done(req, 'audit', format, rows.length);
-    await sendExport(res, format, 'Audit_log', [{ name: 'Audit log', columns: AUDIT_COLUMNS, rows }], { title: 'CMDB export – Audit log', user: req.user!.displayName, delimiter: delimiterOf(req) });
+    await sendExport(res, format, 'Audit_log', [{ name: 'Audit log', columns: AUDIT_COLUMNS, rows }], { title: `${appName} export – Audit log`, user: req.user!.displayName, delimiter: delimiterOf(req) });
   });
 
   r.get('/export/users', requirePermission('user.manage'), async (req, res) => {
     const format = formatOf(req);
     const rows = await loadUsers(pool);
     await done(req, 'users', format, rows.length);
-    await sendExport(res, format, 'Users', [{ name: 'Users', columns: USER_COLUMNS, rows }], { title: 'CMDB export – Users', user: req.user!.displayName, delimiter: delimiterOf(req) });
+    await sendExport(res, format, 'Users', [{ name: 'Users', columns: USER_COLUMNS, rows }], { title: `${appName} export – Users`, user: req.user!.displayName, delimiter: delimiterOf(req) });
   });
 
   r.get('/export/datacenters', async (req, res) => {
@@ -349,7 +349,7 @@ export function exportsRouter(pool: Pool): Router {
     const plantId = queryString(req.query.plantId);
     const rows = await loadDatacenterExportRows(pool, req.user!, plantId ? requireUuid(plantId, 'plantId') : undefined);
     await done(req, 'datacenters', format, rows.length);
-    await sendExport(res, format, 'Data_centers', [{ name: 'Data centers', columns: DATACENTER_COLUMNS, rows }], { title: 'CMDB export – Data centers', user: req.user!.displayName, delimiter: delimiterOf(req) });
+    await sendExport(res, format, 'Data_centers', [{ name: 'Data centers', columns: DATACENTER_COLUMNS, rows }], { title: `${appName} export – Data centers`, user: req.user!.displayName, delimiter: delimiterOf(req) });
   });
 
   r.get('/export/racks', async (req, res) => {
@@ -358,7 +358,7 @@ export function exportsRouter(pool: Pool): Router {
     const buildingId = queryString(req.query.buildingId);
     const rows = await loadRacks(pool, req.user!, { plantId: plantId ? requireUuid(plantId) : undefined, buildingId: buildingId ? requireUuid(buildingId) : undefined });
     await done(req, 'racks', format, rows.length);
-    await sendExport(res, format, 'Racks', [{ name: 'Racks', columns: RACK_COLUMNS, rows }], { title: 'CMDB export – Racks', user: req.user!.displayName, delimiter: delimiterOf(req) });
+    await sendExport(res, format, 'Racks', [{ name: 'Racks', columns: RACK_COLUMNS, rows }], { title: `${appName} export – Racks`, user: req.user!.displayName, delimiter: delimiterOf(req) });
   });
 
   r.get('/export/rack-contents', async (req, res) => {
@@ -372,7 +372,7 @@ export function exportsRouter(pool: Pool): Router {
       rackId: rackId ? requireUuid(rackId) : undefined,
     });
     await done(req, 'rack-contents', format, rows.length);
-    await sendExport(res, format, 'Rack_contents', [{ name: 'Rack contents', columns: RACK_CONTENT_COLUMNS, rows }], { title: 'CMDB export – Rack contents', user: req.user!.displayName, delimiter: delimiterOf(req) });
+    await sendExport(res, format, 'Rack_contents', [{ name: 'Rack contents', columns: RACK_CONTENT_COLUMNS, rows }], { title: `${appName} export – Rack contents`, user: req.user!.displayName, delimiter: delimiterOf(req) });
   });
 
   /** One rack: details, unit-by-unit elevation (as printed on a rack door) and contents */
@@ -416,7 +416,7 @@ export function exportsRouter(pool: Pool): Router {
     await done(req, 'attachments', format, rows.length);
     const columns = attachmentColumns(attachmentContext(pool).config.baseUrl);
     await sendExport(res, format, 'Attachments', [{ name: 'Attachments', columns, rows: rows.map(({ storage_key: _k, sha256: _s, ...r }) => r) }], {
-      title: 'CMDB export – Attachments',
+      title: `${appName} export – Attachments`,
       user: req.user!.displayName,
       delimiter: delimiterOf(req),
     });
@@ -500,9 +500,9 @@ export function exportsRouter(pool: Pool): Router {
     ];
     if (!plantId && can(user.role, 'user.manage')) sheets.push({ name: 'Users', columns: USER_COLUMNS, rows: await loadUsers(pool) });
 
-    const base = plantId ? `Plant_${plants[0].code}` : 'CMDB_full_export';
+    const base = plantId ? `Plant_${plants[0].code}` : 'Infrastructure_full_export';
     await done(req, plantId ? 'plant-dossier' : 'full', format, assets.rows.length);
-    await sendExport(res, format, base, sheets, { title: plantId ? `Plant dossier ${plants[0].code}` : 'CMDB full export', user: user.displayName });
+    await sendExport(res, format, base, sheets, { title: plantId ? `Plant dossier ${plants[0].code}` : `${appName} full export`, user: user.displayName });
   });
 
   /** Single asset dossier: master data, relations, notes, activities, change history */

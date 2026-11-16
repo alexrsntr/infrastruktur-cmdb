@@ -19,8 +19,9 @@ import {
   BlockOutlined,
   RadarChartOutlined,
   SafetyCertificateOutlined,
+  FileProtectOutlined,
 } from '@ant-design/icons';
-import { ROLE_META } from '../../../shared/model';
+import { firstName, ROLE_META } from '../../../shared/model';
 import { useSession } from '../lib/session';
 import { usePlants } from '../lib/queries';
 import { BrandMark } from '../components/BrandMark';
@@ -42,6 +43,7 @@ const NAV: NavItem[] = [
   { key: 'sites', label: 'Plants', icon: <EnvironmentOutlined />, to: '/plants', match: (p) => /^\/(plants|buildings|map|plans|datacenters)/.test(p) },
   { key: 'devices', label: 'Devices', icon: <AppstoreOutlined />, to: '/inventory', match: (p) => /^\/(inventory|assets)/.test(p) },
   { key: 'apps', label: 'Applications', icon: <BlockOutlined />, to: '/applications', match: (p) => p.startsWith('/applications') },
+  { key: 'certs', label: 'Certificates', icon: <FileProtectOutlined />, to: '/certificates', match: (p) => p.startsWith('/certificates') },
   { key: 'racks', label: 'Racks', icon: <HddOutlined />, to: '/racks', match: (p) => p.startsWith('/racks') },
   { key: 'activities', label: 'Activities', icon: <ScheduleOutlined />, to: '/activities', match: (p) => p.startsWith('/activities') },
 ];
@@ -111,9 +113,17 @@ export function AppLayout() {
     NAV.map((n) => {
       const active = n.match(location.pathname);
       return (
-        <Link key={n.key} to={n.to} className={`top-nav-item${active ? ' active' : ''}${vertical ? ' vertical' : ''}`} onClick={() => setDrawer(false)}>
+        <Link
+          key={n.key}
+          to={n.to}
+          className={`top-nav-item${active ? ' active' : ''}${vertical ? ' vertical' : ''}`}
+          onClick={() => setDrawer(false)}
+          // on laptop screens only the icons are shown (styles.css) – the label stays as tooltip and for screen readers
+          title={vertical ? undefined : n.label}
+          aria-label={n.label}
+        >
           <span className="top-nav-icon">{n.icon}</span>
-          {n.label}
+          <span className="top-nav-label">{n.label}</span>
         </Link>
       );
     });
@@ -137,9 +147,11 @@ export function AppLayout() {
           </div>
         )}
         {can('asset.write') && (
-          <Button type="primary" size="large" icon={<PlusOutlined />} onClick={() => openAddDevice()} className="header-add">
-            {screens.sm ? 'Add device' : null}
-          </Button>
+          <Tooltip title="Add device">
+            <Button type="primary" size="large" icon={<PlusOutlined />} onClick={() => openAddDevice()} className="header-add" aria-label="Add device">
+              {screens.sm ? <span className="header-add-text">Add device</span> : null}
+            </Button>
+          </Tooltip>
         )}
         {scopeCodes && wide && (
           <Tooltip title="You see and edit the devices of these plants">
@@ -152,7 +164,7 @@ export function AppLayout() {
         <Dropdown menu={userMenu} placement="bottomRight" trigger={['click']}>
           <Button type="text" className="header-user" aria-label="User menu">
             <Avatar size={34} icon={<UserOutlined />} style={{ background: '#2f8fd8' }} />
-            {screens.xl && <span className="header-user-name">{me.user.displayName.split(' ')[0]}</span>}
+            {screens.xl && <span className="header-user-name">{firstName(me.user.displayName) || me.user.displayName}</span>}
           </Button>
         </Dropdown>
       </Layout.Header>

@@ -24,10 +24,11 @@ const MODEL_EXAMPLE: Partial<Record<AssetType, string>> = {
   ot_device: 'SIMATIC S7-1500',
   printer: 'LaserJet M611',
   camera: 'AXIS P3265-LVE',
+  cabling: 'Fibre trunk 24x OS2',
 };
 
 /** Usually not mounted in a rack – the rack fields are not offered in the wizard */
-const NOT_IN_RACK = new Set<AssetType>(['access_point', 'printer', 'camera']);
+const NOT_IN_RACK = new Set<AssetType>(['access_point', 'printer', 'camera', 'cabling']);
 
 
 const LAST_PLANT_KEY = 'cmdb.lastPlant';

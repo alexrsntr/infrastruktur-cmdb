@@ -174,7 +174,7 @@ export function AssetTable({ fixed = {}, createDefaults, syncUrl = false, pageSi
           </div>
         ) : (
           <div>
-            <div>Added to the CMDB</div>
+            <div>Added</div>
             <span className="muted" style={{ fontSize: 13 }}>
               {fromNow(a.created_at)}
             </span>

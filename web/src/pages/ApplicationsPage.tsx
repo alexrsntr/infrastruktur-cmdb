@@ -274,13 +274,13 @@ export function ApplicationPage() {
         }
         extra={
           <Space>
-            {writable && (
+            {can('asset.edit') && (
               <Button icon={<EditOutlined />} onClick={() => setEditing(true)}>
                 Edit
               </Button>
             )}
             {can('asset.delete') && (
-              <Popconfirm title={`Delete ${a.name}?`} description="The devices stay in the CMDB." onConfirm={remove}>
+              <Popconfirm title={`Delete ${a.name}?`} description="The devices are kept." onConfirm={remove}>
                 <Button danger icon={<DeleteOutlined />}>
                   Delete
                 </Button>

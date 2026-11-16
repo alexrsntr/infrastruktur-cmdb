@@ -34,15 +34,18 @@ export function DatacenterPage() {
     return (
       <Result
         status={status === 403 ? '403' : status === 404 ? '404' : 'error'}
-        title={status === 404 ? 'Data center not found' : status === 403 ? 'No access to this data center' : 'Could not load the data center'}
+        title={status === 404 ? 'Server room / data center not found' : status === 403 ? 'No access to this server room' : 'Could not load the server room'}
         subTitle={errorText(q.error)}
-        extra={<Button onClick={() => navigate('/datacenters')}>All data centers</Button>}
+        extra={<Button onClick={() => navigate('/datacenters')}>All server rooms / data centers</Button>}
       />
     );
   }
 
   const dc = q.data;
+  /** add / remove rooms, links and the whole entry */
   const canEdit = can('location.write');
+  /** change the existing entry (local administrators too) */
+  const canChange = can('location.edit');
   const racks = dc.sites.reduce((n, s) => n + s.racks.filter((r) => r.id).length, 0);
   const devices = dc.sites.reduce((n, s) => n + s.racks.reduce((m, r) => m + r.devices.length, 0), 0);
   const stretchedClusters = dc.clusters.filter((c) => c.stretched).length;
@@ -71,7 +74,7 @@ export function DatacenterPage() {
     <div>
       <PageHeader
         crumbs={[
-          { title: 'Data centers', to: '/datacenters' },
+          { title: 'Server rooms / data centers', to: '/datacenters' },
           { title: `${dc.plant_code} – ${dc.plant_name}`, to: `/plants/${dc.plant_id}` },
         ]}
         icon={
@@ -87,25 +90,27 @@ export function DatacenterPage() {
         }
         subtitle={dc.description ?? undefined}
         extra={
-          canEdit && (
+          canChange && (
             <>
               <Button size="large" icon={<EditOutlined />} onClick={() => setEditing(true)}>
                 Edit
               </Button>
-              {dc.sites.length > 1 && (
+              {canEdit && dc.sites.length > 1 && (
                 <Button size="large" icon={<PlusOutlined />} onClick={() => setLinkModal({ open: true })}>
                   Add link
                 </Button>
               )}
-              <Popconfirm
-                title={`Delete ${dc.name}?`}
-                description="Only the data center grouping is deleted. Racks and devices stay as they are."
-                onConfirm={remove}
-                okText="Delete"
-                okButtonProps={{ danger: true }}
-              >
-                <Button size="large" danger icon={<DeleteOutlined />} aria-label="Delete data center" />
-              </Popconfirm>
+              {canEdit && (
+                <Popconfirm
+                  title={`Delete ${dc.name}?`}
+                  description="Only the server room / data center entry is deleted. Racks and devices stay as they are."
+                  onConfirm={remove}
+                  okText="Delete"
+                  okButtonProps={{ danger: true }}
+                >
+                  <Button size="large" danger icon={<DeleteOutlined />} aria-label="Delete server room / data center" />
+                </Popconfirm>
+              )}
             </>
           )
         }
@@ -157,7 +162,7 @@ export function DatacenterPage() {
               { title: 'Capacity / cable', dataIndex: 'capacity', render: (v) => dash(v) },
               { title: 'Length', dataIndex: 'length_m', width: 100, render: (v) => (v != null ? `${v} m` : '–') },
               { title: 'Note', dataIndex: 'note', ellipsis: true, render: (v) => <Typography.Text type="secondary">{dash(v)}</Typography.Text> },
-              ...(canEdit
+              ...(canChange
                 ? [
                     {
                       title: '',
@@ -166,9 +171,11 @@ export function DatacenterPage() {
                       render: (_: unknown, l: DatacenterLink) => (
                         <Space size={4}>
                           <Button type="text" icon={<EditOutlined />} aria-label="Edit link" onClick={() => setLinkModal({ open: true, link: l })} />
-                          <Popconfirm title={`Delete ${l.label}?`} onConfirm={() => removeLink(l)} okButtonProps={{ danger: true }}>
-                            <Button type="text" danger icon={<DeleteOutlined />} aria-label="Delete link" />
-                          </Popconfirm>
+                          {canEdit && (
+                            <Popconfirm title={`Delete ${l.label}?`} onConfirm={() => removeLink(l)} okButtonProps={{ danger: true }}>
+                              <Button type="text" danger icon={<DeleteOutlined />} aria-label="Delete link" />
+                            </Popconfirm>
+                          )}
                         </Space>
                       ),
                     },

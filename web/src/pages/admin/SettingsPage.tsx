@@ -39,6 +39,15 @@ import {
   type WarrantyNotificationSettings,
   type WarrantyPreview,
 } from '../../../../shared/notifications';
+import {
+  WEEKDAYS,
+  daysLeftText,
+  type CertificateDueItem,
+  type CertificateNotificationSettings,
+  type CertificateNotificationSettingsDto,
+  type CertificatePreview,
+  type CertificateRunResult,
+} from '../../../../shared/certificates';
 import { errorText, http } from '../../lib/api';
 import { fmtDate, fmtDateTime, fromNow } from '../../lib/format';
 import { usePlants } from '../../lib/queries';
@@ -188,12 +197,12 @@ function SmtpTab() {
               </Col>
               <Col xs={24} md={12}>
                 <Form.Item name="fromAddress" label="Sender address" rules={[{ required: true, message: 'Enter the sender address' }, { type: 'email', message: 'Invalid e-mail address' }]}>
-                  <Input placeholder="it-cmdb@example.com" />
+                  <Input placeholder="it-infrastructure@example.com" />
                 </Form.Item>
               </Col>
               <Col xs={24} md={12}>
                 <Form.Item name="fromName" label="Sender name">
-                  <Input placeholder="IT CMDB" />
+                  <Input placeholder="IT Infrastructure" />
                 </Form.Item>
               </Col>
               <Col span={24}>
@@ -546,6 +555,225 @@ function HistoryTab() {
 }
 
 // ---------------------------------------------------------------------------
+// Certificate reminders and overview
+// ---------------------------------------------------------------------------
+
+type CertForm = Omit<CertificateNotificationSettings, 'thresholds'> & { thresholds: (string | number)[] };
+
+function CertificateNotificationsTab() {
+  const { message } = App.useApp();
+  const [form] = Form.useForm<CertForm>();
+  const [saving, setSaving] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [preview, setPreview] = useState<CertificatePreview | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  const settings = useQuery({ queryKey: ['settings', 'certificate-notifications'], queryFn: () => http.get<CertificateNotificationSettingsDto>('/api/settings/certificate-notifications') });
+  const email = useQuery({ queryKey: ['settings', 'email'], queryFn: () => http.get<EmailSettingsDto>('/api/settings/email') });
+  const overviewEnabled = Form.useWatch('overviewEnabled', form);
+
+  useEffect(() => {
+    if (settings.data) form.setFieldsValue({ ...settings.data, thresholds: settings.data.thresholds.map(String) });
+  }, [settings.data, form]);
+
+  const save = async () => {
+    const v = await form.validateFields();
+    const thresholds = [...new Set(v.thresholds.map((t) => Number(t)).filter((t) => Number.isInteger(t) && t >= 1 && t <= 730))];
+    setSaving(true);
+    try {
+      await http.put('/api/settings/certificate-notifications', { ...v, thresholds });
+      message.success('Certificate notification settings saved');
+      await settings.refetch();
+      setPreview(null);
+    } catch (e) {
+      message.error(errorText(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const loadPreview = async () => {
+    setPreviewing(true);
+    try {
+      setPreview(await http.get<CertificatePreview>('/api/notifications/certificates/preview'));
+    } catch (e) {
+      message.error(errorText(e));
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
+  const runNow = async (overview: boolean) => {
+    setRunning(true);
+    try {
+      const res = await http.post<CertificateRunResult>('/api/notifications/certificates/run', { overview });
+      if (res.status === 'ok')
+        message.success(res.emails ? `Sent ${res.emails} e-mail(s)${res.reminders ? ` with ${res.reminders} reminder(s)` : ''}${res.overview ? ' including the overview' : ''}` : 'Nothing to send');
+      else if (res.status === 'skipped') message.warning(res.error ?? 'Skipped');
+      else message.error(res.error ?? 'Sending failed');
+      await settings.refetch();
+      setPreview(null);
+    } catch (e) {
+      message.error(errorText(e));
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const s = settings.data;
+  return (
+    <Space orientation="vertical" size={16} style={{ width: '100%' }}>
+      {email.data && !email.data.configured && (
+        <Alert type="warning" showIcon title="The e-mail server is not configured yet" description="Configure the SMTP server on the first tab – notifications are skipped until then." />
+      )}
+      <Card
+        title="Certificate reminders & overview"
+        loading={settings.isLoading}
+        extra={
+          s?.lastRun && (
+            <Typography.Text type="secondary">
+              Last run {fromNow(s.lastRun.started_at)}: <Tag color={RUN_STATUS[s.lastRun.status as NotificationRun['status']]?.color}>{RUN_STATUS[s.lastRun.status as NotificationRun['status']]?.label ?? s.lastRun.status}</Tag>
+            </Typography.Text>
+          )
+        }
+      >
+        <Form form={form} layout="vertical" disabled={saving}>
+          <Form.Item name="enabled" valuePropName="checked" style={{ marginBottom: 12 }}>
+            <Switch checkedChildren="On" unCheckedChildren="Off" />
+          </Form.Item>
+          <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
+            Once a day the responsible person of a certificate (and the further addresses entered on it) is reminded when a reminder stage is reached. Each stage is
+            sent only once per expiry date – after a renewal with a new date the reminders start again.
+          </Typography.Paragraph>
+          <Row gutter={16}>
+            <Col xs={24} md={12}>
+              <Form.Item
+                name="thresholds"
+                label="Remind … days before the certificate expires"
+                rules={[{ validator: (_, v: (string | number)[]) => (v?.every((t) => /^\d+$/.test(String(t)) && Number(t) >= 1 && Number(t) <= 730) ? Promise.resolve() : Promise.reject(new Error('Whole numbers between 1 and 730'))) }]}
+              >
+                <Select mode="tags" tokenSeparators={[',', ' ']} options={[90, 60, 30, 14, 7, 1].map((d) => ({ value: String(d), label: `${d} days` }))} />
+              </Form.Item>
+            </Col>
+            <Col xs={12} md={6}>
+              <Form.Item name="includeExpired" label="After expiry" valuePropName="checked">
+                <Switch checkedChildren="Remind once" unCheckedChildren="Don't remind" />
+              </Form.Item>
+            </Col>
+            <Col xs={12} md={6}>
+              <Form.Item name="notifyResponsible" label="Remind the responsible persons" valuePropName="checked">
+                <Switch checkedChildren="Yes" unCheckedChildren="No" />
+              </Form.Item>
+            </Col>
+            <Col xs={12} md={6}>
+              <Form.Item name="sendHour" label="Send daily at">
+                <Select options={Array.from({ length: 24 }, (_, h) => ({ value: h, label: `${String(h).padStart(2, '0')}:00` }))} />
+              </Form.Item>
+            </Col>
+            <Col xs={12} md={6}>
+              <Form.Item name="timezone" label="Time zone">
+                <Select showSearch options={TIMEZONES.map((t) => ({ value: t, label: t }))} />
+              </Form.Item>
+            </Col>
+            <Col span={24}>
+              <Form.Item
+                name="recipients"
+                label="Central recipients"
+                rules={[emailRule()]}
+                extra="E.g. the PKI or IT security team. They receive every reminder and the overview. Press Enter after each address."
+              >
+                <Select mode="tags" tokenSeparators={[',', ';', ' ']} placeholder="pki-team@example.com" open={false} suffixIcon={null} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Divider titlePlacement="start" plain style={{ marginTop: 0 }}>
+            Overview e-mail
+          </Divider>
+          <Row gutter={16}>
+            <Col xs={24} md={8}>
+              <Form.Item name="overviewEnabled" label="Weekly overview to the central recipients" valuePropName="checked">
+                <Switch checkedChildren="On" unCheckedChildren="Off" />
+              </Form.Item>
+            </Col>
+            <Col xs={12} md={8}>
+              <Form.Item name="overviewWeekday" label="On">
+                <Select disabled={!overviewEnabled} options={WEEKDAYS.map((d, i) => ({ value: i + 1, label: d }))} />
+              </Form.Item>
+            </Col>
+            <Col xs={12} md={8}>
+              <Form.Item name="overviewDays" label="Lists certificates expiring within" rules={[{ required: true }]}>
+                <InputNumber disabled={!overviewEnabled} min={7} max={730} addonAfter="days" style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
+            The overview lists every certificate that has expired or expires within the period, with its responsible person – it is only sent when there is something to
+            report.
+          </Typography.Paragraph>
+          <Space wrap>
+            <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={save}>
+              Save
+            </Button>
+            {s?.updatedAt && <Typography.Text type="secondary">Last saved {fmtDateTime(s.updatedAt)}</Typography.Text>}
+            <Link to="/certificates">Open the certificates</Link>
+          </Space>
+        </Form>
+      </Card>
+
+      <Card
+        title="What would be sent now"
+        extra={
+          <Space wrap>
+            <Button icon={<EyeOutlined />} loading={previewing} onClick={loadPreview}>
+              Preview
+            </Button>
+            <Popconfirm title="Send the due reminders now?" description="Reminders sent now are not sent again at the next scheduled run." onConfirm={() => runNow(false)} disabled={!s?.enabled}>
+              <Button icon={<SendOutlined />} loading={running} disabled={!s?.enabled}>
+                Send reminders
+              </Button>
+            </Popconfirm>
+            <Popconfirm title="Send the due reminders and the overview now?" onConfirm={() => runNow(true)} disabled={!s?.enabled}>
+              <Tooltip title={!s?.enabled ? 'Turn notifications on and save first' : undefined}>
+                <Button type="primary" icon={<MailOutlined />} loading={running} disabled={!s?.enabled}>
+                  Send with overview
+                </Button>
+              </Tooltip>
+            </Popconfirm>
+          </Space>
+        }
+      >
+        {!preview ? (
+          <Typography.Text type="secondary">Click Preview to see which reminders the next run would send (based on the saved settings).</Typography.Text>
+        ) : (
+          <Space orientation="vertical" size={12} style={{ width: '100%' }}>
+            <Typography.Text>
+              <strong>{preview.reminders.length}</strong> reminder(s) due on {fmtDate(preview.today)}
+              {preview.overview.items > 0 && ` · overview with ${preview.overview.items} certificate(s)${preview.overview.due ? ' due today' : ''}`}
+            </Typography.Text>
+            {preview.unrouted > 0 && (
+              <Alert type="warning" showIcon title={`${preview.unrouted} certificate(s) have no recipient`} description="Enter a responsible e-mail address on the certificate or add central recipients." />
+            )}
+            <Table<CertificateDueItem>
+              rowKey="id"
+              size="small"
+              pagination={false}
+              dataSource={preview.reminders}
+              locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Nothing due" /> }}
+              columns={[
+                { title: 'Certificate', dataIndex: 'name', render: (v, i) => <Link to={`/certificates?open=${i.id}`}>{v}</Link> },
+                { title: 'Expires', dataIndex: 'expires_on', width: 110, render: (v) => fmtDate(v) },
+                { title: 'Remaining', dataIndex: 'days_left', width: 150, render: (v: number) => daysLeftText(v) },
+                { title: 'Stage', dataIndex: 'thresholds', width: 140, render: (t: number[]) => t.map((x) => <Tag key={x}>{thresholdLabel(x)}</Tag>) },
+                { title: 'Recipients', dataIndex: 'recipients', render: (r: string[]) => (r.length ? r.join(', ') : <Tag color="red">nobody</Tag>) },
+              ]}
+            />
+          </Space>
+        )}
+      </Card>
+    </Space>
+  );
+}
+
+// ---------------------------------------------------------------------------
 
 export function SettingsPage() {
   const { can } = useSession();
@@ -557,7 +785,7 @@ export function SettingsPage() {
     <div>
       <PageHeader
         title="Settings & notifications"
-        subtitle="E-mail server, warranty reminders, device types and sign-in with Microsoft. All changes are recorded in the audit log."
+        subtitle="E-mail server, warranty and certificate reminders, device types and sign-in with Microsoft. All changes are recorded in the audit log."
         crumbs={[{ title: 'Administration' }, { title: 'Settings & notifications' }]}
       />
       <Card styles={{ body: { paddingTop: 0 } }}>
@@ -572,6 +800,7 @@ export function SettingsPage() {
           items={[
             { key: 'email', label: 'E-mail server (SMTP)', children: <SmtpTab /> },
             { key: 'warranty', label: 'Warranty notifications', children: <WarrantyTab /> },
+            { key: 'certificates', label: 'Certificate notifications', children: <CertificateNotificationsTab /> },
             { key: 'history', label: 'History', children: <HistoryTab /> },
             { key: 'types', label: 'Device types', children: <DeviceTypesTab /> },
             { key: 'integrations', label: 'API & webhooks', children: <IntegrationsTab /> },

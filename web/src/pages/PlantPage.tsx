@@ -23,7 +23,8 @@ import { BuildingFormModal, PlantFormModal } from '../components/LocationForms';
 import { PageHeader } from '../components/PageHeader';
 import { AboutCard, download, exportUrl, MoreMenu, SectionHead } from '../components/PageParts';
 import { StatTile } from '../components/Simple';
-import { SiteMap } from '../components/WorldMap';
+import { PlantLocationCard } from '../components/GoogleMap';
+import { PlantScorecard } from '../components/Scorecard';
 import { PlansGallery } from '../components/PlansGallery';
 import { useAddDevice } from '../components/AddDeviceWizard';
 import { DatacenterFormModal } from '../components/DatacenterForms';
@@ -149,6 +150,8 @@ export function PlantPage() {
 
       <Row gutter={[24, 24]}>
         <Col xs={24} xl={16}>
+          <PlantScorecard plantId={p.id} />
+          <div style={{ height: 8 }} />
           <SectionHead
             title={`Buildings (${p.buildings.length})`}
             extra={
@@ -183,13 +186,13 @@ export function PlantPage() {
             <>
               <div style={{ height: 24 }} />
               <SectionHead
-                title={`Data centers (${dcs.length})`}
+                title={`Server rooms / data centers (${dcs.length})`}
                 extra={
                   <span style={{ display: 'inline-flex', gap: 12, alignItems: 'center' }}>
                     {dcs.length > 0 && <Link to={`/datacenters?plantId=${p.id}`}>Show all</Link>}
                     {can('location.write') && (
                       <Button icon={<PlusOutlined />} onClick={() => setDcModal(true)}>
-                        Add data center
+                        Add server room
                       </Button>
                     )}
                   </span>
@@ -198,8 +201,8 @@ export function PlantPage() {
               {dcs.length === 0 && (
                 <Card styles={{ body: { padding: 18 } }}>
                   <Typography.Text type="secondary">
-                    No data center yet. Document the server room of this plant in one step – choose the building, done. Racks in that room are added
-                    automatically.
+                    No server room documented yet. Add it in one step – choose the building and room, done. The racks in that room are added
+                    automatically. Two rooms that work together (e.g. a cluster across two buildings) form one data center.
                   </Typography.Text>
                 </Card>
               )}
@@ -242,16 +245,14 @@ export function PlantPage() {
                 ['Description', p.description],
               ]}
               extra={
-                can('location.write') && (
+                can('location.edit') && (
                   <Button type="link" icon={<EditOutlined />} onClick={() => setEditing(true)}>
                     Edit
                   </Button>
                 )
               }
             />
-            <Card title="Location" styles={{ body: { padding: 12 } }}>
-              <SiteMap plant={p} buildings={p.buildings} height={260} />
-            </Card>
+            <PlantLocationCard plant={p} />
           </div>
         </Col>
       </Row>
@@ -278,9 +279,9 @@ export function PlantPage() {
             )}
             <MoreMenu
               items={[
-                { key: 'edit', icon: <EditOutlined />, label: 'Edit plant', onClick: () => setEditing(true), hidden: !can('location.write') },
+                { key: 'edit', icon: <EditOutlined />, label: 'Edit plant', onClick: () => setEditing(true), hidden: !can('location.edit') },
                 { key: 'building', icon: <ClusterOutlined />, label: 'Add building', onClick: () => setBuildingModal(true), hidden: !can('location.write') },
-                { key: 'datacenter', icon: <DatabaseOutlined />, label: 'Add data center', onClick: () => setDcModal(true), hidden: !can('location.write') },
+                { key: 'datacenter', icon: <DatabaseOutlined />, label: 'Add server room / data center', onClick: () => setDcModal(true), hidden: !can('location.write') },
                 { key: 'racks', icon: <HddOutlined />, label: 'Racks of this plant', onClick: () => navigate(`/racks?plantId=${p.id}`) },
                 { key: 'xlsx', icon: <FileExcelOutlined />, label: 'Export plant (Excel)', onClick: () => download(exportUrl('full', 'xlsx', { plantId: p.id })), hidden: !can('export'), divider: true },
                 { key: 'json', icon: <CodeOutlined />, label: 'Export plant (JSON)', onClick: () => download(exportUrl('full', 'json', { plantId: p.id })), hidden: !can('export') },

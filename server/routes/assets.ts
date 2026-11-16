@@ -86,7 +86,7 @@ export function assetsRouter(pool: Pool): Router {
     res.status(201).json(row);
   });
 
-  r.put('/assets/:id', requirePermission('asset.write'), async (req, res) => {
+  r.put('/assets/:id', requirePermission('asset.edit'), async (req, res) => {
     const id = requireUuid(req.params.id);
     const input = parse(assetSchema, req.body);
     const row = await withTransaction(pool, async (db) => {
@@ -124,7 +124,7 @@ export function assetsRouter(pool: Pool): Router {
     res.json(row);
   });
 
-  r.patch('/assets/:id/position', requirePermission('asset.write'), async (req, res) => {
+  r.patch('/assets/:id/position', requirePermission('asset.edit'), async (req, res) => {
     const id = requireUuid(req.params.id);
     const input = parse(positionSchema, req.body);
     const row = await withTransaction(pool, async (db) => {

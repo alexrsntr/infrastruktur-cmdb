@@ -233,7 +233,7 @@ export function AssetPage() {
         subtitle={[typeDef.label, [a.manufacturer, a.model].filter(Boolean).join(' '), [a.plant_code, a.building_name, a.room].filter(Boolean).join(' › ')].filter(Boolean).join(' · ')}
         extra={
           <>
-            {can('asset.write') && (
+            {can('asset.edit') && (
               <Button size="large" icon={<EditOutlined />} onClick={() => setEditing(true)}>
                 Edit
               </Button>
@@ -257,7 +257,7 @@ export function AssetPage() {
                 <Facts rows={aboutRows} />
               ) : (
                 <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
-                  No details yet. {can('asset.write') ? 'Use “Edit” to add IP address, model, serial number and more.' : ''}
+                  No details yet. {can('asset.edit') ?'Use “Edit” to add IP address, model, serial number and more.' : ''}
                 </Typography.Paragraph>
               )}
               <Button type="link" style={{ paddingInline: 0, marginTop: 10, display: 'flex' }} onClick={() => setAllFields((v) => !v)} icon={allFields ? <UpOutlined /> : <DownOutlined />}>

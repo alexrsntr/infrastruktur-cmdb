@@ -63,8 +63,10 @@ export function RackPage() {
     return <Result status={status === 403 ? '403' : status === 404 ? '404' : 'error'} title={status === 404 ? 'Rack not found' : 'Could not load rack'} subTitle={errorText(rack.error)} extra={<Link to="/racks">Back to racks</Link>} />;
   }
 
-  const canMount = can('asset.write');
+  // mounting moves an existing device (local administrators too); panels, shelves … are new entries
+  const canMount = can('asset.edit');
   const canEquip = can('location.write');
+  const canChangeRack = can('location.edit');
   const used = Number(r.used_u ?? 0);
   const free = r.height_u - used;
   const tab = params.get('tab') ?? 'contents';
@@ -133,7 +135,7 @@ export function RackPage() {
               <Button icon={<DragOutlined />} onClick={() => setMount({ open: true, asset: selAsset })}>
                 Move
               </Button>
-              <Popconfirm title={`Remove ${selAsset.name} from the rack?`} description="The device stays in the CMDB." onConfirm={() => unmount(selAsset)}>
+              <Popconfirm title={`Remove ${selAsset.name} from the rack?`} description="The device is kept." onConfirm={() => unmount(selAsset)}>
                 <Button icon={<DisconnectOutlined />}>Unmount</Button>
               </Popconfirm>
             </Space>
@@ -147,16 +149,18 @@ export function RackPage() {
             U{unitLabel(selItem.position_u, selItem.height_u)} ({selItem.height_u} U)
           </InfoRow>
           <InfoRow label="Note">{dash(selItem.note)}</InfoRow>
-          {canEquip && (
+          {canChangeRack && (
             <Space wrap style={{ marginTop: 14 }}>
               <Button icon={<EditOutlined />} onClick={() => setMount({ open: true, item: selItem })}>
                 Edit
               </Button>
-              <Popconfirm title={`Remove ${selItem.label}?`} onConfirm={() => removeItem(selItem)} okButtonProps={{ danger: true }}>
-                <Button danger icon={<DeleteOutlined />}>
-                  Remove
-                </Button>
-              </Popconfirm>
+              {canEquip && (
+                <Popconfirm title={`Remove ${selItem.label}?`} onConfirm={() => removeItem(selItem)} okButtonProps={{ danger: true }}>
+                  <Button danger icon={<DeleteOutlined />}>
+                    Remove
+                  </Button>
+                </Popconfirm>
+              )}
             </Space>
           )}
         </div>
@@ -241,7 +245,7 @@ export function RackPage() {
             <MoreMenu
               items={[
                 { key: 'equip', icon: <PlusOutlined />, label: 'Add patch panel / UPS / shelf', onClick: () => setMount({ open: true, mode: 'item' }), hidden: !canEquip },
-                { key: 'edit', icon: <EditOutlined />, label: 'Edit rack', onClick: () => setEditingRack(true), hidden: !canEquip },
+                { key: 'edit', icon: <EditOutlined />, label: 'Edit rack', onClick: () => setEditingRack(true), hidden: !canChangeRack },
                 { key: 'xlsx', icon: <FileExcelOutlined />, label: 'Export rack (Excel)', onClick: () => download(exportUrl(`rack/${r.id}`, 'xlsx')), hidden: !can('export'), divider: true },
                 { key: 'json', icon: <CodeOutlined />, label: 'Export rack (JSON)', onClick: () => download(exportUrl(`rack/${r.id}`, 'json')), hidden: !can('export') },
                 {
@@ -252,7 +256,7 @@ export function RackPage() {
                   divider: true,
                   hidden: !canEquip,
                   onClick: removeRack,
-                  confirm: { title: `Delete rack ${r.name}?`, content: 'Devices stay in the CMDB and are only removed from the rack.' },
+                  confirm: { title: `Delete rack ${r.name}?`, content: 'Devices are kept and only removed from the rack.' },
                 },
               ]}
             />

@@ -29,6 +29,8 @@ import { applicationsRouter } from './routes/applications';
 import { integrationsRouter } from './routes/integrations';
 import { discoveryRouter } from './routes/discovery';
 import { qualityRouter } from './routes/quality';
+import { scorecardsRouter } from './routes/scorecards';
+import { certificatesRouter } from './routes/certificates';
 import type { DiscoveryDeps } from './discovery/service';
 import type { FetchLike } from './services/webhooks';
 import { EntraService, type EntraDeps } from './entra/service';
@@ -78,6 +80,8 @@ export function createApp(pool: Pool, config: Config, deps: AppDeps = {}) {
           imgSrc: ["'self'", 'data:', 'blob:', ...tileHosts(config.ui.mapTileUrl)],
           connectSrc: ["'self'"],
           fontSrc: ["'self'", 'data:'],
+          // the plant page embeds Google Maps for the plant address (no API key, no script on our page)
+          frameSrc: ["'self'", 'https://maps.google.com', 'https://www.google.com'],
           objectSrc: ["'none'"],
           frameAncestors: ["'none'"],
           formAction: ["'self'", 'https://login.microsoftonline.com'],
@@ -144,7 +148,7 @@ export function createApp(pool: Pool, config: Config, deps: AppDeps = {}) {
   api.use(assetsRouter(pool));
   api.use(journalRouter(pool));
   api.use(adminRouter(pool));
-  api.use(exportsRouter(pool));
+  api.use(exportsRouter(pool, config.ui.appName));
   api.use(importsRouter(pool));
   api.use(racksRouter(pool));
   api.use(settingsRouter(pool, config));
@@ -154,6 +158,8 @@ export function createApp(pool: Pool, config: Config, deps: AppDeps = {}) {
   api.use(datacentersRouter(pool));
   api.use(networkRouter(pool));
   api.use(applicationsRouter(pool));
+  api.use(scorecardsRouter(pool));
+  api.use(certificatesRouter(pool, config));
   api.use(integrationsRouter(pool, config, { fetch: deps.webhookFetch }));
   api.use(discoveryRouter(pool, config, deps.discovery));
   api.use(qualityRouter(pool));

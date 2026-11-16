@@ -15,6 +15,10 @@ locals {
       display_name = "CMDB Editor"
       description  = "Create, change and delete infrastructure, buildings, floors and floor plans; create and change plants; import data."
     }
+    "CMDB.LocalAdmin" = {
+      display_name = "CMDB Local Administrator"
+      description  = "IT contact of a plant: sees only the assigned plants and changes existing entries there, but adds and deletes nothing. Set the plant scope in the app."
+    }
     "CMDB.Operator" = {
       display_name = "CMDB Operator"
       description  = "Read access plus notes, activities and asset status changes (e.g. on-site technicians)."

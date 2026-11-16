@@ -23,6 +23,7 @@ import {
 import { CheckOutlined, EditOutlined, UserAddOutlined, FileExcelOutlined } from '@ant-design/icons';
 import {
   PERMISSIONS,
+  PLANT_BOUND_ROLES,
   ROLES,
   ROLE_META,
   ROLE_PERMISSIONS,
@@ -46,16 +47,27 @@ const PERMISSION_LABELS: Record<Permission, string> = {
   'note.write': 'Write notes',
   'activity.write': 'Manage activities',
   'asset.status': 'Change asset status',
-  'asset.write': 'Create / edit assets',
-  'asset.delete': 'Delete assets',
-  'location.write': 'Manage locations & floor plans',
+  'asset.edit': 'Change existing devices, applications & certificates',
+  'asset.write': 'Add devices, applications & certificates',
+  'asset.delete': 'Delete devices',
+  'location.edit': 'Change existing plants, buildings & racks',
+  'location.write': 'Add & remove buildings, racks & floor plans',
   'location.delete': 'Delete plants',
   import: 'Import',
   'audit.read': 'Audit log',
   'user.manage': 'User management',
   'settings.manage': 'Settings & e-mail notifications',
   'attachment.write': 'Upload files & photos',
+  'scorecard.manage': 'Create & rate plant scorecards',
 };
+
+/** Help text for the plant scope field of a role */
+function scopeHelp(role: Role | undefined, groupManaged: boolean): string {
+  if (role === 'admin') return 'Administrators always see all plants.';
+  if (groupManaged) return 'Set by the Entra group mapping.';
+  if (role && PLANT_BOUND_ROLES.includes(role)) return 'Required: a local administrator only sees and changes these plants.';
+  return 'Leave empty to grant access to all plants.';
+}
 
 const roleOptions = ROLES.map((r) => ({ value: r, label: ROLE_META[r].label }));
 
@@ -154,9 +166,9 @@ function EditUserModal({ user, onClose }: { user: AppUser | null; onClose: () =>
           <Form.Item
             name="plant_scope"
             label="Plant scope"
-            extra={
-              role === 'admin' ? 'Administrators always see all plants.' : groupManaged ? 'Set by the Entra group mapping.' : 'Leave empty to grant access to all plants.'
-            }
+            extra={scopeHelp(role as Role | undefined, groupManaged)}
+            rules={[{ validator: (_, v: string[] | undefined) => (role && PLANT_BOUND_ROLES.includes(role as Role) && !v?.length ? Promise.reject(new Error('Choose at least one plant')) : Promise.resolve()) }]}
+            dependencies={['role']}
           >
             <Select
               mode="multiple"
@@ -205,6 +217,7 @@ interface CreateValues {
 
 function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [form] = Form.useForm<CreateValues>();
+  const newRole = Form.useWatch('role', form) as Role | undefined;
   const { message } = App.useApp();
   const { config } = useSession();
   const plants = usePlants();
@@ -253,7 +266,13 @@ function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void
         <Form.Item name="role" label="Role" rules={[{ required: true }]}>
           <Select options={roleOptions} />
         </Form.Item>
-        <Form.Item name="plant_scope" label="Plant scope" extra="Leave empty to grant access to all plants.">
+        <Form.Item
+          name="plant_scope"
+          label="Plant scope"
+          extra={scopeHelp(newRole, false)}
+          dependencies={['role']}
+          rules={[{ validator: (_, v: string[] | undefined) => (newRole && PLANT_BOUND_ROLES.includes(newRole) && !v?.length ? Promise.reject(new Error('Choose at least one plant')) : Promise.resolve()) }]}
+        >
           <Select
             mode="multiple"
             allowClear
@@ -332,7 +351,7 @@ export function UsersPage() {
           title="How permissions work"
           description={
             <>
-              With sign-in by Microsoft, the role is taken in this order at every sign-in: an <strong>Entra ID app role</strong> (CMDB.Admin, CMDB.Editor,
+              With sign-in by Microsoft, the role is taken in this order at every sign-in: an <strong>Entra ID app role</strong> (CMDB.Admin, CMDB.Editor, CMDB.LocalAdmin,
               CMDB.Operator, CMDB.Viewer – assigned under <em>Enterprise applications → Users and groups</em>), otherwise a <strong>mapped Entra group</strong>{' '}
               (tab “Microsoft Entra ID”, including its plant scope), otherwise the role set here, otherwise the default role. Accounts with e-mail and
               password are managed only here. The <strong>plant scope</strong> is managed here (except for group-managed users) – an empty scope means
@@ -455,7 +474,7 @@ export function UsersPage() {
     <div>
       <PageHeader
         title="Users & permissions"
-        subtitle="Roles, plant scope and account status of everyone who has signed in to the CMDB."
+        subtitle="Roles, plant scope and account status of everyone who has signed in."
         crumbs={[{ title: 'Administration' }, { title: 'Users & permissions' }]}
         extra={
           <>
@@ -482,7 +501,7 @@ export function UsersPage() {
             setParams(next, { replace: true });
           }}
           items={[
-            { key: 'users', label: 'CMDB users', children: usersContent },
+            { key: 'users', label: 'Users', children: usersContent },
             { key: 'entra', label: 'Microsoft Entra ID', children: <EntraDirectoryTab settings={entraSettings.data} /> },
           ]}
         />

@@ -47,7 +47,7 @@ export function RacksPage() {
         extra={
           <>
             <Button size="large" icon={<DatabaseOutlined />} onClick={() => navigate(plantId ? `/datacenters?plantId=${plantId}` : '/datacenters')}>
-              Data centers
+              Server rooms / DCs
             </Button>
             <MoreMenu
               items={[

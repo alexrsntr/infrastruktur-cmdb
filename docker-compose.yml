@@ -22,7 +22,7 @@ services:
       APP_BASE_URL: http://localhost:8080
       # Shown in the header, on the login page and in e-mails
       BRAND_NAME: Infrastruktur
-      APP_NAME: IT CMDB
+      APP_NAME: IT Infrastructure
       BRAND_PRIMARY_COLOR: "#2563eb"
       # Database connection (the database below)
       PGHOST: db

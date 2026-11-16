@@ -5,13 +5,14 @@
 // Roles & permissions
 // ---------------------------------------------------------------------------
 
-export const ROLES = ['admin', 'editor', 'operator', 'viewer'] as const;
+/** Highest privilege first (an Entra user with several app roles gets the first one in this list). */
+export const ROLES = ['admin', 'editor', 'local_admin', 'operator', 'viewer'] as const;
 export type Role = (typeof ROLES)[number];
 
 export const ROLE_META: Record<Role, { label: string; description: string; entraAppRole: string; color: string }> = {
   admin: {
     label: 'Administrator',
-    description: 'Full access including user management, deletion of locations and the global audit log.',
+    description: 'Full access including user management, scorecards, deletion of locations and the global audit log.',
     entraAppRole: 'CMDB.Admin',
     color: 'red',
   },
@@ -20,6 +21,13 @@ export const ROLE_META: Record<Role, { label: string; description: string; entra
     description: 'Create, change and delete infrastructure, buildings, floors and floor plans. Import data.',
     entraAppRole: 'CMDB.Editor',
     color: 'blue',
+  },
+  local_admin: {
+    label: 'Local administrator',
+    description:
+      'IT contact of a plant: sees only the plants assigned to them and can change the existing entries there (devices, buildings, racks, applications, certificates …) – but cannot add or delete anything.',
+    entraAppRole: 'CMDB.LocalAdmin',
+    color: 'orange',
   },
   operator: {
     label: 'Operator',
@@ -41,8 +49,14 @@ export const PERMISSIONS = [
   'note.write',
   'activity.write',
   'asset.status',
+  /** change existing devices, applications, certificates, ports, VLANs … (not create or delete) */
+  'asset.edit',
+  /** create devices, applications, certificates … (and everything else asset related) */
   'asset.write',
   'asset.delete',
+  /** change existing plants, buildings, floors, racks, server rooms (not create or delete) */
+  'location.edit',
+  /** create, change and remove buildings, floors, racks, floor plans, server rooms … */
   'location.write',
   'location.delete',
   'import',
@@ -50,20 +64,33 @@ export const PERMISSIONS = [
   'user.manage',
   'settings.manage',
   'attachment.write',
+  /** create and rate the scorecard of a plant */
+  'scorecard.manage',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
 const VIEWER: Permission[] = ['read', 'export'];
 const OPERATOR: Permission[] = [...VIEWER, 'note.write', 'activity.write', 'asset.status', 'attachment.write'];
-const EDITOR: Permission[] = [...OPERATOR, 'asset.write', 'asset.delete', 'location.write', 'import'];
+const LOCAL_ADMIN: Permission[] = [...OPERATOR, 'asset.edit', 'location.edit'];
+const EDITOR: Permission[] = [...LOCAL_ADMIN, 'asset.write', 'asset.delete', 'location.write', 'import'];
 const ADMIN: Permission[] = [...PERMISSIONS];
 
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   admin: ADMIN,
   editor: EDITOR,
+  local_admin: LOCAL_ADMIN,
   operator: OPERATOR,
   viewer: VIEWER,
 };
+
+/** Roles that only ever see the plants assigned to them (no plants assigned = no plant visible) */
+export const PLANT_BOUND_ROLES: readonly Role[] = ['local_admin'];
+
+/** True if the user sees every plant (administrators, or users without plant restriction whose role allows that) */
+export function seesAllPlants(user: Pick<CurrentUser, 'role' | 'plantScope'>): boolean {
+  if (user.role === 'admin') return true;
+  return user.plantScope.length === 0 && !PLANT_BOUND_ROLES.includes(user.role);
+}
 
 export function can(role: Role | undefined | null, permission: Permission): boolean {
   if (!role) return false;
@@ -100,6 +127,7 @@ export const ASSET_CATEGORIES = {
   power: { label: 'Power' },
   ot: { label: 'Production (OT)' },
   endpoint: { label: 'Endpoints' },
+  cabling: { label: 'Cabling' },
   other: { label: 'Other' },
 } as const;
 export type AssetCategory = keyof typeof ASSET_CATEGORIES;
@@ -401,6 +429,33 @@ export const ASSET_TYPES = {
       { key: 'firmware', label: 'Firmware', type: 'text' },
     ],
   },
+  cabling: {
+    label: 'Cabling',
+    plural: 'Cabling',
+    slug: 'cabling',
+    short: 'CBL',
+    category: 'cabling',
+    hint: 'Copper or fibre cabling: backbone, floor distribution, trunk or patch cabling',
+    example: 'muc-b01-fo-backbone-01',
+    physical: true,
+    rackHeight: 1,
+    color: '#0e6f8e',
+    fields: [
+      // the first six fields are offered when adding a device
+      { key: 'medium', label: 'Medium', type: 'select', options: ['Copper (twisted pair)', 'Fibre single-mode', 'Fibre multi-mode', 'Coax', 'Other'] },
+      { key: 'cable_category', label: 'Category / class', type: 'select', options: ['Cat 5e', 'Cat 6', 'Cat 6A', 'Cat 7', 'Cat 7A', 'Cat 8', 'OS1', 'OS2', 'OM2', 'OM3', 'OM4', 'OM5'] },
+      { key: 'endpoint_a', label: 'From (A side)', type: 'text', placeholder: 'e.g. Server room R01, patch panel PP03 port 1–24' },
+      { key: 'endpoint_b', label: 'To (B side)', type: 'text', placeholder: 'e.g. Hall 2 distributor, PP01 port 1–24' },
+      { key: 'links', label: 'Links / fibres', type: 'number' },
+      { key: 'length_m', label: 'Length', type: 'number', unit: 'm' },
+      { key: 'purpose', label: 'Purpose', type: 'select', options: ['Backbone (building to building)', 'Riser (floor to floor)', 'Horizontal (floor distribution)', 'Trunk / pre-terminated', 'Patch cabling', 'Production / machine'] },
+      { key: 'connector', label: 'Connectors', type: 'text', placeholder: 'e.g. RJ45, LC duplex, MPO-12' },
+      { key: 'route', label: 'Route / cable tray', type: 'text' },
+      { key: 'installer', label: 'Installed by', type: 'text' },
+      { key: 'certified', label: 'Measured / certified', type: 'boolean' },
+      { key: 'measured_on', label: 'Measured on', type: 'date' },
+    ],
+  },
   other: {
     label: 'Other Device',
     plural: 'Other Devices',
@@ -531,6 +586,24 @@ export interface CurrentUser {
   role: Role;
   roleSource: RoleSource;
   plantScope: string[]; // empty = all plants
+}
+
+/**
+ * First name for greetings. Directories often store "Last, First" ("Rosentreter, Alex"), others "First Last";
+ * academic titles are skipped and an e-mail address falls back to its first part ("alex.rosentreter@…" → "Alex").
+ */
+export function firstName(displayName: string | null | undefined): string {
+  const name = (displayName ?? '').replace(/\(.*?\)/g, ' ').trim();
+  if (!name) return '';
+  const comma = name.indexOf(',');
+  const given = comma > 0 ? name.slice(comma + 1).trim() || name.slice(0, comma) : name;
+  const words = given.split(/\s+/).filter(Boolean);
+  const word = words.find((w) => !/^(dr|prof|dipl|ing|mag|mr|mrs|ms)\.?(-\w+\.?)?$/i.test(w)) ?? words[0] ?? name;
+  if (word.includes('@')) {
+    const local = word.split('@')[0].split(/[._-]/)[0];
+    return local ? local.charAt(0).toUpperCase() + local.slice(1) : word;
+  }
+  return word.replace(/[,;]+$/, '');
 }
 
 /** Where a user's role comes from: Entra app role (token), Entra group mapping or set in the CMDB */

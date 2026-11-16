@@ -7,6 +7,7 @@ import {
   Col,
   Divider,
   Row,
+  Segmented,
   Select,
   Space,
   Statistic,
@@ -156,7 +157,7 @@ function ExportSection() {
               <FileExcelOutlined style={{ fontSize: 36, color: '#7fd1ff' }} />
               <div>
                 <Typography.Title level={4} style={{ color: '#fff', marginTop: 0 }}>
-                  Complete CMDB export
+                  Complete export
                 </Typography.Title>
                 <Typography.Paragraph style={{ color: 'rgba(255,255,255,.85)', marginBottom: 12 }}>
                   One workbook with a sheet each for plants, buildings, floors, all devices plus one sheet per device type (switches, access points,
@@ -346,7 +347,32 @@ function ReportView({ report }: { report: ImportReport }) {
   );
 }
 
-function ImportSection() {
+const PLANT_TEMPLATE_HEADERS = ['Code', 'Name', 'Country', 'City', 'Address', 'Latitude', 'Longitude', 'Time zone', 'Contact', 'Description'];
+
+function downloadPlantTemplate() {
+  const example: Record<string, string> = {
+    Code: 'NEF',
+    Name: 'Neuffen',
+    Country: 'Germany',
+    City: 'Neuffen',
+    Address: 'Example street 1',
+    'Time zone': 'Europe/Berlin',
+    Contact: 'Local IT contact',
+    Description: 'Example row – delete before importing',
+  };
+  const lines = [PLANT_TEMPLATE_HEADERS.map(csvCell).join(';'), PLANT_TEMPLATE_HEADERS.map((h) => csvCell(example[h] ?? '')).join(';')];
+  const blob = new Blob(['\ufeff' + lines.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'plants_import_template.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function ImportSection({ kind }: { kind: 'assets' | 'plants' }) {
   const { message } = App.useApp();
   const invalidate = useInvalidate();
   const [file, setFile] = useState<File | null>(null);
@@ -362,7 +388,7 @@ function ImportSection() {
     if (!file) return;
     setBusy(dryRun ? 'dry' : 'import');
     try {
-      const result = await http.upload<ImportReport>('/api/import/assets', file, { dryRun: dryRun ? 'true' : 'false', type: defaultType });
+      const result = await http.upload<ImportReport>(`/api/import/${kind}`, file, { dryRun: dryRun ? 'true' : 'false', type: kind === 'assets' ? defaultType : undefined });
       setReport(result);
       if (dryRun) setValidatedFor(file);
       else {
@@ -380,16 +406,26 @@ function ImportSection() {
   const canImport = !!file && validatedFor === file && !!report?.dryRun && report.created + report.updated > 0;
 
   const rules = useMemo(
-    () => [
-      'Excel (.xlsx – first worksheet) or CSV (comma or semicolon, UTF-8). Column headers as in the device export.',
-      'Existing devices are matched by ID, otherwise by type + name, and updated. All other rows create new devices.',
-      'For existing devices only the columns in the file are changed: an empty cell clears the value, a column that is missing keeps it.',
-      'Plant and building are referenced by their code (or name), the floor by its name.',
-      'Status/criticality/type accept labels or keys (e.g. "Active" or "active"). Dates as YYYY-MM-DD or DD.MM.YYYY.',
-      'Tags are separated by commas. Type-specific columns use the field labels, e.g. "Ports", "RAM (GB)", "Wi-Fi standard".',
-      'Always validate first: the dry run shows exactly what would change without saving anything.',
-    ],
-    [],
+    () =>
+      kind === 'plants'
+        ? [
+            'Excel (.xlsx – first worksheet) or CSV (comma or semicolon, UTF-8). Column headers as in the plant export: Code, Name, Country, City, Address, Latitude, Longitude, Time zone, Contact, Description.',
+            'Existing plants are matched by ID, otherwise by their code, and updated. All other rows create new plants (code and name are required).',
+            'For existing plants only the columns in the file are changed: an empty cell clears the value, a column that is missing keeps it.',
+            'New plants can only be created by users without plant restriction; users restricted to plants update their plants only.',
+            'Latitude and longitude are optional (decimal degrees, e.g. 48.5532). The map uses the address when they are missing.',
+            'Always validate first: the dry run shows exactly what would change without saving anything.',
+          ]
+        : [
+            'Excel (.xlsx – first worksheet) or CSV (comma or semicolon, UTF-8). Column headers as in the device export.',
+            'Existing devices are matched by ID, otherwise by type + name, and updated. All other rows create new devices.',
+            'For existing devices only the columns in the file are changed: an empty cell clears the value, a column that is missing keeps it.',
+            'Plant and building are referenced by their code (or name), the floor by its name.',
+            'Status/criticality/type accept labels or keys (e.g. "Active" or "active"). Dates as YYYY-MM-DD or DD.MM.YYYY.',
+            'Tags are separated by commas. Type-specific columns use the field labels, e.g. "Ports", "RAM (GB)", "Wi-Fi standard".',
+            'Always validate first: the dry run shows exactly what would change without saving anything.',
+          ],
+    [kind],
   );
 
   return (
@@ -405,26 +441,36 @@ function ImportSection() {
           </ul>
           <Divider style={{ margin: '16px 0' }} />
           <Typography.Text strong>Template</Typography.Text>
-          <Space.Compact block style={{ marginTop: 8 }}>
-            <Select
-              allowClear
-              placeholder="All device types"
-              style={{ flex: 1 }}
-              value={templateType}
-              onChange={setTemplateType}
-              options={types.offered.map((t) => ({ value: t, label: ASSET_TYPES[t].plural }))}
-            />
-            <Button icon={<DownloadOutlined />} onClick={() => downloadTemplate(templateType, types.fields, types.offered)}>
-              Download template
-            </Button>
-          </Space.Compact>
+          {kind === 'plants' ? (
+            <div style={{ marginTop: 8 }}>
+              <Button icon={<DownloadOutlined />} onClick={downloadPlantTemplate}>
+                Download plant template
+              </Button>
+            </div>
+          ) : (
+            <Space.Compact block style={{ marginTop: 8 }}>
+              <Select
+                allowClear
+                placeholder="All device types"
+                style={{ flex: 1 }}
+                value={templateType}
+                onChange={setTemplateType}
+                options={types.offered.map((t) => ({ value: t, label: ASSET_TYPES[t].plural }))}
+              />
+              <Button icon={<DownloadOutlined />} onClick={() => downloadTemplate(templateType, types.fields, types.offered)}>
+                Download template
+              </Button>
+            </Space.Compact>
+          )}
           <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
-            Tip: export the current inventory, edit it in Excel and import it again to update many devices at once.
+            {kind === 'plants'
+              ? 'Tip: export the plants (Excel), edit them and import the file again to update many plants at once.'
+              : 'Tip: export the current inventory, edit it in Excel and import it again to update many devices at once.'}
           </Typography.Paragraph>
         </Card>
       </Col>
       <Col xs={24} lg={15}>
-        <Card title={<Space><CloudUploadOutlined /> Import devices</Space>}>
+        <Card title={<Space><CloudUploadOutlined /> {kind === 'plants' ? 'Import plants' : 'Import devices'}</Space>}>
           <Upload.Dragger
             accept=".xlsx,.csv"
             maxCount={1}
@@ -451,18 +497,22 @@ function ImportSection() {
           </Upload.Dragger>
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 16 }}>
-            <Typography.Text type="secondary">Default type (for files without a "Type" column):</Typography.Text>
-            <Select
-              allowClear
-              placeholder="none"
-              style={{ width: 200 }}
-              value={defaultType}
-              onChange={(v) => {
-                setDefaultType(v);
-                setValidatedFor(null);
-              }}
-              options={types.offered.map((t) => ({ value: t, label: ASSET_TYPES[t].label }))}
-            />
+            {kind === 'assets' && (
+              <>
+                <Typography.Text type="secondary">Default type (for files without a "Type" column):</Typography.Text>
+                <Select
+                  allowClear
+                  placeholder="none"
+                  style={{ width: 200 }}
+                  value={defaultType}
+                  onChange={(v) => {
+                    setDefaultType(v);
+                    setValidatedFor(null);
+                  }}
+                  options={types.offered.map((t) => ({ value: t, label: ASSET_TYPES[t].label }))}
+                />
+              </>
+            )}
             <div style={{ flex: 1 }} />
             <Button icon={<FileSearchOutlined />} disabled={!file} loading={busy === 'dry'} onClick={() => run(true)}>
               Validate (dry run)
@@ -487,11 +537,12 @@ function ImportSection() {
 
 export function DataExchangePage() {
   const { can } = useSession();
+  const [importKind, setImportKind] = useState<'assets' | 'plants'>('assets');
   return (
     <div>
       <PageHeader
         title="Export & import"
-        subtitle="Download any part of the CMDB as Excel, CSV or JSON – or add many devices at once from a spreadsheet."
+        subtitle="Download any part of the inventory as Excel, CSV or JSON – or add many devices and plants at once from a spreadsheet."
       />
       {can('export') && (
         <>
@@ -502,8 +553,20 @@ export function DataExchangePage() {
       {can('import') ? (
         <>
           <div style={{ height: 24 }} />
-          <SectionHead title={<><CloudUploadOutlined /> Import devices <Tag style={{ marginLeft: 6 }}>Editors & administrators</Tag></>} />
-          <ImportSection />
+          <SectionHead
+            title={<><CloudUploadOutlined /> Import <Tag style={{ marginLeft: 6 }}>Editors & administrators</Tag></>}
+            extra={
+              <Segmented
+                value={importKind}
+                onChange={(v) => setImportKind(v as 'assets' | 'plants')}
+                options={[
+                  { value: 'assets', label: 'Devices' },
+                  { value: 'plants', label: 'Plants' },
+                ]}
+              />
+            }
+          />
+          <ImportSection key={importKind} kind={importKind} />
         </>
       ) : null}
     </div>

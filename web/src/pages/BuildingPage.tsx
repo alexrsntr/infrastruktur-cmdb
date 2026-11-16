@@ -110,11 +110,11 @@ export function BuildingPage() {
           }))}
         />
         <div style={{ flex: 1 }} />
-        {can('location.write') && floor && (
+        {can('location.edit') && floor && (
           <MoreMenu
             label="Floor"
             items={[
-              { key: 'add', icon: <PlusOutlined />, label: 'Add floor', onClick: () => setFloorModal({ open: true }) },
+              { key: 'add', icon: <PlusOutlined />, label: 'Add floor', onClick: () => setFloorModal({ open: true }), hidden: !can('location.write') },
               { key: 'edit', icon: <EditOutlined />, label: `Rename ${floor.name}`, onClick: () => setFloorModal({ open: true, floor }) },
               {
                 key: 'del',
@@ -122,6 +122,7 @@ export function BuildingPage() {
                 label: `Delete ${floor.name}`,
                 danger: true,
                 divider: true,
+                hidden: !can('location.write'),
                 onClick: () => deleteFloor(floor),
                 confirm: { title: `Delete floor ${floor.name}?`, content: 'The floor plan, notes and activities of this floor are deleted. Devices stay in the building.' },
               },
@@ -185,7 +186,7 @@ export function BuildingPage() {
             )}
             <MoreMenu
               items={[
-                { key: 'edit', icon: <EditOutlined />, label: 'Edit building', onClick: () => setEditing(true), hidden: !can('location.write') },
+                { key: 'edit', icon: <EditOutlined />, label: 'Edit building', onClick: () => setEditing(true), hidden: !can('location.edit') },
                 { key: 'floor', icon: <PlusOutlined />, label: 'Add floor', onClick: () => setFloorModal({ open: true }), hidden: !can('location.write') },
                 { key: 'rack', icon: <HddOutlined />, label: 'New rack', onClick: () => setRackModal(true), hidden: !can('location.write') },
                 {

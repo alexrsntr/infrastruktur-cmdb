@@ -84,7 +84,8 @@ export function FloorPlanMap({
   const { message, modal } = App.useApp();
   const fileRef = useRef<HTMLInputElement>(null);
   const invalidate = useInvalidate();
-  const canPlace = can('asset.write') && !readOnly;
+  // placing moves existing devices (local administrators too)
+  const canPlace = can('asset.edit') && !readOnly;
   const canManagePlan = can('location.write') && !readOnly;
 
   const [editMode, setEditMode] = useState(false);

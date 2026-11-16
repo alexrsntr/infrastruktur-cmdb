@@ -169,7 +169,7 @@ export function loadConfig(): Config {
     },
     ui: {
       brandName: str('BRAND_NAME', 'Infrastruktur'),
-      appName: str('APP_NAME', 'IT CMDB'),
+      appName: str('APP_NAME', 'IT Infrastructure'),
       primaryColor: str('BRAND_PRIMARY_COLOR', '#2563eb'),
       // empty = built-in world map, the browser contacts no external map service
       mapTileUrl: str('MAP_TILE_URL'),

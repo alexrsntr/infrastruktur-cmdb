@@ -8,6 +8,7 @@ import {
   DeploymentUnitOutlined,
   GlobalOutlined,
   HddOutlined,
+  NodeIndexOutlined,
   PrinterOutlined,
   SafetyOutlined,
   ThunderboltOutlined,
@@ -30,5 +31,6 @@ export const ASSET_TYPE_ICONS: Record<AssetType, React.ReactNode> = {
   ot_device: <ControlOutlined />,
   printer: <PrinterOutlined />,
   camera: <VideoCameraOutlined />,
+  cabling: <NodeIndexOutlined />,
   other: <DeploymentUnitOutlined />,
 };

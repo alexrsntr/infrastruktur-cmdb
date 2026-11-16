@@ -1,12 +1,12 @@
 import { Router, type Request } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
-import type { CurrentUser } from '../../shared/model';
+import { can, type CurrentUser } from '../../shared/model';
 import { DATACENTER_KINDS, DC_LINK_KINDS, DC_SITE_ROLES } from '../../shared/datacenters';
 import { requirePermission } from '../auth/context';
 import { withTransaction, type DbClient } from '../db/pool';
 import { audit, diff, snapshot } from '../lib/audit';
-import { badRequest, notFound, parse, queryString, requireUuid, SqlBuilder } from '../lib/http';
+import { badRequest, forbidden, notFound, parse, queryString, requireUuid, SqlBuilder } from '../lib/http';
 import { optText, optUuid, reqText } from '../lib/schemas';
 import { uniqueBuildingCode } from '../lib/buildings';
 import { applyScope, assertPlantAccess, isUnscoped } from '../lib/scope';
@@ -292,7 +292,7 @@ export function datacentersRouter(pool: Pool): Router {
     res.status(201).json(await loadDetail(pool, id, req.user!));
   });
 
-  r.put('/datacenters/:id', requirePermission('location.write'), async (req, res) => {
+  r.put('/datacenters/:id', requirePermission('location.edit'), async (req, res) => {
     const id = requireUuid(req.params.id);
     const input = parse(datacenterSchema, req.body);
     await withTransaction(pool, async (db) => {
@@ -302,6 +302,11 @@ export function datacentersRouter(pool: Pool): Router {
       const { rows: beforeSites } = await db.query('SELECT id, name, role, building_id, room FROM datacenter_site WHERE datacenter_id = $1 ORDER BY position', [id]);
       for (const s of input.sites) {
         if (s.id && !beforeSites.some((b) => b.id === s.id)) throw badRequest('Site does not belong to this data center');
+      }
+      // Local administrators change existing entries only: no new or removed rooms, no new buildings
+      if (!can(req.user!.role, 'location.write')) {
+        const sameSites = input.sites.length === beforeSites.length && input.sites.every((s) => s.id && s.building_id);
+        if (!sameSites) throw forbidden('You can change the existing rooms, but not add or remove rooms or buildings');
       }
       const sites = await resolveSites(db, req, input.plant_id, input);
       const name = input.name ?? before.name;
@@ -366,7 +371,7 @@ export function datacentersRouter(pool: Pool): Router {
     return rows[0];
   }
 
-  r.put('/datacenter-links/:id', requirePermission('location.write'), async (req, res) => {
+  r.put('/datacenter-links/:id', requirePermission('location.edit'), async (req, res) => {
     const id = requireUuid(req.params.id);
     const input = parse(linkSchema, req.body);
     const link = await withTransaction(pool, async (db) => {

@@ -9,6 +9,7 @@ import { useInvalidate } from '../lib/queries';
 import { useSession } from '../lib/session';
 import { StatusDot, TypeIcon } from './Simple';
 import { SectionHead } from './PageParts';
+import { WanLinesCard } from './WanLines';
 
 export const usePlantNetwork = (plantId: string) =>
   useQuery({ queryKey: ['network', plantId], queryFn: () => http.get<PlantNetwork>(`/api/plants/${plantId}/network`) });
@@ -35,7 +36,9 @@ export function NetworkTab({ plantId }: { plantId: string }) {
   const [subnetModal, setSubnetModal] = useState<{ open: boolean; subnet?: Subnet }>({ open: false });
   const [vlanModal, setVlanModal] = useState<{ open: boolean; vlan?: Vlan }>({ open: false });
   const [detail, setDetail] = useState<string | null>(null);
+  // add / delete (editors) and change existing entries (local administrators too)
   const writable = can('asset.write');
+  const editable = can('asset.edit');
 
   if (net.isLoading || !net.data) return <Skeleton active paragraph={{ rows: 8 }} />;
   const { vlans, subnets, duplicates, unassigned, connections } = net.data;
@@ -52,6 +55,7 @@ export function NetworkTab({ plantId }: { plantId: string }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <WanLinesCard plantId={plantId} />
       {duplicates.length > 0 && (
         <Alert
           type="error"
@@ -132,7 +136,7 @@ export function NetworkTab({ plantId }: { plantId: string }) {
                 </Space>
               ),
             },
-            ...(writable
+            ...(editable
               ? [
                   {
                     title: '',
@@ -191,7 +195,7 @@ export function NetworkTab({ plantId }: { plantId: string }) {
             { title: 'Subnets', dataIndex: 'subnet_count', width: 90 },
             { title: 'Ports', dataIndex: 'port_count', width: 90 },
             { title: 'Description', dataIndex: 'description', responsive: ['md'], render: (v) => v ?? <span className="muted">–</span> },
-            ...(writable
+            ...(editable
               ? [
                   {
                     title: '',
@@ -200,9 +204,11 @@ export function NetworkTab({ plantId }: { plantId: string }) {
                     render: (_: unknown, v: Vlan) => (
                       <Space size={0}>
                         <Button type="text" size="small" icon={<EditOutlined />} aria-label={`Edit VLAN ${v.vid}`} onClick={() => setVlanModal({ open: true, vlan: v })} />
-                        <Popconfirm title={`Delete VLAN ${v.vid}?`} description="Subnets keep their addresses." onConfirm={() => removeVlan(v)}>
-                          <Button type="text" size="small" danger icon={<DeleteOutlined />} aria-label={`Delete VLAN ${v.vid}`} />
-                        </Popconfirm>
+                        {writable && (
+                          <Popconfirm title={`Delete VLAN ${v.vid}?`} description="Subnets keep their addresses." onConfirm={() => removeVlan(v)}>
+                            <Button type="text" size="small" danger icon={<DeleteOutlined />} aria-label={`Delete VLAN ${v.vid}`} />
+                          </Popconfirm>
+                        )}
                       </Space>
                     ),
                   },
@@ -304,6 +310,7 @@ function SubnetModal({ plantId, vlans, state, onClose }: { plantId: string; vlan
   const [form] = Form.useForm();
   const { message } = App.useApp();
   const invalidate = useInvalidate();
+  const canDelete = useSession().can('asset.write');
   const [saving, setSaving] = useState(false);
   const s = state.subnet;
   useEffect(() => {
@@ -329,7 +336,7 @@ function SubnetModal({ plantId, vlans, state, onClose }: { plantId: string; vlan
       destroyOnHidden
       footer={(_, { OkBtn, CancelBtn }) => (
         <div style={{ display: 'flex', gap: 8 }}>
-          {s && (
+          {s && canDelete && (
             <Popconfirm title={`Delete ${s.cidr}?`} description="Devices keep their IP addresses." onConfirm={remove}>
               <Button danger icon={<DeleteOutlined />}>
                 Delete

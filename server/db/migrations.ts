@@ -16,6 +16,10 @@ import { networkMigration } from './migrations/013_network';
 import { applicationsMigration } from './migrations/014_applications';
 import { integrationsMigration } from './migrations/015_integrations';
 import { discoveryMigration } from './migrations/016_discovery';
+import { cablingMigration } from './migrations/017_cabling';
+import { localAdminMigration } from './migrations/018_local_admin';
+import { scorecardWanMigration } from './migrations/019_scorecard_wan';
+import { certificatesMigration } from './migrations/020_certificates';
 
 export interface Migration {
   id: string;
@@ -222,4 +226,8 @@ export const migrations: Migration[] = [
   applicationsMigration,
   integrationsMigration,
   discoveryMigration,
+  cablingMigration,
+  localAdminMigration,
+  scorecardWanMigration,
+  certificatesMigration,
 ];

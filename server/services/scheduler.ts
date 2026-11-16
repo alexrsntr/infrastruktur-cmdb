@@ -2,6 +2,7 @@ import type { Pool } from 'pg';
 import type { Config } from '../config';
 import { log } from '../lib/log';
 import { loadWarrantySettings, localParts, runWarrantyJob } from './warrantyNotifications';
+import { loadCertificateSettings, runCertificateJob } from './certificateNotifications';
 
 /**
  * In-process scheduler for the daily warranty digest.
@@ -42,6 +43,35 @@ export async function checkAndRun(pool: Pool, config: Config, now: Date = new Da
   }
 }
 
+const CERT_LOCK_ID = 727_003;
+
+/** Daily certificate reminders (and the weekly overview) – same rules as the warranty digest. */
+export async function checkAndRunCertificates(pool: Pool, config: Config, now: Date = new Date()): Promise<'ran' | 'not-due' | 'locked' | 'disabled'> {
+  const client = await pool.connect();
+  try {
+    const { rows } = await client.query<{ locked: boolean }>('SELECT pg_try_advisory_lock($1) AS locked', [CERT_LOCK_ID]);
+    if (!rows[0].locked) return 'locked';
+    try {
+      const { settings } = await loadCertificateSettings(client);
+      if (!settings.enabled) return 'disabled';
+      const { date, hour } = localParts(settings.timezone, now);
+      if (hour < settings.sendHour) return 'not-due';
+      const { rows: today } = await client.query<{ ok: number; failed: number }>(
+        `SELECT count(*) FILTER (WHERE status = 'ok') AS ok, count(*) FILTER (WHERE status IN ('error','skipped')) AS failed
+         FROM notification_run WHERE kind = 'certificates' AND trigger = 'schedule' AND local_date = $1`,
+        [date],
+      );
+      if (today[0].ok > 0 || today[0].failed >= MAX_ATTEMPTS_PER_DAY) return 'not-due';
+      await runCertificateJob(pool, config, { trigger: 'schedule', now });
+      return 'ran';
+    } finally {
+      await client.query('SELECT pg_advisory_unlock($1)', [CERT_LOCK_ID]).catch(() => undefined);
+    }
+  } finally {
+    client.release();
+  }
+}
+
 export function startScheduler(pool: Pool, config: Config): () => void {
   let running = false;
   const tick = async () => {
@@ -51,6 +81,11 @@ export function startScheduler(pool: Pool, config: Config): () => void {
       await checkAndRun(pool, config);
     } catch (err) {
       log.error('scheduler: check failed', { error: (err as Error).message });
+    }
+    try {
+      await checkAndRunCertificates(pool, config);
+    } catch (err) {
+      log.error('scheduler: certificate check failed', { error: (err as Error).message });
     } finally {
       running = false;
     }
@@ -59,7 +94,7 @@ export function startScheduler(pool: Pool, config: Config): () => void {
   const interval = setInterval(tick, CHECK_INTERVAL_MS);
   first.unref();
   interval.unref();
-  log.info('scheduler: started (warranty notifications)');
+  log.info('scheduler: started (warranty and certificate notifications)');
   return () => {
     clearTimeout(first);
     clearInterval(interval);

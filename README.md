@@ -150,11 +150,14 @@ Actions (automatic deployments), groups and go-live checklist: **[docs/SETUP.md]
 
 | Area | What you get |
 |---|---|
-| **Navigation** | *Home, Plants, Devices, Applications, Racks, Activities*; device views per type, global search (hostname, IP, serial, MAC, plant …) |
-| **Maps** | Built-in world map of all plants (no external map service; optionally your own tile server) · per-floor **floor plans** (PNG/JPEG/WebP upload) with drag-and-drop placement of assets, type filter, legend, print view |
+| **Navigation** | *Home, Plants, Devices, Applications, Certificates, Racks, Activities*; device views per type, global search (hostname, IP, serial, MAC, plant …) |
+| **Maps** | Plant page: **Google Maps** for the plant address (or its coordinates) with a link to open it in Google Maps · built-in world map of all plants (no external map service; optionally your own tile server) · per-floor **floor plans** (PNG/JPEG/WebP upload) with drag-and-drop placement of assets, type filter, legend, print view |
 | **Site plans & pictures** | Upload pictures of a plant (site plan, aerial photo, hall or office photos) and place **access points, switches and other devices, buildings and text labels** on them by click & drag. Every image in *Files* can be turned into such a plan; the device page lists the pictures it is shown on |
-| **Infrastructure** | 14 device types in five categories – network (switch, router, firewall, access point, WLAN controller), compute & storage (server, storage, VM), power (UPS, PDU), production (OT devices: PLC, industrial PC, HMI) and endpoints (printer, camera), plus *other* – with common master data (IP, MAC, FQDN, serial, model, owner, cost center, warranty …) and type-specific fields. Administrators **hide types** they do not need and **add their own fields per type** (*Settings → Device types*); plant pages only show the types in use |
+| **Infrastructure** | 15 device types in six categories – network (switch, router, firewall, access point, WLAN controller), compute & storage (server, storage, VM), power (UPS, PDU), production (OT devices: PLC, industrial PC, HMI), endpoints (printer, camera) and **cabling** (copper / fibre: backbone, riser, horizontal, trunk and patch cabling with category, A/B side, length, measurement), plus *other* – with common master data (IP, MAC, FQDN, serial, model, owner, cost center, warranty …) and type-specific fields. Administrators **hide types** they do not need and **add their own fields per type** (*Settings → Device types*); plant pages only show the types in use |
 | **Lifecycle** | Warranty end, **vendor support end**, **end of life**, support contract and *last seen on the network*. **Needs attention** on the home page (warranty ends soon / ended, out of support, end of life, not seen lately) with a matching filter in the device list |
+| **Scorecard** | Every plant gets a **scorecard**: each area (WAN, network, switches, WLAN, firewall, servers, racks, cabling, power, server room, documentation – areas can be renamed and added) is rated with **1–5 points** and a comment; total points and average on the plant page and on the plant cards. Only **administrators** create and rate it, everyone with access to the plant sees it; every rating is in the change history |
+| **WAN lines** | WAN / internet lines per plant (*Network* tab): line, technology (MPLS, LIA, SD-WAN, LTE …), provider / product, bandwidth, circuit ID, contract end |
+| **Certificates** | SSL/TLS, wildcard, CA, VPN, client and code-signing certificates with **expiry date**, **responsible person** and the plant, application and device they belong to. Counters and filters for expired / expiring certificates, history of changes and sent reminders. **E-mail reminders** to the responsible person (and deputies) e.g. 60/30/14/7/1 days before expiry and once after, plus a weekly **overview e-mail** to the central recipients (*Settings → Certificate notifications*). After a renewal the new expiry date starts the reminders again |
 | **Network & IPAM** | **Ports** per device (bulk creation such as `Gi1/0/1-48`) with a **cable** to the port at the other end (one cable label for both ends), access/trunk VLANs; **VLANs** and **IP subnets** per plant with used and free addresses, next free IP, **duplicate IPs** and addresses outside every subnet (*Network* tab of a plant) |
 | **Applications & impact** | Business applications / IT services with criticality and owner and the devices they run on. **If this device fails**: every device page lists the devices and applications that depend on it (recursively over uplink, runs on, powered by, depends on); every application lists the infrastructure it needs |
 | **Auto-discovery** | The CMDB scans the networks itself with **SNMP v2c/v3** (serial number, model, firmware from ENTITY-MIB, ports from IF-MIB, neighbours from LLDP-MIB; vendors such as Extreme Networks, HPE and Aruba recognised) and reads **Active Directory** computer objects (by default only servers). Known devices are matched (serial → MAC → host name → IP) and only empty fields are filled; new ones wait in the **Discovered devices** inbox. Scheduled, credentials encrypted |
@@ -162,38 +165,42 @@ Actions (automatic deployments), groups and go-live checklist: **[docs/SETUP.md]
 | **QR labels** | Printable labels (A4 sheet or label printer) for one device or a whole list; the QR code opens the device page |
 | **Data quality** | Score per device and overall, gaps per rule (no serial number, location, IP, warranty, responsible person …) and duplicates of serial numbers, MAC and IP addresses – each with a link to the affected devices |
 | **Racks** | Racks and wall cabinets per building (height in U, numbering direction). **Front view** with devices at their units, plus patch panels, cable management, UPS, PDUs and shelves. Click a free unit to mount a device, click a device to move/unmount it; collision check (no two things in the same U). Building tab with all racks side by side, rack list with free capacity, rack export incl. unit-by-unit elevation |
-| **Data centers (stretched)** | Group server rooms into data centers. A **stretched** data center spans two buildings (site A / site B, optional witness): the diagram shows both rooms side by side with their racks and devices, the fibre/WAN links between the rooms, the device connections across the sites (e.g. core switch A ↔ core switch B with ports) and clusters whose hosts run in both rooms. Racks are assigned automatically by building and room; export as Excel/CSV/JSON |
+| **Server rooms / data centers** | Document the server room of a plant in one step (building + room – its racks are assigned automatically) and group server rooms into data centers. A **stretched** data center spans two buildings (site A / site B, optional witness): the diagram shows both rooms side by side with their racks and devices, the fibre/WAN links between the rooms, the device connections across the sites (e.g. core switch A ↔ core switch B with ports) and clusters whose hosts run in both rooms. Racks are assigned automatically by building and room; export as Excel/CSV/JSON |
 | **Relations** | Uplink, runs on, connected to, depends on, redundant with, **powered by** (device → UPS) – including port documentation (e.g. AP `eth0` → switch `Gi1/0/12`, VM → ESX host) |
 | **Attachments** | Files on plants, buildings, floors, racks and devices: photos (gallery with preview), data sheets, contracts, configuration backups. Pictures can be marked as **plan** to place devices on them. Type detection from the file content, executables/scripts/web pages blocked, plant scope enforced, files served with safe headers. Download all files of an object or a plant as **ZIP**. Stored in **Azure Blob Storage** (managed identity, versioning + soft delete) or the database for development |
 | **Notes** | Free-text notes on plants, buildings, floors and assets; pinning; author-only editing |
 | **Activities** | Maintenance, incidents, changes, installations, inspections, replacements with status, assignee and due date; overdue highlighting; global activity board |
 | **History & audit** | Field-level change history for every object (who/what/when, old → new). Global audit log (incl. logins & exports) for administrators |
-| **Permissions** | 4 roles (Admin, Editor, Operator, Viewer), managed in the app, from **Entra ID app roles** or from **Entra groups** mapped to roles, plus optional **plant scoping** per user (e.g. a technician only sees plant MUC) |
+| **Permissions** | 5 roles (Admin, Editor, **Local administrator**, Operator, Viewer), managed in the app, from **Entra ID app roles** or from **Entra groups** mapped to roles, plus optional **plant scoping** per user (e.g. a technician only sees plant MUC) |
 | **Export** | Every list exports to **Excel / CSV / JSON** with the current filters. Complete workbook (one sheet per entity & asset type), plant dossier, asset dossier, audit log, users. CSV with `;` (Excel DE) or `,`, formula-injection safe |
-| **Import** | Excel/CSV import of assets (same columns as the export) with **dry run** validation, upsert by ID or type+name, per-row error report |
+| **Import** | Excel/CSV import of **devices** and **plants** (same columns as the export) with **dry run** validation, upsert by ID or type+name (plants: ID or code), per-row error report, templates |
 | **Warranty e-mails** | Daily digest e-mail of devices whose warranty/support ends in e.g. 90/30/7 days (and once when expired). Global recipients plus recipients per plant. Each device is reported once per stage; safe with several app instances. SMTP server configured in the app (*Administration → Settings*), password stored encrypted. Preview, "send now", test e-mail and send history |
-| **Dashboard** | KPIs per device type in use, devices that need attention, upcoming activities, recent changes |
+| **Dashboard** | Greeting with the first name (also for directory names such as “Last, First”), KPIs per device type in use, devices that need attention, expiring certificates, upcoming activities, recent changes |
 | **Appearance** | **Light and dark mode** (or follow the operating system) – switch with the sun/moon button in the header |
 
 ## Roles & permissions
 
-| Permission | Viewer | Operator | Editor | Admin |
-|---|:-:|:-:|:-:|:-:|
-| Read everything in scope, export | ✔ | ✔ | ✔ | ✔ |
-| Notes & activities, change asset status | | ✔ | ✔ | ✔ |
-| Create / edit / delete assets & relations, place on floor plans | | | ✔ | ✔ |
-| Manage buildings, floors, floor plans; import | | | ✔ | ✔ |
-| Create plants (only users without plant restriction) | | | ✔ | ✔ |
-| Report monitoring status, link tickets | | ✔ | ✔ | ✔ |
-| Ports, cables, VLANs, subnets, applications; review discovered devices | | | ✔ | ✔ |
-| Delete plants, user management, global audit log, settings & e-mail notifications, device types, API tokens, webhooks, discovery sources | | | | ✔ |
+| Permission | Viewer | Operator | Local admin | Editor | Admin |
+|---|:-:|:-:|:-:|:-:|:-:|
+| Read everything in scope, export | ✔ | ✔ | ✔ | ✔ | ✔ |
+| Notes & activities, change asset status, files | | ✔ | ✔ | ✔ | ✔ |
+| Report monitoring status, link tickets | | ✔ | ✔ | ✔ | ✔ |
+| **Change existing** devices, plants, buildings, floors, racks, server rooms, applications, certificates, ports, VLANs, subnets, WAN lines; move devices on floor plans and in racks | | | ✔ | ✔ | ✔ |
+| **Add and delete** devices, relations, buildings, floors, floor plans, racks, applications, certificates, ports, cables, VLANs, subnets, WAN lines; import; review discovered devices | | | | ✔ | ✔ |
+| Create plants (only users without plant restriction) | | | | ✔ | ✔ |
+| Create and rate **plant scorecards** | | | | | ✔ |
+| Delete plants, user management, global audit log, settings & e-mail notifications, device types, API tokens, webhooks, discovery sources | | | | | ✔ |
+
+* **Local administrator** (`CMDB.LocalAdmin`): the IT contact of a plant. Always needs a plant scope – they only see
+  their plants (an empty scope means *no* plant, never all) and keep the existing entries there up to date, but cannot
+  add or delete anything.
 
 * **Sign-in** (`AUTH_MODE`): `local` = e-mail + password accounts managed by the administrators in the app
   (Docker and the Azure one-click setup) – Microsoft Entra ID can be added later in the app
   (*Administration → Settings → Microsoft Entra ID*, no restart); `entra` = Microsoft Entra ID single sign-on
   configured by environment variables (Terraform).
 * With Entra ID the role is determined at every sign-in: **app role** in the token (`CMDB.Admin`, `CMDB.Editor`,
-  `CMDB.Operator`, `CMDB.Viewer`, assigned in *Enterprise applications*) > **Entra group mapped to a role**
+  `CMDB.LocalAdmin`, `CMDB.Operator`, `CMDB.Viewer`, assigned in *Enterprise applications*) > **Entra group mapped to a role**
   (*Users & permissions → Microsoft Entra ID*, memberships read with Microsoft Graph, optional plant scope) >
   role set in the app > `DEFAULT_ROLE`. If several apply, the highest role of that source wins.
 * Local accounts: the first visitor creates the administrator; administrators add users with an initial
@@ -220,7 +227,7 @@ Azure Database for PostgreSQL Flexible Server (Entra-only auth)
 * `server/` – Express API (TypeScript, bundled with esbuild), SQL migrations (`server/db/migrations.ts`)
 * `web/` – React SPA (Vite)
 * `shared/model.ts` – domain model shared by API and UI: roles/permissions, asset types & fields, enums, DTOs;
-  `shared/network.ts`, `applications.ts`, `integrations.ts`, `discovery.ts`, `quality.ts` for the newer areas
+  `shared/network.ts`, `applications.ts`, `integrations.ts`, `discovery.ts`, `quality.ts`, `scorecard.ts`, `certificates.ts` for the newer areas
 * `server/discovery/` – SNMP and Active Directory collectors, matching and scheduling
 * `server/services/webhooks.ts` – webhook dispatcher (outbox, HMAC signature, retries)
 * `tests/` – API tests (Vitest + Supertest against a real PostgreSQL)
@@ -245,8 +252,8 @@ npm run seed                  # schema + demo data (6 fictitious plants, floor p
 npm run dev                   # API on :3000, UI on http://localhost:5173
 ```
 
-In **dev mode** the login page offers four personas (Admin, Editor, Operator restricted to plant MUC,
-Viewer). Dev mode is refused when `NODE_ENV=production`.
+In **dev mode** the login page offers five personas (Admin, Editor, Local administrator and Operator restricted to
+plant MUC, Viewer). Dev mode is refused when `NODE_ENV=production`.
 
 | Command | |
 |---|---|
@@ -285,7 +292,7 @@ The most important ones for Azure:
 | `SETTINGS_ENCRYPTION_KEY` | Key Vault reference | encrypts secrets stored in the app settings (SMTP password) |
 | `NOTIFICATIONS_SCHEDULER` | `true` | daily warranty e-mails (App Service *Always On* must be enabled) |
 | `MAP_TILE_URL` | OSM / Azure Maps / internal | map tiles (allowed automatically in the CSP) |
-| `BRAND_NAME`, `APP_NAME`, `BRAND_PRIMARY_COLOR` | `Example Corp`, `IT CMDB`, `#2563eb` | your corporate look (defaults: `Infrastruktur`, `IT CMDB`, `#2563eb`) |
+| `BRAND_NAME`, `APP_NAME`, `BRAND_PRIMARY_COLOR` | `Example Corp`, `IT Infrastructure`, `#2563eb` | your corporate look (defaults: `Infrastruktur`, `IT Infrastructure`, `#2563eb`) |
 
 **New here? Start with the [setup guide](docs/SETUP.md)** ([Deutsch](docs/SETUP.de.md)). Deployment step by step (Terraform, app registration, database grants, GitHub Actions): **[docs/AZURE.md](docs/AZURE.md)**. E-mail notifications: **[docs/NOTIFICATIONS.md](docs/NOTIFICATIONS.md)**. Backlog: **[docs/BACKLOG.md](docs/BACKLOG.md)**.
 

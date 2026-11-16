@@ -145,7 +145,7 @@ export function DatacenterFormModal({
       const saved = datacenter
         ? await http.put<DatacenterDetail>(`/api/datacenters/${datacenter.id}`, body)
         : await http.post<DatacenterDetail>('/api/datacenters', body);
-      message.success(datacenter ? 'Data center saved' : `${saved.name} created`);
+      message.success(datacenter ? 'Server room / data center saved' : `${saved.name} created`);
       await invalidate();
       onSaved?.(saved);
       onClose();
@@ -227,8 +227,8 @@ export function DatacenterFormModal({
       onCancel={onClose}
       onOk={submit}
       confirmLoading={saving}
-      okText={datacenter ? 'Save' : 'Create data center'}
-      title={datacenter ? `Edit ${datacenter.name}` : `New data center${fixedPlant && plant ? ` in ${plant.code}` : ''}`}
+      okText={datacenter ? 'Save' : 'Create'}
+      title={datacenter ? `Edit ${datacenter.name}` : `New server room / data center${fixedPlant && plant ? ` in ${plant.code}` : ''}`}
       width={680}
       destroyOnHidden
     >
@@ -265,7 +265,7 @@ export function DatacenterFormModal({
           </Button>
         )}
         <Form.Item name="name" label="Name (optional)" rules={[{ max: 100 }]} style={{ marginBottom: editing ? undefined : 0 }}>
-          <Input placeholder={plant ? `${plant.code} data center` : 'e.g. DC Munich'} />
+          <Input placeholder={plant ? `${plant.code} server room` : 'e.g. Server room Munich'} />
         </Form.Item>
         {editing && (
           <Form.Item name="description" label="Description (optional)">

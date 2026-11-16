@@ -77,7 +77,7 @@ Set your own look in `.env` (on Azure: Terraform variable `extra_app_settings`, 
 
 ```bash
 BRAND_NAME=Example Corp       # small caption above the app name, e.g. your company
-APP_NAME=IT CMDB
+APP_NAME=IT Infrastructure
 BRAND_PRIMARY_COLOR="#2563eb" # primary colour of buttons, links and e-mails
 ```
 
@@ -117,7 +117,8 @@ The names are up to you; these are used throughout the documentation:
 | Group | App role | For whom |
 |---|---|---|
 | SG-CMDB-Admins | CMDB.Admin | central IT team (everything, including users and settings) |
-| SG-CMDB-Editors | CMDB.Editor | **local IT admins of the plants** – restricted to their plant in the app |
+| SG-CMDB-Editors | CMDB.Editor | central IT staff who add and delete infrastructure |
+| SG-CMDB-LocalAdmins | CMDB.LocalAdmin | **local IT admins of the plants** – only their plant (plant scope in the app), change existing entries, add nothing |
 | SG-CMDB-Operators | CMDB.Operator | on-site technicians (notes, activities, status, files) |
 | SG-CMDB-Viewers | CMDB.Viewer | read and export |
 | SG-CMDB-PostgreSQL-Admins | – | database administrators |
@@ -190,7 +191,8 @@ your organisation account. The `bootstrap_admins` are administrators automatical
 
 1. **Create plants** (*Plants → Add plant*) – or import existing lists via *Export & import*
    (download an Excel template first, fill it in, *Validate*, then *Import*).
-2. **Restrict local admins to their plant:** *user menu → Users & permissions* → user → *Plant scope*.
+2. **Assign local admins their plant:** *user menu → Users & permissions* → user → role *Local administrator* and *Plant scope*
+   (required for this role – without a plant they see nothing).
    Users appear after their first sign-in; you can also create them beforehand with *Add user* and their e-mail.
 3. **Set up e-mail:** *Settings & e-mail* → enter the SMTP relay → *Send test e-mail* → enable warranty
    reminders and enter recipients (central and per plant). Details: [NOTIFICATIONS.md](NOTIFICATIONS.md).
@@ -222,7 +224,7 @@ So that every `git push` to `main` is tested and deployed automatically:
 - [ ] `terraform apply` without errors, `…/healthz` and `…/readyz` return `ok`
 - [ ] Sign-in with an organisation account works; users without an app role are rejected
 - [ ] Bootstrap admin sees *Users & permissions* and *Settings*
-- [ ] A local admin (role Editor, restricted to one plant) only sees that plant and can create a device
+- [ ] A local admin (role Local administrator, one plant) only sees that plant, can change a device there but cannot add one
 - [ ] File upload and download work (Azure Blob Storage)
 - [ ] Test e-mail arrives; the warranty reminder *Preview* shows the expected devices
 - [ ] Excel export works

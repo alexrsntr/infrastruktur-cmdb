@@ -1,8 +1,10 @@
 import { Link } from 'react-router';
 import { Card, Col, Empty, Row, Skeleton, Tag, Typography } from 'antd';
-import { BankOutlined, SafetyCertificateOutlined, ScheduleOutlined } from '@ant-design/icons';
+import { BankOutlined, FileProtectOutlined, SafetyCertificateOutlined, ScheduleOutlined } from '@ant-design/icons';
+import { CERT_DAYS } from '../../../shared/certificates';
+import { useCertificates } from './CertificatesPage';
 import dayjs from 'dayjs';
-import { ACTIVITY_KIND_META, ASSET_TYPES, type AssetType } from '../../../shared/model';
+import { ACTIVITY_KIND_META, ASSET_TYPES, firstName, type AssetType } from '../../../shared/model';
 import { useAssetTypes, useDashboard } from '../lib/queries';
 import { AttentionList, attentionLink, useAttention } from '../components/AttentionList';
 import { useSession } from '../lib/session';
@@ -24,12 +26,14 @@ export function DashboardPage() {
   const types = useAssetTypes();
   const attention = useAttention();
   const byType = Object.fromEntries((data?.byType ?? []).map((t) => [t.type, t.count])) as Record<string, number>;
-  const firstName = me.user.displayName.split(' ')[0];
+  const name = firstName(me.user.displayName) || firstName(me.user.email);
+  const certs = useCertificates({});
+  const certsDue = (certs.data?.counts.expired ?? 0) + (certs.data?.counts.critical ?? 0) + (certs.data?.counts.warning ?? 0);
 
   return (
     <div>
       <PageHeader
-        title={`${greeting()}, ${firstName}`}
+        title={name ? `${greeting()}, ${name}` : greeting()}
         subtitle={scoped ? 'This is what is going on in your plants.' : 'This is what is going on in all plants.'}
       />
 
@@ -49,6 +53,15 @@ export function DashboardPage() {
               value={attention.data?.total ?? '–'}
               label="Devices need attention"
             />
+            {(certs.data?.counts.total ?? 0) > 0 && (
+              <StatTile
+                to="/certificates?due=soon"
+                icon={<FileProtectOutlined />}
+                color={certsDue ? '#c4262e' : '#1e9e5a'}
+                value={certsDue}
+                label={`Certificates expired or expiring within ${CERT_DAYS.warning} days`}
+              />
+            )}
           </div>
 
           <Row gutter={[20, 20]}>

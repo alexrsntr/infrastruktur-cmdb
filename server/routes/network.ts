@@ -284,7 +284,7 @@ export function networkRouter(pool: Pool): Router {
     res.status(201).json(row);
   });
 
-  r.put('/vlans/:id', requirePermission('asset.write'), async (req, res) => {
+  r.put('/vlans/:id', requirePermission('asset.edit'), async (req, res) => {
     const id = requireUuid(req.params.id);
     const input = parse(vlanSchema.omit({ plant_id: true }), req.body);
     const row = await withTransaction(pool, async (db) => {
@@ -382,7 +382,7 @@ export function networkRouter(pool: Pool): Router {
     res.status(201).json(row);
   });
 
-  r.put('/subnets/:id', requirePermission('asset.write'), async (req, res) => {
+  r.put('/subnets/:id', requirePermission('asset.edit'), async (req, res) => {
     const id = requireUuid(req.params.id);
     const row = await withTransaction(pool, async (db) => {
       const before = await loadSubnet(db, id);
@@ -471,7 +471,7 @@ export function networkRouter(pool: Pool): Router {
     res.status(201).json(ports);
   });
 
-  r.put('/ports/:id', requirePermission('asset.write'), async (req, res) => {
+  r.put('/ports/:id', requirePermission('asset.edit'), async (req, res) => {
     const id = requireUuid(req.params.id);
     const input = parse(portUpdateSchema, req.body);
     const port = await withTransaction(pool, async (db) => {

@@ -159,7 +159,7 @@ export function plansRouter(pool: Pool): Router {
     res.status(201).json(marker);
   });
 
-  r.patch('/plan-markers/:id', requirePermission('asset.write'), async (req, res) => {
+  r.patch('/plan-markers/:id', requirePermission('asset.edit'), async (req, res) => {
     const id = requireUuid(req.params.id);
     const input = parse(markerUpdateSchema, req.body);
     const marker = await withTransaction(pool, async (db) => {

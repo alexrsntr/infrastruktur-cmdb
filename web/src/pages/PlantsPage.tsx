@@ -8,23 +8,26 @@ import { PageHeader } from '../components/PageHeader';
 import { download, exportUrl, MoreMenu } from '../components/PageParts';
 import { StatTile } from '../components/Simple';
 import { WorldMap } from '../components/WorldMap';
+import { ScoreTag, useScorecardSummaries } from '../components/Scorecard';
+import type { ScorecardSummary } from '../../../shared/scorecard';
 import { useDashboard, usePlants } from '../lib/queries';
 import { useSession } from '../lib/session';
 import { tintBg, tintFg } from '../lib/palette';
 
-function PlantCard({ p, onOpen }: { p: Plant; onOpen: () => void }) {
+function PlantCard({ p, score, onOpen }: { p: Plant; score?: ScorecardSummary; onOpen: () => void }) {
   return (
     <Card hoverable onClick={onOpen} styles={{ body: { padding: 22 } }} style={{ height: '100%' }}>
       <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 14 }}>
         <span className="stat-icon" style={{ background: tintBg('#2563eb'), color: tintFg('#2563eb'), fontSize: 15, fontWeight: 800, width: 56 }}>
           {p.code}
         </span>
-        <div style={{ minWidth: 0 }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ fontSize: 18, fontWeight: 700, lineHeight: 1.25 }}>{p.name}</div>
           <Typography.Text type="secondary">
             <EnvironmentOutlined /> {[p.city, p.country].filter(Boolean).join(', ') || 'No address yet'}
           </Typography.Text>
         </div>
+        <ScoreTag summary={score} />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px 16px' }}>
         {ASSET_TYPE_KEYS.filter((t) => (p.asset_counts?.[t] ?? 0) > 0).map((t) => (
@@ -51,6 +54,7 @@ export function PlantsPage() {
   const { can, scoped } = useSession();
   const plants = usePlants();
   const dashboard = useDashboard();
+  const scores = useScorecardSummaries();
   const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
   const [view, setView] = useState<'cards' | 'map'>('cards');
@@ -130,7 +134,7 @@ export function PlantsPage() {
         <Row gutter={[16, 16]}>
           {rows.map((p) => (
             <Col key={p.id} xs={24} md={12} xl={8}>
-              <PlantCard p={p} onOpen={() => navigate(`/plants/${p.id}`)} />
+              <PlantCard p={p} score={scores.data?.find((s) => s.plant_id === p.id)} onOpen={() => navigate(`/plants/${p.id}`)} />
             </Col>
           ))}
         </Row>

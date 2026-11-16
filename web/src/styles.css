@@ -160,11 +160,46 @@ body {
   flex: 0 1 auto;
 }
 
-/* six navigation items: tighter on laptop screens so the search box keeps its width */
+/* The header has to fit on laptop screens too (seven navigation items, search, add, user):
+   it gives up space step by step – button text and user name, then the brand text, finally the item labels. */
+@media (max-width: 1799px) {
+  .header-add-text,
+  .header-user-name {
+    display: none;
+  }
+}
 @media (max-width: 1599px) {
+  .app-header {
+    padding-inline: 20px !important;
+  }
+  .header-search {
+    width: clamp(160px, 16vw, 320px);
+    min-width: 160px;
+  }
   .top-nav-item:not(.vertical) {
     padding: 0 10px;
     font-size: 15px;
+  }
+}
+@media (max-width: 1439px) {
+  .brand-text {
+    display: none;
+  }
+  .brand {
+    margin-right: 6px;
+  }
+  .top-nav-item:not(.vertical) {
+    padding: 0 9px;
+    font-size: 14.5px;
+    gap: 6px;
+  }
+}
+@media (max-width: 1199px) {
+  .top-nav-item:not(.vertical) .top-nav-label {
+    display: none;
+  }
+  .top-nav-item:not(.vertical) {
+    padding: 0 13px;
   }
 }
 
@@ -493,4 +528,28 @@ button.stat-tile:focus-visible {
   .app-content {
     padding: 0;
   }
+}
+
+/* certificates: replaced / retired rows */
+.muted-row > td {
+  opacity: 0.6;
+}
+
+/* page header icon (certificates, server rooms) */
+.page-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-size: 26px;
+  background: var(--cmdb-primary-soft);
+  color: var(--ant-color-primary, #2563eb);
+  flex: 0 0 auto;
+}
+
+/* side panels (drawers) start below the sticky header – otherwise it covers their title and buttons */
+.ant-drawer-right > .ant-drawer-content-wrapper,
+.ant-drawer-left > .ant-drawer-content-wrapper {
+  top: 64px;
 }

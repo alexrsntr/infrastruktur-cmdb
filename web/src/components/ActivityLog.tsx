@@ -58,7 +58,7 @@ const KIND_STYLE: Record<string, { bg: string; fg: string; icon: React.ReactNode
 };
 
 const ACTION_TEXT: Record<string, string> = {
-  create: 'added this to the CMDB',
+  create: 'added this',
   update: 'changed',
   delete: 'deleted',
   'relation.add': 'added a connection',
@@ -73,6 +73,12 @@ const ACTION_TEXT: Record<string, string> = {
   'rack.item.add': 'added rack equipment',
   'rack.item.update': 'changed rack equipment',
   'rack.item.remove': 'removed rack equipment',
+  'scorecard.create': 'created the scorecard',
+  'scorecard.update': 'rated the scorecard',
+  'scorecard.delete': 'deleted the scorecard',
+  'wan.add': 'added a WAN line',
+  'wan.update': 'changed a WAN line',
+  'wan.remove': 'removed a WAN line',
 };
 
 function val(v: unknown): string {
@@ -87,6 +93,13 @@ function val(v: unknown): string {
 function changeLines(item: TimelineItem): string[] {
   const c = item.changes ?? {};
   const entries = Object.entries(c).filter(([k]) => !k.startsWith('_'));
+  if (item.action === 'wan.add' || item.action === 'wan.remove') return [[c.line, c.technology, c.provider, c.bandwidth].filter(Boolean).join(' · ')];
+  if (item.action === 'update' || item.action === 'activity.update' || item.action?.startsWith('scorecard.') || item.action === 'wan.update') {
+    const prefix = item.action === 'wan.update' && c.line ? [String(c.line)] : [];
+    return prefix.concat(entries
+      .filter(([, v]) => v && typeof v === 'object' && 'from' in (v as object))
+      .map(([k, v]) => `${item.action?.startsWith('scorecard.') ? k : fieldLabel(k)}: ${val((v as { from: unknown }).from)} → ${val((v as { to: unknown }).to)}`));
+  }
   if (item.action === 'update' || item.action === 'activity.update') {
     return entries
       .filter(([, v]) => v && typeof v === 'object' && 'from' in (v as object))
@@ -335,6 +348,9 @@ const ROUTE: Record<string, (id: string) => string> = {
   plant: (id) => `/plants/${id}`,
   building: (id) => `/buildings/${id}`,
   rack: (id) => `/racks/${id}`,
+  application: (id) => `/applications/${id}`,
+  datacenter: (id) => `/datacenters/${id}`,
+  certificate: (id) => `/certificates?open=${id}`,
 };
 
 export function EntityLink({ type, id, label }: { type: string; id: string; label: string }) {

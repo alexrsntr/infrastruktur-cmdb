@@ -107,7 +107,7 @@ export function racksRouter(pool: Pool): Router {
     res.status(201).json(rack);
   });
 
-  r.put('/racks/:id', requirePermission('location.write'), async (req, res) => {
+  r.put('/racks/:id', requirePermission('location.edit'), async (req, res) => {
     const id = requireUuid(req.params.id);
     const input = parse(rackSchema, req.body);
     const rack = await withTransaction(pool, async (db) => {
@@ -194,7 +194,7 @@ export function racksRouter(pool: Pool): Router {
     res.status(201).json(item);
   });
 
-  r.put('/rack-items/:id', requirePermission('location.write'), async (req, res) => {
+  r.put('/rack-items/:id', requirePermission('location.edit'), async (req, res) => {
     const id = requireUuid(req.params.id);
     const input = parse(rackItemSchema, req.body);
     const item = await withTransaction(pool, async (db) => {
@@ -234,7 +234,7 @@ export function racksRouter(pool: Pool): Router {
   });
 
   // ------------------------------------------------- mount / move / unmount
-  r.patch('/assets/:id/rack', requirePermission('asset.write'), async (req, res) => {
+  r.patch('/assets/:id/rack', requirePermission('asset.edit'), async (req, res) => {
     const id = requireUuid(req.params.id);
     const input = parse(rackMountSchema, req.body);
     const row = await withTransaction(pool, async (db) => {

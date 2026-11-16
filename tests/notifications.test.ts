@@ -74,7 +74,7 @@ const smtpSettings = (overrides: Record<string, unknown> = {}) => ({
   username: 'cmdb',
   password: PASSWORD,
   fromAddress: 'cmdb@example.local',
-  fromName: 'IT CMDB',
+  fromName: 'IT Infrastructure',
   allowInvalidCertificates: false,
   ...overrides,
 });
@@ -169,7 +169,7 @@ describe('SMTP settings', () => {
     const res = await admin.post('/api/settings/email/test', { to: 'anna.admin@example.local' }).expect(200);
     expect(res.body.ok).toBe(true);
     expect(inbox).toHaveLength(1);
-    expect(inbox[0]).toMatchObject({ to: ['anna.admin@example.local'], subject: '[IT CMDB] Test e-mail', user: 'cmdb' });
+    expect(inbox[0]).toMatchObject({ to: ['anna.admin@example.local'], subject: '[IT Infrastructure] Test e-mail', user: 'cmdb' });
   });
 
   it('reports SMTP errors in a readable way', async () => {
@@ -219,7 +219,7 @@ describe('warranty notifications', () => {
     expect(inbox).toHaveLength(2);
 
     const infra = inbox.find((m) => m.to.includes('it-infra@example.local'))!;
-    expect(infra.subject).toMatch(new RegExp(`^\\[IT CMDB\\] ${preview.items.length} warranties expiring – `));
+    expect(infra.subject).toMatch(new RegExp(`^\\[IT Infrastructure\\] ${preview.items.length} warranties expiring – `));
     const muc = preview.items.find((i: { name: string }) => i.name === 'muc-esx01');
     expect(infra.html).toContain(`http://localhost:5173/assets/${muc.id}`);
     expect(infra.text).toContain('muc-esx01');

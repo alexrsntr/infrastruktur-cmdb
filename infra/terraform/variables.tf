@@ -184,8 +184,8 @@ variable "entra_app_role_assignments" {
   default     = {}
 
   validation {
-    condition     = alltrue([for role in keys(var.entra_app_role_assignments) : contains(["CMDB.Admin", "CMDB.Editor", "CMDB.Operator", "CMDB.Viewer"], role)])
-    error_message = "Keys must be CMDB.Admin, CMDB.Editor, CMDB.Operator or CMDB.Viewer."
+    condition     = alltrue([for role in keys(var.entra_app_role_assignments) : contains(["CMDB.Admin", "CMDB.Editor", "CMDB.LocalAdmin", "CMDB.Operator", "CMDB.Viewer"], role)])
+    error_message = "Keys must be CMDB.Admin, CMDB.Editor, CMDB.LocalAdmin, CMDB.Operator or CMDB.Viewer."
   }
 
   validation {

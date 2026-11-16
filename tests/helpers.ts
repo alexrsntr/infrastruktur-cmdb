@@ -44,7 +44,7 @@ export async function setupTestApp(opts: { authMode?: 'dev' | 'local' | 'entra';
   return { app, pool, config };
 }
 
-export type Persona = 'admin' | 'editor' | 'operator' | 'viewer';
+export type Persona = 'admin' | 'editor' | 'local' | 'operator' | 'viewer';
 
 export interface Session {
   agent: ReturnType<typeof request.agent>;

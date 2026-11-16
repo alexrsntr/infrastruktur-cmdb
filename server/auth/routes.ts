@@ -59,7 +59,7 @@ export async function upsertLoginUser(pool: Pool, config: Config, id: LoginIdent
 
   if (opts.requireAppRole && !id.entraRole && !id.groupRole && !bootstrap) {
     throw new LoginRejectedError(
-      'Your account has not been assigned a role for this application. Please request access from the CMDB administrators.',
+      'Your account has not been assigned a role for this application. Please request access from the administrators.',
     );
   }
 
@@ -86,7 +86,7 @@ export async function upsertLoginUser(pool: Pool, config: Config, id: LoginIdent
 
     let user: UserRecord;
     if (existing) {
-      if (!existing.active) throw new LoginRejectedError('Your CMDB account has been deactivated.');
+      if (!existing.active) throw new LoginRejectedError('Your account has been deactivated.');
       const res = await client.query<UserRecord>(
         // accounts with a password keep their e-mail address – it is their user name for the password sign-in
         `UPDATE app_user SET oid = $2, tenant_id = $3, email = CASE WHEN password_hash IS NULL THEN $4 ELSE email END,
@@ -288,7 +288,7 @@ function mountEntra(router: Router, pool: Pool, config: Config, entra: EntraServ
       const group = await groupRoleFor(pool, entra, rt, oid);
       if (group.failed && !appRole && !bootstrap) {
         throw new LoginRejectedError(
-          'Your group memberships in Microsoft Entra ID could not be checked right now. Please try again in a few minutes or contact the CMDB administrators.',
+          'Your group memberships in Microsoft Entra ID could not be checked right now. please try again in a few minutes or contact the administrators.',
         );
       }
 
@@ -333,7 +333,7 @@ function mountEntra(router: Router, pool: Pool, config: Config, entra: EntraServ
         ok: false,
         account: t.email,
         role: null,
-        message: `This Microsoft account is already linked to the CMDB user "${others[0].display_name}". Test with your own Microsoft account.`,
+        message: `This Microsoft account is already linked to the user "${others[0].display_name}". Test with your own Microsoft account.`,
       });
       return res.redirect(SETTINGS_URL);
     }
@@ -341,7 +341,7 @@ function mountEntra(router: Router, pool: Pool, config: Config, entra: EntraServ
     const decided = decideRole({ appRole: t.appRole, groupRole: t.group.role, existing: rows[0] ?? null, defaultRole: config.defaultRole, isBootstrapAdmin: t.bootstrap });
     const rejected = t.rt.requireAppRole && !t.appRole && !t.group.role && !t.bootstrap;
     const ok = !rejected && decided.role === 'admin';
-    const origin = decided.source === 'entra' ? 'its app role' : decided.source === 'group' ? `the group ${t.group.groupNames.join(', ')}` : 'your CMDB account';
+    const origin = decided.source === 'entra' ? 'its app role' : decided.source === 'group' ? `the group ${t.group.groupNames.join(', ')}` : 'your account';
     const message = ok
       ? null
       : rejected
@@ -459,7 +459,7 @@ function mountLocal(router: Router, pool: Pool, config: Config, entra: EntraServ
       log.warn('auth: local sign-in failed', { email });
       return res.status(401).json({ error: 'E-mail address or password is incorrect.' });
     }
-    if (!user.active) return res.status(403).json({ error: 'Your CMDB account has been deactivated.' });
+    if (!user.active) return res.status(403).json({ error: 'Your account has been deactivated.' });
     if (mode === 'admins' && user.role !== 'admin') {
       return res.status(403).json({ error: 'Only administrators can sign in with a password. Please use "Sign in with Microsoft".' });
     }
@@ -476,7 +476,7 @@ export const DEV_PERSONAS: Record<string, { name: string; email: string; role: R
   admin: { name: 'Anna Admin', email: 'anna.admin@example.local', role: 'admin' },
   editor: { name: 'Erik Editor', email: 'erik.editor@example.local', role: 'editor' },
   operator: { name: 'Olga Operator (MUC only)', email: 'olga.operator@example.local', role: 'operator', scope: ['MUC'] },
-  local: { name: 'Lars Local Admin (MUC)', email: 'lars.localadmin@example.local', role: 'editor', scope: ['MUC'] },
+  local: { name: 'Lars Local Admin (MUC)', email: 'lars.localadmin@example.local', role: 'local_admin', scope: ['MUC'] },
   viewer: { name: 'Viktor Viewer', email: 'viktor.viewer@example.local', role: 'viewer' },
 };
 

@@ -10,7 +10,7 @@ import { errorText, http } from '../lib/api';
 const DEV_PERSONAS = [
   { key: 'admin', name: 'Anna Admin', role: 'admin' as const, note: 'all plants' },
   { key: 'editor', name: 'Erik Editor', role: 'editor' as const, note: 'all plants' },
-  { key: 'local', name: 'Lars Local Admin', role: 'editor' as const, note: 'plant MUC only' },
+  { key: 'local', name: 'Lars Local Admin', role: 'local_admin' as const, note: 'plant MUC only, edit only' },
   { key: 'operator', name: 'Olga Operator', role: 'operator' as const, note: 'plant MUC only' },
   { key: 'viewer', name: 'Viktor Viewer', role: 'viewer' as const, note: 'all plants' },
 ];
@@ -38,7 +38,7 @@ export function LoginPage({ config }: { config?: AppConfig }) {
               {config?.brandName ?? 'Infrastruktur'}
             </Typography.Text>
             <Typography.Title level={4} style={{ margin: 0 }}>
-              {config?.appName ?? 'IT CMDB'}
+              {config?.appName ?? 'IT Infrastructure'}
             </Typography.Title>
           </div>
         </Space>
@@ -209,7 +209,7 @@ function LocalLogin({ returnTo, compact = false }: { returnTo: string; compact?:
         </Button>
       </Form>
       <Typography.Paragraph type="secondary" style={{ marginTop: 16, marginBottom: 0, fontSize: 12 }}>
-        Forgot your password? Ask a CMDB administrator to set a new one.
+        Forgot your password? Ask an administrator to set a new one.
       </Typography.Paragraph>
     </>
   );

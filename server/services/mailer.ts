@@ -47,7 +47,7 @@ export const EMPTY_SMTP: StoredSmtpSettings = {
   username: '',
   passwordEnc: null,
   fromAddress: '',
-  fromName: 'IT CMDB',
+  fromName: 'IT Infrastructure',
   allowInvalidCertificates: false,
 };
 

@@ -33,7 +33,7 @@ export const ASSET_FROM = `
         WHEN 'note.add' THEN 'Note: ' || (l.changes->>'note')
         WHEN 'activity.add' THEN initcap(l.changes->>'kind') || ': ' || (l.changes->>'title')
         WHEN 'activity.update' THEN 'Activity updated: ' || COALESCE(l.entity_label, '')
-        WHEN 'create' THEN 'Added to the CMDB'
+        WHEN 'create' THEN 'Added'
         WHEN 'update' THEN 'Changed ' || COALESCE((SELECT string_agg(replace(k, '_', ' '), ', ')
                                                    FROM (SELECT k FROM jsonb_object_keys(l.changes) AS k WHERE k NOT LIKE '\\_%' LIMIT 3) x), 'data')
         WHEN 'attachment.add' THEN 'File added: ' || (l.changes->>'file')

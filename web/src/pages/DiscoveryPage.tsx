@@ -125,7 +125,7 @@ function Inbox() {
           emptyText: (
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description={state === 'new' ? 'Nothing new – every discovered device is in the CMDB or ignored.' : 'Nothing here.'}
+              description={state === 'new' ? 'Nothing new – every discovered device is documented or ignored.' : 'Nothing here.'}
             />
           ),
         }}
@@ -173,7 +173,7 @@ function Inbox() {
           ...(state === 'linked'
             ? [
                 {
-                  title: 'In the CMDB',
+                  title: 'Documented as',
                   key: 'asset',
                   width: 220,
                   render: (_: unknown, i: DiscoveryItem) =>
@@ -304,7 +304,7 @@ function CreateModal({ item, onClose }: { item: DiscoveryItem | null; onClose: (
   return (
     <Modal
       open={!!item}
-      title="Add to the CMDB"
+      title="Add as a device"
       okText="Add device"
       confirmLoading={saving}
       onCancel={onClose}
@@ -396,7 +396,7 @@ function LinkModal({ item, onClose }: { item: DiscoveryItem | null; onClose: () 
         onSearch={setSearch}
         value={assetId}
         onChange={setAssetId}
-        placeholder="Search the device in the CMDB"
+        placeholder="Search the documented device"
         loading={options.isFetching}
         options={(options.data ?? []).map((o) => ({ value: o.id, label: `${o.name}${o.ip_address ? ` · ${o.ip_address}` : ''}${o.plant_code ? ` · ${o.plant_code}` : ''}` }))}
       />
@@ -440,7 +440,7 @@ function Sources() {
         message="How discovery works"
         description={
           <span>
-            The CMDB itself queries the networks (SNMP v2c/v3, UDP 161) and the domain controllers (LDAPS, TCP 636). When it runs in Azure, the plant networks must
+            The application itself queries the networks (SNMP v2c/v3, UDP 161) and the domain controllers (LDAPS, TCP 636). When it runs in Azure, the plant networks must
             be reachable through the VPN / ExpressRoute and VNet integration; ICMP is not available in App Service, so devices are found by SNMP. Credentials are
             stored encrypted. Devices are matched by serial number, then MAC address, host name and IP address; existing values are never overwritten.
           </span>

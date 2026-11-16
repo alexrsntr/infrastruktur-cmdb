@@ -138,7 +138,7 @@ export function EntraDirectoryTab({ settings }: { settings?: EntraSettingsDto })
                 },
                 { title: 'Job title', key: 'job', width: 200, render: (_, u) => [u.jobTitle, u.department].filter(Boolean).join(' · ') || '–' },
                 {
-                  title: 'CMDB',
+                  title: 'Access',
                   key: 'cmdb',
                   width: 220,
                   render: (_, u) =>
@@ -146,7 +146,7 @@ export function EntraDirectoryTab({ settings }: { settings?: EntraSettingsDto })
                       <RoleTag role={u.cmdbRole} />
                     ) : (
                       <Button size="small" icon={<UserAddOutlined />} onClick={() => setProvisioning(u)}>
-                        Add to CMDB
+                        Add user
                       </Button>
                     ),
                 },
@@ -185,7 +185,7 @@ export function EntraDirectoryTab({ settings }: { settings?: EntraSettingsDto })
                   ),
                 },
                 {
-                  title: 'CMDB role',
+                  title: 'Role',
                   key: 'role',
                   width: 240,
                   render: (_, g) => (
@@ -232,7 +232,7 @@ function GroupMembers({ groupId, onProvision }: { groupId: string; onProvision: 
         columns={[
           { title: 'Member (including nested groups)', key: 'n', render: (_, u) => `${u.displayName} · ${u.userPrincipalName ?? u.mail ?? ''}` },
           {
-            title: 'CMDB',
+            title: 'Access',
             key: 'c',
             width: 200,
             render: (_, u) =>
@@ -240,7 +240,7 @@ function GroupMembers({ groupId, onProvision }: { groupId: string; onProvision: 
                 <RoleTag role={u.cmdbRole} />
               ) : (
                 <Button size="small" type="link" onClick={() => onProvision(u)}>
-                  Add to CMDB
+                  Add user
                 </Button>
               ),
           },
@@ -301,7 +301,7 @@ function ProvisionModal({ user, onClose }: { user: DirectoryUser | null; onClose
   };
 
   return (
-    <Modal open={!!user} title={user ? `Add ${user.displayName} to the CMDB` : ''} onCancel={onClose} onOk={submit} okText="Add" confirmLoading={saving} destroyOnHidden>
+    <Modal open={!!user} title={user ? `Add ${user.displayName}` : ''} onCancel={onClose} onOk={submit} okText="Add" confirmLoading={saving} destroyOnHidden>
       <Typography.Paragraph type="secondary">
         {user?.userPrincipalName} – the role set here applies unless the person has an app role or a mapped Entra group (those take precedence).
       </Typography.Paragraph>
@@ -343,7 +343,7 @@ function GroupRoleModal({ value, onClose }: { value: { groupId: string; displayN
   return (
     <Modal
       open={!!value}
-      title={value ? `CMDB role for the group “${value.displayName}”` : ''}
+      title={value ? `Role for the group “${value.displayName}”` : ''}
       onCancel={onClose}
       onOk={submit}
       okText="Save"
@@ -391,7 +391,7 @@ function GroupRoleTable({
   };
 
   return (
-    <Card title="Entra groups → CMDB roles" style={{ marginBottom: 16 }} extra={<Typography.Text type="secondary">search a group above to add one</Typography.Text>}>
+    <Card title="Entra groups → roles" style={{ marginBottom: 16 }} extra={<Typography.Text type="secondary">search a group above to add one</Typography.Text>}>
       {groupPermissionMissing && !!mappings.data?.length && (
         <Alert
           type="warning"

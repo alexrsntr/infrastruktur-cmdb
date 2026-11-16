@@ -83,7 +83,7 @@ export function locationsRouter(pool: Pool): Router {
     res.status(201).json(row);
   });
 
-  r.put('/plants/:id', requirePermission('location.write'), async (req, res) => {
+  r.put('/plants/:id', requirePermission('location.edit'), async (req, res) => {
     const id = requireUuid(req.params.id);
     assertPlantAccess(req.user!, id);
     const input = parse(plantSchema, req.body);
@@ -177,7 +177,7 @@ export function locationsRouter(pool: Pool): Router {
     res.status(201).json(row);
   });
 
-  r.put('/buildings/:id', requirePermission('location.write'), async (req, res) => {
+  r.put('/buildings/:id', requirePermission('location.edit'), async (req, res) => {
     const id = requireUuid(req.params.id);
     const input = parse(buildingSchema, req.body);
     const row = await withTransaction(pool, async (db) => {
@@ -253,7 +253,7 @@ export function locationsRouter(pool: Pool): Router {
     res.status(201).json(row);
   });
 
-  r.put('/floors/:id', requirePermission('location.write'), async (req, res) => {
+  r.put('/floors/:id', requirePermission('location.edit'), async (req, res) => {
     const id = requireUuid(req.params.id);
     const floor = await loadFloorPlant(pool, id);
     assertPlantAccess(req.user!, floor.plant_id);

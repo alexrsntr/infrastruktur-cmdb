@@ -262,7 +262,7 @@ export function EntraSettingsTab() {
                 <Button icon={<ApiOutlined />} loading={busy === 'test'} disabled={!s.configured} onClick={testConnection}>
                   Test connection
                 </Button>
-                <Tooltip title={!s.configured ? 'Save the configuration first' : 'Opens the Microsoft sign-in; you stay signed in to the CMDB'}>
+                <Tooltip title={!s.configured ? 'Save the configuration first' : 'Opens the Microsoft sign-in; you stay signed in here'}>
                   <Button icon={<LoginOutlined />} disabled={!s.configured || s.enabled} href={s.configured && !s.enabled ? '/auth/entra/test-login' : undefined}>
                     Test sign-in with Microsoft
                   </Button>
@@ -396,7 +396,7 @@ export function EntraSettingsTab() {
               <li>
                 <b>Consent</b>: the sign-in needs no admin consent if users may consent to apps in your tenant; otherwise an <i>Application Administrator</i>{' '}
                 or <i>Cloud Application Administrator</i> grants consent for the delegated permissions. The optional application permissions always need
-                admin consent by a <i>Privileged Role Administrator</i> or <i>Global Administrator</i> – without them, use app roles for the CMDB roles.
+                admin consent by a <i>Privileged Role Administrator</i> or <i>Global Administrator</i> – without them, use app roles for the roles.
               </li>
               <li>
                 Enterprise application → <b>Users and groups</b>: assign people or groups to the app roles (and set <i>Assignment required</i> if only assigned users may sign in).

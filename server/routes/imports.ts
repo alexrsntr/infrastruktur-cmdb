@@ -15,10 +15,10 @@ import {
 import { requirePermission } from '../auth/context';
 import { audit, diff, snapshot } from '../lib/audit';
 import { badRequest, isUuid, queryString } from '../lib/http';
-import { assetSchema } from '../lib/schemas';
-import { hasPlantAccess } from '../lib/scope';
+import { assetSchema, plantSchema } from '../lib/schemas';
+import { hasPlantAccess, isUnscoped } from '../lib/scope';
 import { insertAsset, resolveAssetLocation, updateAsset } from '../services/assets';
-import { attributeFields, assetColumns } from '../services/tabular';
+import { attributeFields, assetColumns, PLANT_COLUMNS } from '../services/tabular';
 import { cleanAttributes, loadAssetTypeSettings } from '../services/assetTypes';
 
 const MAX_ROWS = 10_000;
@@ -287,6 +287,65 @@ function keepMissingColumns(input: Record<string, unknown>, existing: Record<str
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// Plants
+// ---------------------------------------------------------------------------
+
+const PLANT_FIELDS = ['code', 'name', 'country', 'city', 'address', 'latitude', 'longitude', 'timezone', 'contact', 'description'] as const;
+type PlantField = (typeof PLANT_FIELDS)[number];
+
+/** Plant export headers, field keys and common aliases → field */
+function plantHeaderMap(): Map<string, PlantField | 'id'> {
+  const map = new Map<string, PlantField | 'id'>();
+  for (const c of PLANT_COLUMNS) {
+    if (c.key === 'id' || (PLANT_FIELDS as readonly string[]).includes(c.key)) {
+      map.set(norm(c.header), c.key as PlantField | 'id');
+      map.set(norm(c.key), c.key as PlantField | 'id');
+    }
+  }
+  const aliases: Record<string, PlantField> = {
+    plant: 'code',
+    plantcode: 'code',
+    site: 'code',
+    sitecode: 'code',
+    plantname: 'name',
+    sitename: 'name',
+    street: 'address',
+    location: 'city',
+    town: 'city',
+    lat: 'latitude',
+    lng: 'longitude',
+    lon: 'longitude',
+    tz: 'timezone',
+    contactperson: 'contact',
+    responsible: 'contact',
+    notes: 'description',
+    note: 'description',
+  };
+  for (const [k, v] of Object.entries(aliases)) if (!map.has(k)) map.set(k, v);
+  return map;
+}
+
+/** Plant fields of one row; a field whose column is missing keeps the value of an existing plant. */
+function mapPlantRow(raw: RawRow, headers: Map<string, PlantField | 'id'>): { id: string | null; values: Partial<Record<PlantField, unknown>> } {
+  const values: Partial<Record<PlantField, unknown>> = {};
+  let id: string | null = null;
+  for (const [header, value] of Object.entries(raw)) {
+    const key = headers.get(norm(header));
+    if (!key) continue;
+    if (key === 'id') {
+      const s = str(value);
+      id = s && isUuid(s) ? s : null;
+    } else if (key === 'latitude' || key === 'longitude') {
+      const s = str(value);
+      const n = toNumber(value);
+      if (s && n === null) throw new Error(`Invalid ${key} "${s}"`);
+      values[key] = n;
+    } else values[key] = str(value);
+  }
+  return { id, values };
+}
+
 export function importsRouter(pool: Pool): Router {
   const r = Router();
 
@@ -349,6 +408,86 @@ export function importsRouter(pool: Pool): Router {
         await db.query('ROLLBACK');
       } else {
         await audit(db, req, { action: 'import', entityType: 'assets', changes: { file: req.file.originalname, created: report.created, updated: report.updated, errors: report.errors.length } });
+        await db.query('COMMIT');
+      }
+    } catch (err) {
+      await db.query('ROLLBACK').catch(() => undefined);
+      throw err;
+    } finally {
+      db.release();
+    }
+    res.json(report);
+  });
+
+  /**
+   * Plants from Excel / CSV: matched by ID, otherwise by code, and updated; other rows create new plants
+   * (only users without plant restriction may create plants, like in the UI).
+   */
+  r.post('/import/plants', requirePermission('import'), upload.single('file'), async (req, res) => {
+    if (!req.file) throw badRequest('No file uploaded (field "file")');
+    const dryRun = queryString(req.query.dryRun) !== 'false';
+    const { rows } = await readRows(req.file);
+    if (rows.length > MAX_ROWS) throw badRequest(`Too many rows (${rows.length}). The limit is ${MAX_ROWS} per file.`);
+    const headers = plantHeaderMap();
+    const report: ImportReport = { dryRun, total: rows.length, created: 0, updated: 0, skipped: 0, errors: [] };
+    const user = req.user!;
+    const db = await pool.connect();
+    try {
+      await db.query('BEGIN');
+      const seenCodes = new Map<string, number>();
+      for (let i = 0; i < rows.length; i++) {
+        const rowNumber = i + 2;
+        await db.query('SAVEPOINT row_sp');
+        try {
+          const { id, values } = mapPlantRow(rows[i], headers);
+          const code = typeof values.code === 'string' ? values.code : null;
+          if (code) {
+            const earlier = seenCodes.get(code.toLowerCase());
+            if (earlier) throw new Error(`The code "${code}" appears again (row ${earlier})`);
+            seenCodes.set(code.toLowerCase(), rowNumber);
+          }
+          let existing = null;
+          if (id) existing = (await db.query('SELECT * FROM plant WHERE id = $1 FOR UPDATE', [id])).rows[0];
+          if (!existing && code) existing = (await db.query('SELECT * FROM plant WHERE lower(code) = lower($1) FOR UPDATE', [code])).rows[0];
+          const merged: Record<string, unknown> = existing ? { ...Object.fromEntries(PLANT_FIELDS.map((f) => [f, existing[f]])), ...values } : values;
+          const missing = (['code', 'name'] as const).filter((f) => !merged[f]);
+          if (missing.length) throw new Error(`${missing.map((f) => (f === 'code' ? 'Code' : 'Name')).join(' and ')} missing`);
+          const parsed = plantSchema.safeParse(merged);
+          if (!parsed.success) throw new Error(parsed.error.issues.map((x) => `${x.path.join('.') || 'row'}: ${x.message === 'Required' ? 'missing' : x.message}`).join('; '));
+          const input = parsed.data;
+
+          if (existing) {
+            if (!hasPlantAccess(user, existing.id)) throw new Error('This plant is outside of your plant scope');
+            const { rows: after } = await db.query(
+              `UPDATE plant SET code=$2, name=$3, country=$4, city=$5, address=$6, latitude=$7, longitude=$8, timezone=$9, contact=$10,
+                 description=$11, updated_by=$12, updated_at=now() WHERE id=$1 RETURNING *`,
+              [existing.id, input.code, input.name, input.country, input.city, input.address, input.latitude, input.longitude, input.timezone, input.contact, input.description, user.id],
+            );
+            const changes = diff(existing, after[0]);
+            if (Object.keys(changes).length) {
+              report.updated++;
+              await audit(db, req, { action: 'update', entityType: 'plant', entityId: existing.id, entityLabel: `${input.code} – ${input.name}`, plantId: existing.id, changes: { ...changes, _source: 'import' } });
+            } else report.skipped++;
+          } else {
+            if (!isUnscoped(user)) throw new Error('New plants can only be created by users without plant restriction');
+            const { rows: created } = await db.query(
+              `INSERT INTO plant (code, name, country, city, address, latitude, longitude, timezone, contact, description, created_by, updated_by)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$11) RETURNING *`,
+              [input.code, input.name, input.country, input.city, input.address, input.latitude, input.longitude, input.timezone, input.contact, input.description, user.id],
+            );
+            report.created++;
+            await audit(db, req, { action: 'create', entityType: 'plant', entityId: created[0].id, entityLabel: `${input.code} – ${input.name}`, plantId: created[0].id, changes: { ...snapshot(created[0]), _source: 'import' } });
+          }
+          await db.query('RELEASE SAVEPOINT row_sp');
+        } catch (err) {
+          await db.query('ROLLBACK TO SAVEPOINT row_sp');
+          const e = err as { message: string; code?: string };
+          report.errors.push({ row: rowNumber, message: e.code === '23505' ? 'A plant with this code already exists' : e.message });
+        }
+      }
+      if (dryRun) await db.query('ROLLBACK');
+      else {
+        await audit(db, req, { action: 'import', entityType: 'plants', changes: { file: req.file.originalname, created: report.created, updated: report.updated, errors: report.errors.length } });
         await db.query('COMMIT');
       }
     } catch (err) {

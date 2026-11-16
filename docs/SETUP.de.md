@@ -160,7 +160,7 @@ npm run seed                  # legt das Schema an und lädt Demodaten (6 fiktiv
 npm run dev                   # API auf :3000, Oberfläche auf http://localhost:5173
 ```
 
-<http://localhost:5173> öffnen. Im Dev-Modus bietet die Anmeldeseite Demo-Personen an (Admin, Editor, Operator
+<http://localhost:5173> öffnen. Im Dev-Modus bietet die Anmeldeseite Demo-Personen an (Admin, Editor, Local Admin und Operator
 mit Beschränkung auf ein Werk, Viewer), damit man Rollen und Werksbeschränkung ausprobieren kann. Der Dev-Modus
 wird verweigert, sobald `NODE_ENV=production` gesetzt ist.
 
@@ -179,7 +179,7 @@ In der `.env` (in Azure: Terraform-Variable `extra_app_settings`, siehe [AZURE.m
 
 ```bash
 BRAND_NAME=Beispiel GmbH      # kleine Zeile über dem App-Namen, z. B. der Firmenname
-APP_NAME=IT CMDB
+APP_NAME=IT Infrastructure
 BRAND_PRIMARY_COLOR="#2563eb" # Hauptfarbe für Buttons, Links und E-Mails
 ```
 
@@ -220,7 +220,8 @@ Die Namen sind frei wählbar; die Dokumentation verwendet diese:
 | Gruppe | App-Rolle | Für wen |
 |---|---|---|
 | SG-CMDB-Admins | CMDB.Admin | zentrales IT-Team (alles, inkl. Benutzer & Einstellungen) |
-| SG-CMDB-Editors | CMDB.Editor | **lokale IT-Admins der Werke** – in der App auf ihr Werk beschränkt |
+| SG-CMDB-Editors | CMDB.Editor | zentrale IT, die Infrastruktur anlegt und löscht |
+| SG-CMDB-LocalAdmins | CMDB.LocalAdmin | **lokale IT-Admins der Werke** – nur ihr Werk (Werks-Scope in der App), ändern vorhandene Einträge, legen nichts neu an |
 | SG-CMDB-Operators | CMDB.Operator | Techniker vor Ort (Notizen, Aktivitäten, Status, Dateien) |
 | SG-CMDB-Viewers | CMDB.Viewer | Lesen und Export |
 | SG-CMDB-PostgreSQL-Admins | – | Datenbank-Administratoren |
@@ -326,7 +327,7 @@ Damit jedes `git push` auf `main` automatisch getestet und ausgerollt wird:
 - [ ] `terraform apply` ohne Fehler, `…/healthz` und `…/readyz` liefern `ok`
 - [ ] Anmeldung mit Firmenkonto funktioniert; Benutzer ohne Rolle werden abgewiesen
 - [ ] Bootstrap-Admin sieht *Users & permissions* und *Settings*
-- [ ] Ein lokaler Admin (Rolle Editor, auf sein Werk beschränkt) sieht nur sein Werk und kann ein Gerät anlegen
+- [ ] Ein lokaler Admin (Rolle Local administrator, ein Werk) sieht nur sein Werk, kann dort ein Gerät ändern, aber keins anlegen
 - [ ] Datei-Upload und -Download funktionieren (Azure Blob Storage)
 - [ ] Test-E-Mail kommt an; Garantie-Erinnerung *Preview* zeigt die erwarteten Geräte
 - [ ] Export (Excel) funktioniert

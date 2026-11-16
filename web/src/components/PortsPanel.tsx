@@ -28,7 +28,9 @@ export function PortsPanel({ assetId, assetName }: { assetId: string; assetName:
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<AssetPort | null>(null);
   const [connecting, setConnecting] = useState<AssetPort | null>(null);
+  // add / delete ports and cables (editors) – change existing ports (local administrators too)
   const writable = can('asset.write');
+  const editable = can('asset.edit');
 
   const disconnect = async (p: AssetPort) => {
     try {
@@ -107,7 +109,7 @@ export function PortsPanel({ assetId, assetName }: { assetId: string; assetName:
             },
             { title: 'Cable', key: 'cable', width: 120, render: (_, p) => (p.cable_label ? <Tag>{p.cable_label}</Tag> : <span className="muted">–</span>) },
             { title: 'VLAN', key: 'vlan', width: 150, render: (_, p) => vlanText(p) || <span className="muted">–</span> },
-            ...(writable
+            ...(editable
               ? [
                   {
                     title: '',
@@ -116,10 +118,12 @@ export function PortsPanel({ assetId, assetName }: { assetId: string; assetName:
                     align: 'right' as const,
                     render: (_: unknown, p: AssetPort) => (
                       <Space size={0}>
-                        <Tooltip title={p.connected_port_id ? 'Change cable' : 'Connect cable'}>
-                          <Button type="text" size="small" icon={<LinkOutlined />} aria-label={`Connect ${p.name}`} onClick={() => setConnecting(p)} />
-                        </Tooltip>
-                        {p.connected_port_id && (
+                        {writable && (
+                          <Tooltip title={p.connected_port_id ? 'Change cable' : 'Connect cable'}>
+                            <Button type="text" size="small" icon={<LinkOutlined />} aria-label={`Connect ${p.name}`} onClick={() => setConnecting(p)} />
+                          </Tooltip>
+                        )}
+                        {writable && p.connected_port_id && (
                           <Popconfirm title={`Remove the cable on ${p.name}?`} onConfirm={() => disconnect(p)}>
                             <Tooltip title="Remove cable">
                               <Button type="text" size="small" icon={<DisconnectOutlined />} aria-label={`Disconnect ${p.name}`} />
@@ -129,9 +133,11 @@ export function PortsPanel({ assetId, assetName }: { assetId: string; assetName:
                         <Tooltip title="Edit port">
                           <Button type="text" size="small" icon={<EditOutlined />} aria-label={`Edit ${p.name}`} onClick={() => setEditing(p)} />
                         </Tooltip>
-                        <Popconfirm title={`Delete port ${p.name}?`} onConfirm={() => remove(p)}>
-                          <Button type="text" size="small" danger icon={<DeleteOutlined />} aria-label={`Delete ${p.name}`} />
-                        </Popconfirm>
+                        {writable && (
+                          <Popconfirm title={`Delete port ${p.name}?`} onConfirm={() => remove(p)}>
+                            <Button type="text" size="small" danger icon={<DeleteOutlined />} aria-label={`Delete ${p.name}`} />
+                          </Popconfirm>
+                        )}
                       </Space>
                     ),
                   },

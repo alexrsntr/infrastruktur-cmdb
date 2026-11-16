@@ -38,14 +38,14 @@ export function DatacentersPage() {
             <ApartmentOutlined />
           </span>
         }
-        title="Data centers"
-        subtitle="Server rooms of each plant – also when one data center is split across two buildings."
+        title="Server rooms / data centers"
+        subtitle="Server rooms and data centers of each plant – also when one data center is split across two buildings."
         extra={
           <>
             <ExportMenu dataset="datacenters" query={{ plantId }} />
             {can('location.write') && (
               <Button type="primary" size="large" icon={<PlusOutlined />} onClick={() => setCreating(true)}>
-                New data center
+                New server room / data center
               </Button>
             )}
           </>
@@ -75,10 +75,10 @@ export function DatacentersPage() {
             description={
               <div style={{ maxWidth: 560, margin: '0 auto' }}>
                 <Typography.Title level={4} style={{ marginTop: 8 }}>
-                  No data center documented yet
+                  No server room or data center documented yet
                 </Typography.Title>
                 <Typography.Paragraph type="secondary" style={{ fontSize: 15 }}>
-                  A data center groups your server rooms. If it is <strong>stretched</strong> across two buildings – for example a cluster with hosts in both rooms – the CMDB draws both rooms side by side with
+                  Document the server room of a plant – its racks are assigned automatically. A data center groups server rooms. If it is <strong>stretched</strong> across two buildings – for example a cluster with hosts in both rooms – both rooms are drawn side by side with
                   their racks, the fibre links between them and the connections of the core switches.
                 </Typography.Paragraph>
               </div>
@@ -86,7 +86,7 @@ export function DatacentersPage() {
           >
             {can('location.write') && (
               <Button type="primary" size="large" icon={<PlusOutlined />} onClick={() => setCreating(true)}>
-                Create the first data center
+                Add the first server room
               </Button>
             )}
           </Empty>

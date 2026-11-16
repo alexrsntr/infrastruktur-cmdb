@@ -18,6 +18,7 @@ import type { Config } from '../config';
 import { requireAdmin } from '../auth/context';
 import { audit } from '../lib/audit';
 import { HttpError, badRequest, parse } from '../lib/http';
+import { plantBoundRoleCheck } from '../lib/schemas';
 import { clientKey } from '../lib/rateLimit';
 import { encryptSecret } from '../lib/secrets';
 import { explainEntraError } from '../entra/errors';
@@ -44,16 +45,20 @@ const settingsSchema = z.object({
 
 const localLoginSchema = z.object({ mode: z.enum(LOCAL_LOGIN_MODES) });
 
-const groupRoleSchema = z.object({
-  display_name: z.string().trim().min(1).max(256),
-  role: z.enum(ROLES),
-  plant_scope: z.array(z.string().uuid()).max(500).default([]),
-});
+const groupRoleSchema = z
+  .object({
+    display_name: z.string().trim().min(1).max(256),
+    role: z.enum(ROLES),
+    plant_scope: z.array(z.string().uuid()).max(500).default([]),
+  })
+  .refine(...plantBoundRoleCheck);
 
-const provisionSchema = z.object({
-  role: z.enum(ROLES),
-  plant_scope: z.array(z.string().uuid()).max(500).default([]),
-});
+const provisionSchema = z
+  .object({
+    role: z.enum(ROLES),
+    plant_scope: z.array(z.string().uuid()).max(500).default([]),
+  })
+  .refine(...plantBoundRoleCheck);
 
 const ENV_NAMES: Record<EntraField, string> = {
   tenantId: 'ENTRA_TENANT_ID',
@@ -203,7 +208,7 @@ export function entraRouter(pool: Pool, config: Config, entra: EntraService): Ro
     if (rt.enabled && next.requireAppRole && !rt.requireAppRole && effectiveLocalLogin(config, rt) === 'off' && req.user!.roleSource === 'local') {
       throw new HttpError(
         409,
-        'You would lock yourself out: your role is set in the CMDB, not by an app role or group, and password sign-in is off. Assign yourself the app role CMDB.Admin or a mapped group first.',
+        'You would lock yourself out: your role is set in this application, not by an app role or group, and password sign-in is off. Assign yourself the app role CMDB.Admin or a mapped group first.',
       );
     }
     if (identityChanged) next.checks = null;
@@ -359,7 +364,7 @@ export function entraRouter(pool: Pool, config: Config, entra: EntraService): Ro
       'SELECT display_name FROM app_user WHERE oid = $1 OR (oid IS NULL AND lower(email) = $2)',
       [user.id, email],
     );
-    if (existing[0]) throw new HttpError(409, `"${existing[0].display_name}" is already a CMDB user – it is linked automatically at the first sign-in with Microsoft.`);
+    if (existing[0]) throw new HttpError(409, `"${existing[0].display_name}" is already a user – it is linked automatically at the first sign-in with Microsoft.`);
     const { rows } = await pool.query<{ id: string }>(
       `INSERT INTO app_user (oid, tenant_id, email, display_name, role, role_source, plant_scope) VALUES ($1,$2,$3,$4,$5,'local',$6::uuid[]) RETURNING id`,
       [user.id, rt.tenantId, email, user.displayName, input.role, input.plant_scope],
