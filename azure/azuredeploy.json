@@ -172,6 +172,7 @@
             { "name": "PGPASSWORD", "value": "[parameters('databasePassword')]" },
             { "name": "PGSSLMODE", "value": "require" },
             { "name": "STORAGE_DRIVER", "value": "database" },
+            { "name": "DB_STORAGE_LIMIT_GB", "value": "32" },
             { "name": "BRAND_NAME", "value": "[parameters('brandName')]" }
           ]
         }

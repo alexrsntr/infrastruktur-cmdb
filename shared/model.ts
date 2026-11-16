@@ -147,6 +147,8 @@ export interface AssetTypeDef {
   physical: boolean;
   /** Typical height in a rack (U) */
   rackHeight: number;
+  /** Passive infrastructure (cabling): no hostname, IP / MAC address, serial number or OS – the forms ask for its own fields instead */
+  passive?: boolean;
   color: string;
   fields: FieldDef[];
 }
@@ -437,8 +439,9 @@ export const ASSET_TYPES = {
     short: 'CBL',
     category: 'cabling',
     hint: 'Copper or fibre cabling: backbone, floor distribution, trunk or patch cabling',
-    example: 'muc-b01-fo-backbone-01',
+    example: 'MUC-B01-FO-BACKBONE-01',
     physical: true,
+    passive: true,
     rackHeight: 1,
     color: '#0e6f8e',
     fields: [
@@ -498,6 +501,20 @@ export function assetTypeByName(name: string | null | undefined): AssetType | un
 }
 
 /** Type name inside a sentence: "switch", "access point" – acronyms such as "UPS" stay upper case. */
+/** Category / class choices that fit the cable medium: Cat … for copper, OS … for single-mode and OM … for multi-mode fibre */
+export function cableCategoriesFor(medium: unknown, all: readonly string[]): string[] {
+  if (typeof medium !== 'string' || !medium) return [...all];
+  if (medium.startsWith('Copper')) return all.filter((o) => o.startsWith('Cat'));
+  if (medium === 'Fibre single-mode') return all.filter((o) => o.startsWith('OS'));
+  if (medium === 'Fibre multi-mode') return all.filter((o) => o.startsWith('OM'));
+  return [...all];
+}
+
+/** Cabling and other passive infrastructure – see AssetTypeDef.passive */
+export function isPassiveType(type: AssetType | null | undefined): boolean {
+  return !!type && (ASSET_TYPES[type] as AssetTypeDef).passive === true;
+}
+
 export function assetTypeNoun(type: AssetType): string {
   const { label } = ASSET_TYPES[type];
   return label === label.toUpperCase() ? label : label.toLowerCase();

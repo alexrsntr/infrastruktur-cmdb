@@ -3,6 +3,7 @@ import type { Config } from '../config';
 import { log } from '../lib/log';
 import { loadWarrantySettings, localParts, runWarrantyJob } from './warrantyNotifications';
 import { loadCertificateSettings, runCertificateJob } from './certificateNotifications';
+import { checkDbStorage } from './dbStorage';
 
 /**
  * In-process scheduler for the daily warranty digest.
@@ -72,8 +73,29 @@ export async function checkAndRunCertificates(pool: Pool, config: Config, now: D
   }
 }
 
+const STORAGE_LOCK_ID = 727_004;
+const STORAGE_INTERVAL_MS = 60 * 60 * 1000;
+
+/** Hourly database storage check – e-mails the administrators when a threshold is reached (once per level). */
+export async function checkAndRunDbStorage(pool: Pool, config: Config, now: Date = new Date()): Promise<'ran' | 'locked'> {
+  const client = await pool.connect();
+  try {
+    const { rows } = await client.query<{ locked: boolean }>('SELECT pg_try_advisory_lock($1) AS locked', [STORAGE_LOCK_ID]);
+    if (!rows[0].locked) return 'locked';
+    try {
+      await checkDbStorage(pool, config, now);
+      return 'ran';
+    } finally {
+      await client.query('SELECT pg_advisory_unlock($1)', [STORAGE_LOCK_ID]).catch(() => undefined);
+    }
+  } finally {
+    client.release();
+  }
+}
+
 export function startScheduler(pool: Pool, config: Config): () => void {
   let running = false;
+  let lastStorageCheck = 0;
   const tick = async () => {
     if (running) return;
     running = true;
@@ -86,6 +108,14 @@ export function startScheduler(pool: Pool, config: Config): () => void {
       await checkAndRunCertificates(pool, config);
     } catch (err) {
       log.error('scheduler: certificate check failed', { error: (err as Error).message });
+    }
+    try {
+      if (Date.now() - lastStorageCheck >= STORAGE_INTERVAL_MS) {
+        lastStorageCheck = Date.now();
+        await checkAndRunDbStorage(pool, config);
+      }
+    } catch (err) {
+      log.error('scheduler: database storage check failed', { error: (err as Error).message });
     } finally {
       running = false;
     }
@@ -94,7 +124,7 @@ export function startScheduler(pool: Pool, config: Config): () => void {
   const interval = setInterval(tick, CHECK_INTERVAL_MS);
   first.unref();
   interval.unref();
-  log.info('scheduler: started (warranty and certificate notifications)');
+  log.info('scheduler: started (warranty and certificate notifications, database storage check)');
   return () => {
     clearTimeout(first);
     clearInterval(interval);

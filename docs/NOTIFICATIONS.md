@@ -82,20 +82,40 @@ Examples with stages 90/30/7:
 ## 2b. Certificate reminders and overview
 
 *Settings & e-mail → Certificate notifications* (administrators). Certificates are documented under
-*Certificates* in the main navigation: expiry date, responsible person (name + e-mail), further addresses
+*Certificates* in the main navigation: expiry date, one or more responsible persons (name + e-mail each), further addresses
 ("also remind"), plant, application and device.
 
-* **Reminders**: once a day (send hour and time zone as configured) the responsible person and the further
+* **Reminders**: once a day (send hour and time zone as configured) every responsible person with an e-mail address and the further
   addresses of a certificate receive one e-mail when a reminder stage is reached – default 60, 30, 14, 7 and 1 day
   before expiry, and once after expiry. Each stage is sent once per expiry date: entering the new date after a
   renewal starts the reminders again.
 * **Central recipients** (e.g. the PKI team) receive every reminder in addition.
 * **Overview**: on the configured weekday the central recipients get one e-mail with all certificates that have
-  expired or expire within the configured period (default 90 days), with their responsible person. It is only sent
+  expired or expire within the configured period (default 90 days), with their responsible persons. It is only sent
   when there is something to report.
 * Only certificates with the status *Active* or *Renewal in progress* are reminded; *Replaced* and *Retired* ones
   are ignored.
 * *Preview* shows what the next run would send; *Send reminders* / *Send with overview* send immediately.
+
+## 2c. Database storage warning
+
+*Settings & e-mail → Database storage* (administrators). The app measures every hour how much space the
+PostgreSQL server uses (all databases it can see plus the write-ahead log, if its rights allow listing it) and
+compares it with the **storage size of the server** – `DB_STORAGE_LIMIT_GB` (default 32, as in the Azure
+templates) or the value entered on the tab.
+
+* From the **warning level** (default 80 %) every administrator sees a banner above each page; the warning can be
+  hidden for the browser session. From the **critical level** (default 90 %) the banner stays.
+* **E-mail**: once per level (warning, then critical) to all active administrators with an e-mail address and the
+  additional recipients. When the fill level drops at least 5 points below the threshold again (storage enlarged,
+  data cleaned up), the next rise is reported again. Without a configured SMTP server only the banner warns; the
+  e-mail follows as soon as SMTP is set up.
+* At **95 %** Azure switches the server to read-only – nothing can be saved, not even a sign-in. Enlarge the storage
+  in the Azure portal (*server → Compute + storage*) or enable *storage auto-grow*, then **enter the new size on the
+  tab**, otherwise the warning stays.
+* The tab shows the largest tables, e.g. how much the files (photos, plans, documents) take when they are stored in
+  the database (`STORAGE_DRIVER=database`).
+* `0` as size switches the warning off (e.g. for a local installation without a fixed limit).
 
 ## 3. Reliability
 
@@ -121,5 +141,8 @@ Examples with stages 90/30/7:
 | GET | `/api/notifications/warranty/preview` | Devices and recipients of the next run |
 | POST | `/api/notifications/warranty/run` | Run now |
 | GET | `/api/notifications/runs`, `/api/notifications/log` | History |
+| GET | `/api/system/db-storage` | Fill level of the database (banner) |
+| GET / PUT | `/api/settings/db-storage` | Storage size, thresholds and recipients (+ largest tables, last e-mail) |
+| POST | `/api/settings/db-storage/check` | Measure now and send the e-mail if a level was reached |
 
 All changes, test e-mails and manual runs are recorded in the audit log.

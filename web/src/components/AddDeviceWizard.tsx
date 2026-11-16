@@ -1,14 +1,26 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { App, Button, Col, DatePicker, Form, Input, InputNumber, Modal, Row, Select, Steps, Switch, Typography } from 'antd';
+import { App, Button, Col, DatePicker, Form, Input, InputNumber, Modal, Row, Select, Steps, Typography } from 'antd';
 import { ArrowLeftOutlined, ArrowRightOutlined, CheckOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { ASSET_CATEGORIES, ASSET_STATUSES, ASSET_STATUS_META, ASSET_TYPES, assetTypeNoun, type AssetCategory, type Asset, type AssetType, type FieldDef } from '../../../shared/model';
+import {
+  ASSET_CATEGORIES,
+  ASSET_STATUSES,
+  ASSET_STATUS_META,
+  ASSET_TYPES,
+  assetTypeNoun,
+  cableCategoriesFor,
+  isPassiveType,
+  type AssetCategory,
+  type Asset,
+  type AssetType,
+  type FieldDef,
+} from '../../../shared/model';
 import { errorText, http } from '../lib/api';
 import { DATE_FORMAT } from '../lib/format';
 import { useAssetTypes, useBuildings, useInvalidate, usePlants, useRacks } from '../lib/queries';
 import { useSession } from '../lib/session';
-import { DateStringInput } from './DateStringInput';
+import { AttributeInput } from './AttributeInput';
 import { TypeIcon } from './Simple';
 
 const MODEL_EXAMPLE: Partial<Record<AssetType, string>> = {
@@ -24,8 +36,10 @@ const MODEL_EXAMPLE: Partial<Record<AssetType, string>> = {
   ot_device: 'SIMATIC S7-1500',
   printer: 'LaserJet M611',
   camera: 'AXIS P3265-LVE',
-  cabling: 'Fibre trunk 24x OS2',
 };
+
+/** Type fields asked on the first page (cabling: medium, category, A/B side, links, length) – the rest come with the details */
+const MAIN_FIELDS = 6;
 
 /** Usually not mounted in a rack – the rack fields are not offered in the wizard */
 const NOT_IN_RACK = new Set<AssetType>(['access_point', 'printer', 'camera', 'cabling']);
@@ -50,14 +64,6 @@ export function AddDeviceProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-function AttributeInput({ field }: { field: FieldDef }) {
-  if (field.type === 'number') return <InputNumber style={{ width: '100%' }} addonAfter={field.unit} />;
-  if (field.type === 'boolean') return <Switch />;
-  if (field.type === 'select') return <Select allowClear options={field.options?.map((o) => ({ value: o, label: o }))} />;
-  if (field.type === 'date') return <DateStringInput />;
-  return <Input placeholder={field.placeholder} />;
-}
-
 /** Three short steps instead of one long form: type → name & place → optional details. */
 function AddDeviceWizard({ open, defaults, onClose }: { open: boolean; defaults: Defaults; onClose: () => void }) {
   const [form] = Form.useForm();
@@ -76,6 +82,7 @@ function AddDeviceWizard({ open, defaults, onClose }: { open: boolean; defaults:
   const buildingId = Form.useWatch('building_id', form) as string | undefined;
   const rackId = Form.useWatch('rack_id', form) as string | undefined;
   const racks = useRacks({ buildingId }, !!buildingId);
+  const passive = isPassiveType(type);
 
   useEffect(() => {
     if (!open) return;
@@ -95,8 +102,10 @@ function AddDeviceWizard({ open, defaults, onClose }: { open: boolean; defaults:
   }, [open]);
 
   const create = async () => {
-    const v = await form.validateFields();
-    const all = { ...form.getFieldsValue(true), ...v };
+    await form.validateFields();
+    // every value of all steps (the fields of the other pages are not mounted, but kept in the store) –
+    // a shallow merge with validateFields() would replace the type fields of page 2 by those of page 3
+    const all = form.getFieldsValue(true);
     const body = {
       type,
       name: all.name,
@@ -108,11 +117,12 @@ function AddDeviceWizard({ open, defaults, onClose }: { open: boolean; defaults:
       rack_id: all.rack_id ?? null,
       rack_u: all.rack_id ? (all.rack_u ?? null) : null,
       rack_height_u: all.rack_height_u ?? 1,
-      ip_address: all.ip_address ?? null,
+      // cabling has no network identity – drop values typed for another type before going back
+      ip_address: passive ? null : (all.ip_address ?? null),
       manufacturer: all.manufacturer ?? null,
       model: all.model ?? null,
-      serial_number: all.serial_number ?? null,
-      mac_address: all.mac_address ?? null,
+      serial_number: passive ? null : (all.serial_number ?? null),
+      mac_address: passive ? null : (all.mac_address ?? null),
       warranty_end: all.warranty_end ? dayjs(all.warranty_end).format('YYYY-MM-DD') : null,
       description: all.description ?? null,
       attributes: all.attributes ?? {},
@@ -143,12 +153,32 @@ function AddDeviceWizard({ open, defaults, onClose }: { open: boolean; defaults:
 
   const typeDef = type ? ASSET_TYPES[type] : null;
   const plantBuildings = (buildings.data ?? []).filter((b) => b.plant_id === plantId);
+  const typeFields = (typeDef?.fields ?? []) as readonly FieldDef[];
+  const noun = passive ? 'cabling' : 'device';
+  const attributeItem = (f: FieldDef) => (
+    <Col xs={24} md={12} key={f.key}>
+      {f.key === 'cable_category' ? (
+        // the choices follow the medium (Cat … for copper, OS … / OM … for fibre)
+        <Form.Item noStyle dependencies={[['attributes', 'medium']]}>
+          {({ getFieldValue }) => (
+            <Form.Item name={['attributes', f.key]} label={f.label}>
+              <AttributeInput field={f} options={cableCategoriesFor(getFieldValue(['attributes', 'medium']), f.options ?? [])} />
+            </Form.Item>
+          )}
+        </Form.Item>
+      ) : (
+        <Form.Item name={['attributes', f.key]} label={f.label} valuePropName={f.type === 'boolean' ? 'checked' : 'value'}>
+          <AttributeInput field={f} />
+        </Form.Item>
+      )}
+    </Col>
+  );
 
   return (
     <Modal
       open={open}
       onCancel={onClose}
-      title="Add a device"
+      title={step > 0 && passive ? 'Add cabling' : 'Add a device'}
       width={760}
       destroyOnHidden
       footer={
@@ -164,7 +194,7 @@ function AddDeviceWizard({ open, defaults, onClose }: { open: boolean; defaults:
                 </Button>
               )}
               <Button size="large" type="primary" icon={<CheckOutlined />} loading={saving} onClick={create}>
-                Add device
+                Add {noun}
               </Button>
             </div>
           </div>
@@ -175,7 +205,7 @@ function AddDeviceWizard({ open, defaults, onClose }: { open: boolean; defaults:
         size="small"
         current={step}
         style={{ margin: '8px 0 24px' }}
-        items={[{ title: 'Type' }, { title: 'Name & location' }, { title: 'Details (optional)' }]}
+        items={[{ title: 'Type' }, { title: passive ? 'Name & route' : 'Name & location' }, { title: 'Details (optional)' }]}
       />
       {step === 0 && (
         <Row gutter={[14, 14]}>
@@ -212,11 +242,27 @@ function AddDeviceWizard({ open, defaults, onClose }: { open: boolean; defaults:
           })}
         </Row>
       )}
-      <Form form={form} layout="vertical" requiredMark={(label, { required }) => (required ? <>{label} *</> : label)} preserve>
+      <Form
+        form={form}
+        layout="vertical"
+        requiredMark={(label, { required }) => (required ? <>{label} *</> : label)}
+        preserve
+        onValuesChange={(changed: { attributes?: Record<string, unknown> }) => {
+          // a category that does not fit the new medium (e.g. Cat 6A for fibre) is cleared
+          if (!changed.attributes || !('medium' in changed.attributes)) return;
+          const all = typeFields.find((f) => f.key === 'cable_category')?.options ?? [];
+          const current = form.getFieldValue(['attributes', 'cable_category']) as string | undefined;
+          if (current && !cableCategoriesFor(changed.attributes.medium, all).includes(current)) form.setFieldValue(['attributes', 'cable_category'], undefined);
+        }}
+      >
         {step === 1 && typeDef && (
           <Row gutter={16}>
             <Col span={24}>
-              <Form.Item name="name" label={`Name of the ${assetTypeNoun(type!)} (hostname)`} rules={[{ required: true, whitespace: true, message: 'Please enter a name' }]}>
+              <Form.Item
+                name="name"
+                label={passive ? 'Cable label / name' : `Name of the ${assetTypeNoun(type!)} (hostname)`}
+                rules={[{ required: true, whitespace: true, message: passive ? 'Please enter the cable label' : 'Please enter a name' }]}
+              >
                 <Input size="large" placeholder={`e.g. ${typeDef.example}`} autoFocus />
               </Form.Item>
             </Col>
@@ -242,66 +288,81 @@ function AddDeviceWizard({ open, defaults, onClose }: { open: boolean; defaults:
                 />
               </Form.Item>
             </Col>
-            <Col xs={24} md={12}>
-              <Form.Item name="room" label="Room / place">
-                <Input placeholder={type === 'access_point' ? 'e.g. Office 1.12, Hall 1 north' : 'e.g. Server room'} />
-              </Form.Item>
-            </Col>
-            <Col xs={24} md={12}>
-              <Form.Item name="ip_address" label="IP address" rules={[{ pattern: /^([0-9]{1,3}\.){3}[0-9]{1,3}(\/\d{1,2})?$|^[0-9a-fA-F:]+(\/\d{1,3})?$/, message: 'Not a valid IP address' }]}>
-                <Input className="mono" placeholder="e.g. 10.10.20.42" />
-              </Form.Item>
-            </Col>
-            {typeDef.physical && !NOT_IN_RACK.has(type!) && (
+            {passive && typeFields.slice(0, MAIN_FIELDS).map((f) => attributeItem(f))}
+            {!passive && (
               <>
                 <Col xs={24} md={12}>
-                  <Form.Item name="rack_id" label="Rack">
-                    <Select
-                      allowClear
-                      disabled={!buildingId}
-                      placeholder={buildingId ? 'Choose rack (optional)' : 'Choose a building first'}
-                      options={(racks.data ?? []).map((r) => ({ value: r.id, label: `${r.name}${r.room ? ` · ${r.room}` : ''} – ${r.height_u - Number(r.used_u ?? 0)} U free` }))}
-                    />
+                  <Form.Item name="room" label="Room / place">
+                    <Input placeholder={type === 'access_point' ? 'e.g. Office 1.12, Hall 1 north' : 'e.g. Server room'} />
                   </Form.Item>
                 </Col>
-                <Col xs={12} md={6}>
-                  <Form.Item name="rack_u" label="Lowest unit (U)">
-                    <InputNumber min={1} max={60} disabled={!rackId} style={{ width: '100%' }} />
+                <Col xs={24} md={12}>
+                  <Form.Item name="ip_address" label="IP address" rules={[{ pattern: /^([0-9]{1,3}\.){3}[0-9]{1,3}(\/\d{1,2})?$|^[0-9a-fA-F:]+(\/\d{1,3})?$/, message: 'Not a valid IP address' }]}>
+                    <Input className="mono" placeholder="e.g. 10.10.20.42" />
                   </Form.Item>
                 </Col>
-                <Col xs={12} md={6}>
-                  <Form.Item name="rack_height_u" label="Height (U)">
-                    <InputNumber min={1} max={20} disabled={!rackId} style={{ width: '100%' }} />
+                {typeDef.physical && !NOT_IN_RACK.has(type!) && (
+                  <>
+                    <Col xs={24} md={12}>
+                      <Form.Item name="rack_id" label="Rack">
+                        <Select
+                          allowClear
+                          disabled={!buildingId}
+                          placeholder={buildingId ? 'Choose rack (optional)' : 'Choose a building first'}
+                          options={(racks.data ?? []).map((r) => ({ value: r.id, label: `${r.name}${r.room ? ` · ${r.room}` : ''} – ${r.height_u - Number(r.used_u ?? 0)} U free` }))}
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={12} md={6}>
+                      <Form.Item name="rack_u" label="Lowest unit (U)">
+                        <InputNumber min={1} max={60} disabled={!rackId} style={{ width: '100%' }} />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={12} md={6}>
+                      <Form.Item name="rack_height_u" label="Height (U)">
+                        <InputNumber min={1} max={20} disabled={!rackId} style={{ width: '100%' }} />
+                      </Form.Item>
+                    </Col>
+                  </>
+                )}
+                <Col xs={24} md={12}>
+                  <Form.Item name="model" label="Model">
+                    <Input placeholder={MODEL_EXAMPLE[type!] ? `e.g. ${MODEL_EXAMPLE[type!]}` : undefined} />
                   </Form.Item>
                 </Col>
               </>
             )}
-            <Col xs={24} md={12}>
-              <Form.Item name="model" label="Model">
-                <Input placeholder={MODEL_EXAMPLE[type!] ? `e.g. ${MODEL_EXAMPLE[type!]}` : undefined} />
-              </Form.Item>
-            </Col>
           </Row>
         )}
         {step === 2 && typeDef && (
           <Row gutter={16}>
             <Col xs={24} md={12}>
               <Form.Item name="manufacturer" label="Manufacturer">
-                <Input />
+                <Input placeholder={passive ? 'e.g. Corning, R&M, Panduit' : undefined} />
               </Form.Item>
             </Col>
+            {passive ? (
+              <Col xs={24} md={12}>
+                <Form.Item name="model" label="Product / article no.">
+                  <Input placeholder="e.g. pre-terminated trunk 24x LC/UPC" />
+                </Form.Item>
+              </Col>
+            ) : (
+              <>
+                <Col xs={24} md={12}>
+                  <Form.Item name="serial_number" label="Serial number">
+                    <Input className="mono" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item name="mac_address" label="MAC address" rules={[{ pattern: /^([0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}$|^([0-9a-fA-F]{4}\.){2}[0-9a-fA-F]{4}$/, message: 'Not a valid MAC address' }]}>
+                    <Input className="mono" placeholder="aa:bb:cc:dd:ee:ff" />
+                  </Form.Item>
+                </Col>
+              </>
+            )}
             <Col xs={24} md={12}>
-              <Form.Item name="serial_number" label="Serial number">
-                <Input className="mono" />
-              </Form.Item>
-            </Col>
-            <Col xs={24} md={12}>
-              <Form.Item name="mac_address" label="MAC address" rules={[{ pattern: /^([0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}$|^([0-9a-fA-F]{4}\.){2}[0-9a-fA-F]{4}$/, message: 'Not a valid MAC address' }]}>
-                <Input className="mono" placeholder="aa:bb:cc:dd:ee:ff" />
-              </Form.Item>
-            </Col>
-            <Col xs={24} md={12}>
-              <Form.Item name="warranty_end" label="Warranty / support until">
+              <Form.Item name="warranty_end" label={passive ? 'System warranty until' : 'Warranty / support until'}>
                 <DatePicker format={DATE_FORMAT} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
@@ -310,20 +371,14 @@ function AddDeviceWizard({ open, defaults, onClose }: { open: boolean; defaults:
                 <Select options={ASSET_STATUSES.map((s) => ({ value: s, label: ASSET_STATUS_META[s].label }))} />
               </Form.Item>
             </Col>
-            {[...(typeDef.fields as readonly FieldDef[]).slice(0, 6), ...(types.settings.customFields[type!] ?? [])].map((f) => (
-              <Col xs={24} md={12} key={f.key}>
-                <Form.Item name={['attributes', f.key]} label={f.label} valuePropName={f.type === 'boolean' ? 'checked' : 'value'}>
-                  <AttributeInput field={f} />
-                </Form.Item>
-              </Col>
-            ))}
+            {[...(passive ? typeFields.slice(MAIN_FIELDS) : typeFields.slice(0, MAIN_FIELDS)), ...(types.settings.customFields[type!] ?? [])].map((f) => attributeItem(f))}
             <Col span={24}>
               <Form.Item name="description" label="Note">
                 <Input.TextArea autoSize={{ minRows: 2, maxRows: 5 }} placeholder="Anything colleagues should know" />
               </Form.Item>
             </Col>
             <Col span={24}>
-              <Typography.Text type="secondary">You can add or change everything later on the device page.</Typography.Text>
+              <Typography.Text type="secondary">You can add or change everything later on the {noun} page.</Typography.Text>
             </Col>
           </Row>
         )}

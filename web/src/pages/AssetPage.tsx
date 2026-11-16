@@ -23,6 +23,7 @@ import {
   CRITICALITY_META,
   RELATION_TYPES,
   formatRackUnits,
+  isPassiveType,
   type AssetDetail,
   type AssetRelation,
 } from '../../../shared/model';
@@ -175,25 +176,39 @@ export function AssetPage() {
   };
 
   // ---- About ----
-  const basics: [string, unknown, React.ReactNode?][] = [
-    ['IP address', a.ip_address, <Typography.Text copyable className="mono">{a.ip_address}</Typography.Text>],
-    ['Model', [a.manufacturer, a.model].filter(Boolean).join(' ')],
-    ['Serial number', a.serial_number, <Typography.Text copyable className="mono">{a.serial_number}</Typography.Text>],
-    ['MAC address', a.mac_address, <span className="mono">{a.mac_address}</span>],
-    ['Hostname (FQDN)', a.fqdn, <span className="mono">{a.fqdn}</span>],
-    ['OS / firmware', a.os],
-    ['Warranty until', a.warranty_end, <WarrantyDate value={a.warranty_end} warnDays={ATTENTION_DAYS.warranty} />],
-    ['Vendor support until', a.support_end, <WarrantyDate value={a.support_end} warnDays={ATTENTION_DAYS.support} />],
-    ['End of life', a.end_of_life, <WarrantyDate value={a.end_of_life} warnDays={ATTENTION_DAYS.eol} />],
-    ['Responsible', a.owner],
-    ['Inventory no.', a.asset_tag],
-  ];
-  const extra: [string, unknown, React.ReactNode?][] = [
-    ...types.fields(a.type).map((f): [string, unknown, React.ReactNode?] => {
-      const v = a.attributes?.[f.key];
-      if (f.type === 'date' && typeof v === 'string' && v) return [f.label, v, fmtDate(v)];
-      return [f.label, v, typeof v === 'boolean' ? (v ? 'Yes' : 'No') : f.unit && filled(v) ? `${v} ${f.unit}` : (v as React.ReactNode)];
-    }),
+  type FactRow = [string, unknown, React.ReactNode?];
+  const passive = isPassiveType(a.type);
+  const typeFieldList = types.fields(a.type);
+  const fieldRow = (f: (typeof typeFieldList)[number]): FactRow => {
+    const v = a.attributes?.[f.key];
+    if (f.type === 'date' && typeof v === 'string' && v) return [f.label, v, fmtDate(v)];
+    return [f.label, v, typeof v === 'boolean' ? (v ? 'Yes' : 'No') : f.unit && filled(v) ? `${v} ${f.unit}` : (v as React.ReactNode)];
+  };
+  // cabling: medium, category, A/B side, links and length are its main facts (instead of IP, serial number …)
+  const leadFields = passive ? typeFieldList.slice(0, 6) : [];
+  const basics: FactRow[] = passive
+    ? [
+        ...leadFields.map(fieldRow),
+        ['Product', [a.manufacturer, a.model].filter(Boolean).join(' ')],
+        ['System warranty until', a.warranty_end, <WarrantyDate value={a.warranty_end} warnDays={ATTENTION_DAYS.warranty} />],
+        ['Responsible', a.owner],
+        ['Inventory no.', a.asset_tag],
+      ]
+    : [
+        ['IP address', a.ip_address, <Typography.Text copyable className="mono">{a.ip_address}</Typography.Text>],
+        ['Model', [a.manufacturer, a.model].filter(Boolean).join(' ')],
+        ['Serial number', a.serial_number, <Typography.Text copyable className="mono">{a.serial_number}</Typography.Text>],
+        ['MAC address', a.mac_address, <span className="mono">{a.mac_address}</span>],
+        ['Hostname (FQDN)', a.fqdn, <span className="mono">{a.fqdn}</span>],
+        ['OS / firmware', a.os],
+        ['Warranty until', a.warranty_end, <WarrantyDate value={a.warranty_end} warnDays={ATTENTION_DAYS.warranty} />],
+        ['Vendor support until', a.support_end, <WarrantyDate value={a.support_end} warnDays={ATTENTION_DAYS.support} />],
+        ['End of life', a.end_of_life, <WarrantyDate value={a.end_of_life} warnDays={ATTENTION_DAYS.eol} />],
+        ['Responsible', a.owner],
+        ['Inventory no.', a.asset_tag],
+      ];
+  const extra: FactRow[] = [
+    ...typeFieldList.slice(leadFields.length).map(fieldRow),
     ['Criticality', a.criticality, CRITICALITY_META[a.criticality].label],
     ['Cost center', a.cost_center],
     ['Support contract', a.support_contract],
@@ -204,7 +219,7 @@ export function AssetPage() {
     ['Added', a.created_at, `${fmtDateTime(a.created_at)}${a.created_by_name ? ` · ${a.created_by_name}` : ''}`],
     ['Last change', a.updated_at, `${fmtDateTime(a.updated_at)}${a.updated_by_name ? ` · ${a.updated_by_name}` : ''}`],
   ];
-  const toRows = (list: [string, unknown, React.ReactNode?][], showEmpty: boolean) =>
+  const toRows = (list: FactRow[], showEmpty: boolean) =>
     list.filter(([, v]) => showEmpty || filled(v)).map(([k, v, node]): [string, React.ReactNode] => [k, filled(v) ? (node ?? String(v)) : <span className="muted">–</span>]);
   const aboutRows = [...toRows(basics, false), ...(allFields ? toRows(extra, true) : [])];
 
@@ -257,7 +272,7 @@ export function AssetPage() {
                 <Facts rows={aboutRows} />
               ) : (
                 <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
-                  No details yet. {can('asset.edit') ?'Use “Edit” to add IP address, model, serial number and more.' : ''}
+                  No details yet. {can('asset.edit') ? (passive ? 'Use “Edit” to add the A and B side, medium, length and more.' : 'Use “Edit” to add IP address, model, serial number and more.') : ''}
                 </Typography.Paragraph>
               )}
               <Button type="link" style={{ paddingInline: 0, marginTop: 10, display: 'flex' }} onClick={() => setAllFields((v) => !v)} icon={allFields ? <UpOutlined /> : <DownOutlined />}>

@@ -40,6 +40,7 @@ locals {
     PGSSLMODE           = "require"
     AZURE_CLIENT_ID     = azurerm_user_assigned_identity.app.client_id
     DB_MIGRATE_ON_START = "true"
+    DB_STORAGE_LIMIT_GB = tostring(floor(var.postgres_storage_mb / 1024))
 
     # Attachments in Blob Storage (managed identity, no keys)
     STORAGE_DRIVER            = "azure-blob"

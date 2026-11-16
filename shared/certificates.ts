@@ -1,4 +1,4 @@
-// Certificates (TLS, internal CA, client, code signing …) with expiry date, responsible person and e-mail reminders.
+// Certificates (TLS, internal CA, client, code signing …) with expiry date, responsible persons and e-mail reminders.
 // Shared by API and web client.
 
 export const CERT_KINDS = ['tls', 'wildcard', 'ca', 'client', 'code_signing', 'smime', 'vpn', 'other'] as const;
@@ -74,9 +74,8 @@ export interface Certificate {
   application_name?: string | null;
   asset_id: string | null;
   asset_name?: string | null;
-  /** Responsible person (name) and the address the reminders go to */
-  responsible: string | null;
-  responsible_email: string | null;
+  /** Responsible persons – each one with an e-mail address gets the reminders */
+  responsibles: CertificateResponsible[];
   /** Further addresses that get the reminders (team mailbox …) */
   notify_emails: string[];
   description: string | null;
@@ -92,7 +91,7 @@ export interface CertificateCounts {
   expired: number;
   critical: number;
   warning: number;
-  /** watched certificates without responsible e-mail address */
+  /** watched certificates without any responsible e-mail address */
   no_responsible: number;
 }
 
@@ -144,7 +143,7 @@ export interface CertificateNotificationSettingsDto extends CertificateNotificat
   lastRun: { started_at: string; status: string; emails: number; items: number; error: string | null } | null;
 }
 
-export interface CertificateDueItem extends Pick<Certificate, 'id' | 'name' | 'common_name' | 'expires_on' | 'days_left' | 'responsible' | 'responsible_email' | 'plant_code' | 'application_name'> {
+export interface CertificateDueItem extends Pick<Certificate, 'id' | 'name' | 'common_name' | 'expires_on' | 'days_left' | 'responsibles' | 'plant_code' | 'application_name'> {
   /** reminder stages reached and not yet sent (0 = expired) */
   thresholds: number[];
   recipients: string[];
@@ -164,4 +163,22 @@ export interface CertificateRunResult {
   reminders: number;
   emails: number;
   overview: boolean;
+}
+
+export interface CertificateResponsible {
+  name: string | null;
+  /** gets the reminders */
+  email: string | null;
+}
+
+export const MAX_CERT_RESPONSIBLES = 20;
+
+/** "Rita Responsible, Tom (tom@example.com)" – for lists and e-mails */
+export function responsiblesText(list: readonly CertificateResponsible[] | null | undefined): string {
+  return (list ?? []).map((r) => r.name || r.email || '').filter(Boolean).join(', ');
+}
+
+/** E-mail addresses of the responsible persons */
+export function responsibleEmails(list: readonly CertificateResponsible[] | null | undefined): string[] {
+  return (list ?? []).map((r) => r.email).filter((e): e is string => !!e);
 }

@@ -20,6 +20,7 @@ import { exportsRouter } from './routes/exports';
 import { importsRouter } from './routes/imports';
 import { racksRouter } from './routes/racks';
 import { settingsRouter } from './routes/settings';
+import { dbStorageRouter } from './routes/dbStorage';
 import { attachmentsRouter } from './routes/attachments';
 import { plansRouter } from './routes/plans';
 import { datacentersRouter } from './routes/datacenters';
@@ -152,6 +153,7 @@ export function createApp(pool: Pool, config: Config, deps: AppDeps = {}) {
   api.use(importsRouter(pool));
   api.use(racksRouter(pool));
   api.use(settingsRouter(pool, config));
+  api.use(dbStorageRouter(pool, config));
   api.use(entraRouter(pool, config, entra));
   api.use(attachmentsRouter(pool, config));
   api.use(plansRouter(pool));

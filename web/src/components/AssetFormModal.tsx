@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { App, Col, DatePicker, Divider, Form, Input, InputNumber, Modal, Row, Select, Space, Switch, Typography } from 'antd';
+import { App, Col, DatePicker, Divider, Form, Input, InputNumber, Modal, Row, Select, Space, Typography } from 'antd';
 import dayjs from 'dayjs';
 import {
   ASSET_STATUSES,
@@ -8,33 +8,19 @@ import {
   ASSET_TYPE_KEYS,
   CRITICALITIES,
   CRITICALITY_META,
+  cableCategoriesFor,
+  isPassiveType,
   type Asset,
   type AssetType,
-  type FieldDef,
 } from '../../../shared/model';
 import { errorText, http } from '../lib/api';
 import { DATE_FORMAT } from '../lib/format';
 import { useAssetTypes, useBuilding, useBuildings, useInvalidate, usePlants, useRacks } from '../lib/queries';
-import { DateStringInput } from './DateStringInput';
+import { AttributeInput } from './AttributeInput';
 import { ASSET_TYPE_ICONS } from './icons';
 
 const DATE_FIELDS = ['purchase_date', 'warranty_end', 'support_end', 'end_of_life'] as const;
 type FormValues = Omit<Asset, (typeof DATE_FIELDS)[number]> & Record<(typeof DATE_FIELDS)[number], dayjs.Dayjs | null>;
-
-function AttributeInput({ field }: { field: FieldDef }) {
-  switch (field.type) {
-    case 'number':
-      return <InputNumber style={{ width: '100%' }} addonAfter={field.unit} />;
-    case 'boolean':
-      return <Switch />;
-    case 'select':
-      return <Select allowClear options={field.options?.map((o) => ({ value: o, label: o }))} />;
-    case 'date':
-      return <DateStringInput />;
-    default:
-      return <Input placeholder={field.placeholder} />;
-  }
-}
 
 export function AssetFormModal({
   open,
@@ -62,6 +48,7 @@ export function AssetFormModal({
   const buildingId = Form.useWatch('building_id', form) as string | null | undefined;
   const building = useBuilding(buildingId ?? undefined);
   const rackId = Form.useWatch('rack_id', form) as string | null | undefined;
+  const passive = isPassiveType(type);
   const racks = useRacks({ buildingId: buildingId ?? undefined }, !!buildingId);
 
   // Initialise the form only when the dialog opens (props may be re-created on every parent render)
@@ -102,6 +89,8 @@ export function AssetFormModal({
       ...Object.fromEntries(DATE_FIELDS.map((k) => [k, v[k] ? v[k].format('YYYY-MM-DD') : null])),
       tags: v.tags ?? [],
       attributes: v.attributes ?? {},
+      // cabling has no network identity (the fields are not shown for it)
+      ...(passive ? { ip_address: null, mac_address: null, fqdn: null, os: null, serial_number: null } : {}),
     };
     setSaving(true);
     try {
@@ -131,7 +120,18 @@ export function AssetFormModal({
       destroyOnHidden
       styles={{ body: { maxHeight: '70vh', overflowY: 'auto', paddingRight: 8 } }}
     >
-      <Form form={form} layout="vertical" requiredMark={(label, { required }) => (required ? <>{label} *</> : label)}>
+      <Form
+        form={form}
+        layout="vertical"
+        requiredMark={(label, { required }) => (required ? <>{label} *</> : label)}
+        onValuesChange={(changed: { attributes?: Record<string, unknown> }) => {
+          // a category that does not fit the new medium (e.g. Cat 6A for fibre) is cleared
+          if (!changed.attributes || !('medium' in changed.attributes) || !type) return;
+          const all = types.fields(type).find((f) => f.key === 'cable_category')?.options ?? [];
+          const current = form.getFieldValue(['attributes', 'cable_category']) as string | undefined;
+          if (current && !cableCategoriesFor(changed.attributes.medium, all).includes(current)) form.setFieldValue(['attributes', 'cable_category'], undefined);
+        }}
+      >
         <Divider titlePlacement="start" plain style={{ marginTop: 0 }}>
           General
         </Divider>
@@ -152,8 +152,8 @@ export function AssetFormModal({
             </Form.Item>
           </Col>
           <Col xs={24} md={16}>
-            <Form.Item name="name" label="Name / hostname" rules={[{ required: true, whitespace: true, max: 200 }]}>
-              <Input placeholder="e.g. muc-b01-sw03" autoFocus />
+            <Form.Item name="name" label={passive ? 'Name / cable label' : 'Name / hostname'} rules={[{ required: true, whitespace: true, max: 200 }]}>
+              <Input placeholder={passive ? `e.g. ${ASSET_TYPES.cabling.example}` : 'e.g. muc-b01-sw03'} autoFocus />
             </Form.Item>
           </Col>
           <Col xs={12} md={8}>
@@ -231,53 +231,59 @@ export function AssetFormModal({
         </Row>
 
         <Divider titlePlacement="start" plain>
-          Hardware & network
+          {passive ? 'Product' : 'Hardware & network'}
         </Divider>
         <Row gutter={16}>
-          <Col xs={12} md={6}>
+          <Col xs={12} md={passive ? 8 : 6}>
             <Form.Item name="manufacturer" label="Manufacturer">
+              <Input placeholder={passive ? 'e.g. Corning, R&M, Panduit' : undefined} />
+            </Form.Item>
+          </Col>
+          <Col xs={12} md={passive ? 8 : 6}>
+            <Form.Item name="model" label={passive ? 'Product / article no.' : 'Model'}>
               <Input />
             </Form.Item>
           </Col>
-          <Col xs={12} md={6}>
-            <Form.Item name="model" label="Model">
-              <Input />
-            </Form.Item>
-          </Col>
-          <Col xs={12} md={6}>
-            <Form.Item name="serial_number" label="Serial number">
-              <Input />
-            </Form.Item>
-          </Col>
-          <Col xs={12} md={6}>
+          {!passive && (
+            <Col xs={12} md={6}>
+              <Form.Item name="serial_number" label="Serial number">
+                <Input />
+              </Form.Item>
+            </Col>
+          )}
+          <Col xs={12} md={passive ? 8 : 6}>
             <Form.Item name="asset_tag" label="Asset tag / inventory no.">
               <Input />
             </Form.Item>
           </Col>
-          <Col xs={12} md={6}>
-            <Form.Item
-              name="ip_address"
-              label="IP address"
-              rules={[{ pattern: /^([0-9]{1,3}\.){3}[0-9]{1,3}(\/\d{1,2})?$|^[0-9a-fA-F:]+(\/\d{1,3})?$/, message: 'Invalid IP address' }]}
-            >
-              <Input className="mono" />
-            </Form.Item>
-          </Col>
-          <Col xs={12} md={6}>
-            <Form.Item name="mac_address" label="MAC address" rules={[{ pattern: /^([0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}$|^([0-9a-fA-F]{4}\.){2}[0-9a-fA-F]{4}$/, message: 'Invalid MAC address' }]}>
-              <Input className="mono" placeholder="aa:bb:cc:dd:ee:ff" />
-            </Form.Item>
-          </Col>
-          <Col xs={12} md={6}>
-            <Form.Item name="fqdn" label="FQDN">
-              <Input className="mono" />
-            </Form.Item>
-          </Col>
-          <Col xs={12} md={6}>
-            <Form.Item name="os" label="OS / firmware">
-              <Input />
-            </Form.Item>
-          </Col>
+          {!passive && (
+            <>
+              <Col xs={12} md={6}>
+                <Form.Item
+                  name="ip_address"
+                  label="IP address"
+                  rules={[{ pattern: /^([0-9]{1,3}\.){3}[0-9]{1,3}(\/\d{1,2})?$|^[0-9a-fA-F:]+(\/\d{1,3})?$/, message: 'Invalid IP address' }]}
+                >
+                  <Input className="mono" />
+                </Form.Item>
+              </Col>
+              <Col xs={12} md={6}>
+                <Form.Item name="mac_address" label="MAC address" rules={[{ pattern: /^([0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}$|^([0-9a-fA-F]{4}\.){2}[0-9a-fA-F]{4}$/, message: 'Invalid MAC address' }]}>
+                  <Input className="mono" placeholder="aa:bb:cc:dd:ee:ff" />
+                </Form.Item>
+              </Col>
+              <Col xs={12} md={6}>
+                <Form.Item name="fqdn" label="FQDN">
+                  <Input className="mono" />
+                </Form.Item>
+              </Col>
+              <Col xs={12} md={6}>
+                <Form.Item name="os" label="OS / firmware">
+                  <Input />
+                </Form.Item>
+              </Col>
+            </>
+          )}
         </Row>
 
         {typeDef && type && types.fields(type).length > 0 && (
@@ -288,9 +294,20 @@ export function AssetFormModal({
             <Row gutter={16}>
               {types.fields(type).map((f) => (
                 <Col xs={12} md={6} key={f.key}>
-                  <Form.Item name={['attributes', f.key]} label={f.label} valuePropName={f.type === 'boolean' ? 'checked' : 'value'}>
-                    <AttributeInput field={f} />
-                  </Form.Item>
+                  {f.key === 'cable_category' ? (
+                    // the choices follow the medium (Cat … for copper, OS … / OM … for fibre)
+                    <Form.Item noStyle dependencies={[['attributes', 'medium']]}>
+                      {({ getFieldValue }) => (
+                        <Form.Item name={['attributes', f.key]} label={f.label}>
+                          <AttributeInput field={f} options={cableCategoriesFor(getFieldValue(['attributes', 'medium']), f.options ?? [])} />
+                        </Form.Item>
+                      )}
+                    </Form.Item>
+                  ) : (
+                    <Form.Item name={['attributes', f.key]} label={f.label} valuePropName={f.type === 'boolean' ? 'checked' : 'value'}>
+                      <AttributeInput field={f} />
+                    </Form.Item>
+                  )}
                 </Col>
               ))}
             </Row>

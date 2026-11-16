@@ -8,7 +8,10 @@ import {
   type CertificateDueItem,
   type CertificateNotificationSettings,
   type CertificatePreview,
+  type CertificateResponsible,
   type CertificateRunResult,
+  responsibleEmails,
+  responsiblesText,
 } from '../../shared/certificates';
 import type { Config } from '../config';
 import type { DbClient } from '../db/pool';
@@ -47,8 +50,7 @@ interface DueRow {
   common_name: string | null;
   expires_on: string;
   days_left: number;
-  responsible: string | null;
-  responsible_email: string | null;
+  responsibles: CertificateResponsible[];
   notify_emails: string[];
   plant_code: string | null;
   application_name: string | null;
@@ -63,7 +65,7 @@ export async function computeReminders(db: DbClient, settings: CertificateNotifi
   const maxDays = Math.max(0, ...thresholds);
   const { rows } = await db.query<DueRow>(
     `SELECT c.id, c.name, c.kind, c.common_name, c.expires_on::text AS expires_on, (c.expires_on - $1::date) AS days_left,
-            c.responsible, c.responsible_email, c.notify_emails, p.code AS plant_code, ap.name AS application_name, c.installed_on,
+            c.responsibles, c.notify_emails, p.code AS plant_code, ap.name AS application_name, c.installed_on,
             ARRAY(SELECT n.threshold_days FROM certificate_notification n WHERE n.certificate_id = c.id AND n.expires_on = c.expires_on) AS sent
      FROM certificate c
      LEFT JOIN plant p ON p.id = c.plant_id
@@ -80,7 +82,7 @@ export async function computeReminders(db: DbClient, settings: CertificateNotifi
     if (settings.includeExpired && r.days_left < 0) applicable.push(0);
     const pending = applicable.filter((t) => !r.sent.includes(t));
     if (!pending.length) continue;
-    const recipients = uniqueEmails([...(settings.notifyResponsible ? [r.responsible_email, ...r.notify_emails] : []), ...settings.recipients]);
+    const recipients = uniqueEmails([...(settings.notifyResponsible ? [...responsibleEmails(r.responsibles), ...r.notify_emails] : []), ...settings.recipients]);
     out.push({
       id: r.id,
       name: r.name,
@@ -88,8 +90,7 @@ export async function computeReminders(db: DbClient, settings: CertificateNotifi
       common_name: r.common_name,
       expires_on: r.expires_on,
       days_left: r.days_left,
-      responsible: r.responsible,
-      responsible_email: r.responsible_email,
+      responsibles: r.responsibles,
       plant_code: r.plant_code,
       application_name: r.application_name,
       installed_on: r.installed_on,
@@ -106,7 +107,7 @@ type OverviewItem = Omit<DueRow, 'sent' | 'notify_emails'>;
 export async function overviewItems(db: DbClient, settings: CertificateNotificationSettings, today: string): Promise<OverviewItem[]> {
   const { rows } = await db.query<OverviewItem>(
     `SELECT c.id, c.name, c.kind, c.common_name, c.expires_on::text AS expires_on, (c.expires_on - $1::date) AS days_left,
-            c.responsible, c.responsible_email, p.code AS plant_code, ap.name AS application_name, c.installed_on
+            c.responsibles, p.code AS plant_code, ap.name AS application_name, c.installed_on
      FROM certificate c LEFT JOIN plant p ON p.id = c.plant_id LEFT JOIN application ap ON ap.id = c.application_id
      WHERE c.status = ANY($2::text[]) AND c.expires_on - $1::date <= $3
      ORDER BY c.expires_on, lower(c.name)`,
@@ -173,7 +174,7 @@ function certTable(items: OverviewItem[], baseUrl: string, withResponsible: bool
         <td style="${CELL}"><a href="${escapeHtml(`${baseUrl}/certificates?open=${i.id}`)}" style="color:#2563eb;font-weight:600;text-decoration:none">${escapeHtml(i.name)}</a>
           <div style="font-size:12px;color:#6b7280">${escapeHtml(what)}</div></td>
         <td style="${CELL}">${escapeHtml([i.plant_code, i.application_name].filter(Boolean).join(' / ') || i.installed_on || '–')}</td>
-        ${withResponsible ? `<td style="${CELL}">${escapeHtml(i.responsible || i.responsible_email || '–')}</td>` : ''}
+        ${withResponsible ? `<td style="${CELL}">${escapeHtml(responsiblesText(i.responsibles) || '–')}</td>` : ''}
         <td style="${CELL};white-space:nowrap">${fmtDate(i.expires_on)}</td>
         <td style="${CELL};white-space:nowrap;color:${color};font-weight:${i.days_left <= 14 ? 700 : 400}">${daysLeftText(i.days_left)}</td>
       </tr>`;
@@ -189,7 +190,7 @@ function certTable(items: OverviewItem[], baseUrl: string, withResponsible: bool
 function textLines(items: OverviewItem[], baseUrl: string): string[] {
   return items.map(
     (i) =>
-      `- ${i.name}${i.common_name && i.common_name !== i.name ? ` (${i.common_name})` : ''} – expires ${fmtDate(i.expires_on)}, ${daysLeftText(i.days_left)}${i.responsible ? `, responsible: ${i.responsible}` : ''}\n  ${baseUrl}/certificates?open=${i.id}`,
+      `- ${i.name}${i.common_name && i.common_name !== i.name ? ` (${i.common_name})` : ''} – expires ${fmtDate(i.expires_on)}, ${daysLeftText(i.days_left)}${i.responsibles.length ? `, responsible: ${responsiblesText(i.responsibles)}` : ''}\n  ${baseUrl}/certificates?open=${i.id}`,
   );
 }
 

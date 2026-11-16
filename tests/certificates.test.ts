@@ -10,6 +10,7 @@ import { checkAndRunCertificates } from '../server/services/scheduler';
 import { isoWeekday } from '../server/services/certificateNotifications';
 import { localParts } from '../server/services/warrantyNotifications';
 import type { Certificate, CertificateList, CertificatePreview, CertificateRunResult } from '../shared/certificates';
+import { certificateResponsiblesMigration } from '../server/db/migrations/022_certificate_responsibles';
 
 interface Captured {
   to: string[];
@@ -217,3 +218,75 @@ describe('certificate e-mails', () => {
     expect(await checkAndRunCertificates(pool, config, now)).toBe('disabled');
   });
 });
+
+describe('several responsible persons', () => {
+  it('are stored as a list without empty rows and duplicate addresses', async () => {
+    const created = (
+      await editor
+        .post('/api/certificates', {
+          name: 'erp.example.com',
+          kind: 'tls',
+          expires_on: inDays(5),
+          responsibles: [
+            { name: 'Anna Owner', email: 'anna.owner@example.local' },
+            { name: 'Ben Deputy', email: 'Ben.Deputy@example.local' },
+            { name: '', email: '' },
+            { name: 'Carl (phone only)', email: null },
+            { name: 'Anna again', email: 'anna.owner@example.local' },
+          ],
+        })
+        .expect(201)
+    ).body as Certificate;
+    expect(created.responsibles).toEqual([
+      { name: 'Anna Owner', email: 'anna.owner@example.local' },
+      { name: 'Ben Deputy', email: 'ben.deputy@example.local' },
+      { name: 'Carl (phone only)', email: null },
+    ]);
+    expect(created).not.toHaveProperty('responsible');
+
+    const found = (await viewer.get('/api/certificates?q=deputy').expect(200)).body as CertificateList;
+    expect(found.items.map((c) => c.name)).toEqual(['erp.example.com']);
+
+    const tooMany = Array.from({ length: 21 }, (_, i) => ({ name: `P${i}`, email: `p${i}@example.local` }));
+    await editor.post('/api/certificates', { name: 'too-many', expires_on: inDays(5), responsibles: tooMany }).expect(400);
+    await editor.post('/api/certificates', { name: 'bad', expires_on: inDays(5), responsibles: [{ name: 'X', email: 'nope' }] }).expect(400);
+  });
+
+  it('reminds every responsible person with an address', async () => {
+    await admin.put('/api/settings/certificate-notifications', notificationSettings({ recipients: [] })).expect(200);
+    const preview = (await admin.get('/api/notifications/certificates/preview').expect(200)).body as CertificatePreview;
+    const erp = preview.reminders.find((r) => r.name === 'erp.example.com')!;
+    expect(erp.recipients).toEqual(['anna.owner@example.local', 'ben.deputy@example.local']);
+
+    inbox.length = 0;
+    await admin.post('/api/notifications/certificates/run', { overview: false }).expect(200);
+    for (const addr of ['anna.owner@example.local', 'ben.deputy@example.local']) {
+      const mails = inbox.filter((m) => m.to.includes(addr));
+      expect(mails).toHaveLength(1);
+      expect(mails[0].subject).toMatch(/erp\.example\.com/);
+    }
+  });
+
+  it('keeps the person of certificates created before (migration 022)', async () => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('CREATE SCHEMA mig022');
+      await client.query('SET LOCAL search_path TO mig022');
+      await client.query('CREATE TABLE certificate (id int PRIMARY KEY, responsible text, responsible_email text)');
+      await client.query(`INSERT INTO certificate VALUES (1, 'Rita', 'rita@example.local'), (2, NULL, 'team@example.local'), (3, ' ', NULL), (4, 'Tom', '')`);
+      await client.query(certificateResponsiblesMigration.sql);
+      const { rows } = await client.query('SELECT id, responsibles FROM certificate ORDER BY id');
+      expect(rows).toEqual([
+        { id: 1, responsibles: [{ name: 'Rita', email: 'rita@example.local' }] },
+        { id: 2, responsibles: [{ name: null, email: 'team@example.local' }] },
+        { id: 3, responsibles: [] },
+        { id: 4, responsibles: [{ name: 'Tom', email: null }] },
+      ]);
+    } finally {
+      await client.query('ROLLBACK');
+      client.release();
+    }
+  });
+});
+

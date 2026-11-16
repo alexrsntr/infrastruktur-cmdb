@@ -28,6 +28,7 @@ import { GlobalSearch } from '../components/GlobalSearch';
 import { useAddDevice } from '../components/AddDeviceWizard';
 import { ChangePasswordModal } from '../components/ChangePasswordModal';
 import { ColorModeSwitch } from '../components/ColorModeSwitch';
+import { DbStorageBanner } from '../components/DbStorageBanner';
 
 interface NavItem {
   key: string;
@@ -179,6 +180,7 @@ export function AppLayout() {
 
       <Layout.Content className="app-content">
         <div className="app-content-inner">
+          <DbStorageBanner />
           <Outlet />
         </div>
       </Layout.Content>

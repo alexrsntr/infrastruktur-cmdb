@@ -555,6 +555,10 @@
               "value": "database"
             },
             {
+              "name": "DB_STORAGE_LIMIT_GB",
+              "value": "32"
+            },
+            {
               "name": "BRAND_NAME",
               "value": "[parameters('brandName')]"
             }

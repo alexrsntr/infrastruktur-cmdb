@@ -80,6 +80,8 @@ export interface Config {
     ssl: boolean;
     migrateOnStart: boolean;
     poolMax: number;
+    /** Storage size of the PostgreSQL server in GB – default for the storage warning (Settings → Database storage) */
+    storageLimitGb: number;
   };
   managedIdentityClientId: string;
   /** Key for encrypting secrets stored in app settings (e.g. SMTP password). Falls back to SESSION_SECRET. */
@@ -155,6 +157,7 @@ export function loadConfig(): Config {
       ssl: ['require', 'verify-full', 'verify-ca'].includes(str('PGSSLMODE', 'disable')),
       migrateOnStart: bool('DB_MIGRATE_ON_START', true),
       poolMax: int('DB_POOL_MAX', 10),
+      storageLimitGb: int('DB_STORAGE_LIMIT_GB', 32),
     },
     managedIdentityClientId: str('AZURE_CLIENT_ID'),
     settingsEncryptionKey: str('SETTINGS_ENCRYPTION_KEY'),
@@ -194,6 +197,7 @@ function validate(c: Config) {
   if (!['database', 'azure-blob'].includes(c.storage.driver)) errors.push('STORAGE_DRIVER must be "database" or "azure-blob"');
   if (c.storage.driver === 'azure-blob' && !c.storage.accountUrl && !c.storage.connectionString)
     errors.push('STORAGE_DRIVER=azure-blob requires AZURE_STORAGE_ACCOUNT_URL (managed identity) or AZURE_STORAGE_CONNECTION_STRING');
+  if (c.db.storageLimitGb < 0 || c.db.storageLimitGb > 65536) errors.push('DB_STORAGE_LIMIT_GB must be between 0 (no storage warning) and 65536');
   if (c.storage.maxUploadMb < 1 || c.storage.maxUploadMb > 500) errors.push('ATTACHMENT_MAX_MB must be between 1 and 500');
   if (c.authMode === 'entra') {
     if (!c.entra.tenantId) errors.push('ENTRA_TENANT_ID is required when AUTH_MODE=entra');

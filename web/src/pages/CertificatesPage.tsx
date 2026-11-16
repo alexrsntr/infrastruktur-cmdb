@@ -32,6 +32,7 @@ import {
   ExclamationCircleOutlined,
   FileProtectOutlined,
   MailOutlined,
+  MinusCircleOutlined,
   PlusOutlined,
   SearchOutlined,
   UserOutlined,
@@ -44,9 +45,12 @@ import {
   CERT_STATUSES,
   CERT_STATUS_META,
   CERT_WATCHED_STATUSES,
+  MAX_CERT_RESPONSIBLES,
   certExpiry,
   daysLeftText,
+  responsibleEmails,
   type Certificate,
+  type CertificateResponsible,
   type CertificateList,
 } from '../../../shared/certificates';
 import type { Application } from '../../../shared/applications';
@@ -112,7 +116,7 @@ export function CertificatesPage() {
           </span>
         }
         title="Certificates"
-        subtitle="SSL/TLS, CA, VPN and other certificates with expiry date and responsible person. The responsible persons are reminded by e-mail before a certificate expires."
+        subtitle="SSL/TLS, CA, VPN and other certificates with expiry date and responsible persons. The responsible persons are reminded by e-mail before a certificate expires."
         extra={
           can('asset.write') && (
             <Button type="primary" size="large" icon={<PlusOutlined />} onClick={() => setEditing({ open: true })}>
@@ -210,12 +214,21 @@ export function CertificatesPage() {
               key: 'responsible',
               width: 220,
               render: (_, c) =>
-                c.responsible || c.responsible_email ? (
+                c.responsibles.length ? (
                   <div>
-                    <div>{c.responsible ?? c.responsible_email}</div>
-                    {c.responsible && c.responsible_email && (
-                      <Typography.Text type="secondary" style={{ fontSize: 12.5 }}>
-                        {c.responsible_email}
+                    {c.responsibles.slice(0, 2).map((r, i) => (
+                      <div key={i} style={{ marginBottom: 2 }}>
+                        <div>{r.name ?? r.email}</div>
+                        {r.name && r.email && (
+                          <Typography.Text type="secondary" style={{ fontSize: 12.5 }}>
+                            {r.email}
+                          </Typography.Text>
+                        )}
+                      </div>
+                    ))}
+                    {c.responsibles.length > 2 && (
+                      <Typography.Text type="secondary" style={{ fontSize: 12.5 }} title={c.responsibles.slice(2).map((r) => r.name ?? r.email).join(', ')}>
+                        +{c.responsibles.length - 2} more
                       </Typography.Text>
                     )}
                   </div>
@@ -317,8 +330,8 @@ function CertificateDrawer({ id, onClose, onEdit }: { id: string | null; onClose
             <Tag>{CERT_KIND_META[c.kind].label}</Tag>
             {c.auto_renew && <Tag color="cyan">Auto-renewed</Tag>}
           </Space>
-          {CERT_WATCHED_STATUSES.includes(c.status) && !c.responsible_email && (
-            <Alert type="warning" showIcon title="Nobody is reminded" description="Enter the e-mail address of the responsible person so that the reminders reach someone." />
+          {CERT_WATCHED_STATUSES.includes(c.status) && !responsibleEmails(c.responsibles).length && (
+            <Alert type="warning" showIcon title="No responsible person is reminded" description="Enter the e-mail address of at least one responsible person so that the reminders reach someone." />
           )}
           <Descriptions column={1} size="small" bordered styles={{ label: { width: 170 } }}>
             <Descriptions.Item label="Expires on">
@@ -329,7 +342,11 @@ function CertificateDrawer({ id, onClose, onEdit }: { id: string | null; onClose
             <Descriptions.Item label="Further host names (SAN)">{dash(c.sans)}</Descriptions.Item>
             <Descriptions.Item label="Issuer">{dash(c.issuer)}</Descriptions.Item>
             <Descriptions.Item label="Serial number">{dash(c.serial_number && <span className="mono">{c.serial_number}</span>)}</Descriptions.Item>
-            <Descriptions.Item label="Responsible">{dash([c.responsible, c.responsible_email].filter(Boolean).join(' · '))}</Descriptions.Item>
+            <Descriptions.Item label={c.responsibles.length > 1 ? 'Responsible persons' : 'Responsible'}>
+              {c.responsibles.length
+                ? c.responsibles.map((r, i) => <div key={i}>{[r.name, r.email].filter(Boolean).join(' · ')}</div>)
+                : dash(null)}
+            </Descriptions.Item>
             <Descriptions.Item label="Also reminded">{dash(c.notify_emails.join(', '))}</Descriptions.Item>
             <Descriptions.Item label="Plant">{c.plant_id ? <Link to={`/plants/${c.plant_id}`}>{c.plant_code} – {c.plant_name}</Link> : 'All plants (central)'}</Descriptions.Item>
             <Descriptions.Item label="Application">{dash(c.application_id && <Link to={`/applications/${c.application_id}`}>{c.application_name}</Link>)}</Descriptions.Item>
@@ -414,7 +431,7 @@ function CertificateFormModal({ state, onClose, onSaved }: { state: { open: bool
     if (!state.open) return;
     form.setFieldsValue(
       c
-        ? { ...c }
+        ? { ...c, responsibles: c.responsibles.length ? c.responsibles : [{ name: null, email: null }] }
         : {
             name: '',
             kind: 'tls',
@@ -422,8 +439,7 @@ function CertificateFormModal({ state, onClose, onSaved }: { state: { open: bool
             auto_renew: false,
             plant_id: scoped && me.user.plantScope.length === 1 ? me.user.plantScope[0] : undefined,
             notify_emails: [],
-            responsible: me.user.displayName,
-            responsible_email: me.user.email ?? '',
+            responsibles: [{ name: me.user.displayName, email: me.user.email ?? null }],
           },
     );
   }, [state.open, c, form, scoped, me.user]);
@@ -438,7 +454,8 @@ function CertificateFormModal({ state, onClose, onSaved }: { state: { open: bool
         application_id: v.application_id ?? null,
         asset_id: v.asset_id ?? null,
         notify_emails: v.notify_emails ?? [],
-        responsible_email: v.responsible_email || null,
+        // empty rows are dropped by the server
+        responsibles: ((v.responsibles ?? []) as Partial<CertificateResponsible>[]).map((r) => ({ name: r.name?.trim() || null, email: r.email?.trim() || null })),
       };
       const saved = c ? await http.put<Certificate>(`/api/certificates/${c.id}`, body) : await http.post<Certificate>('/api/certificates', body);
       message.success(`${saved.name} saved`);
@@ -486,14 +503,34 @@ function CertificateFormModal({ state, onClose, onSaved }: { state: { open: bool
               <Switch checkedChildren="Yes" unCheckedChildren="No" />
             </Form.Item>
           </Col>
-          <Col xs={24} md={12}>
-            <Form.Item name="responsible" label="Responsible person">
-              <Input placeholder="Name" maxLength={200} />
-            </Form.Item>
-          </Col>
-          <Col xs={24} md={12}>
-            <Form.Item name="responsible_email" label="E-mail of the responsible person" rules={[{ type: 'email', message: 'Invalid e-mail address' }]} extra="Receives the reminders before expiry.">
-              <Input placeholder="name@example.com" maxLength={254} />
+          <Col span={24}>
+            <Form.Item label="Responsible persons" extra="Everyone with an e-mail address receives the reminders before expiry.">
+              <Form.List name="responsibles">
+                {(fields, { add, remove }) => (
+                  <Space orientation="vertical" size={8} style={{ width: '100%' }}>
+                    {fields.map((field, i) => (
+                      <Row key={field.key} gutter={8} wrap={false} align="top">
+                        <Col flex="2 1 0">
+                          <Form.Item name={[field.name, 'name']} noStyle>
+                            <Input placeholder="Name" maxLength={200} aria-label={`Name of responsible person ${i + 1}`} />
+                          </Form.Item>
+                        </Col>
+                        <Col flex="3 1 0">
+                          <Form.Item name={[field.name, 'email']} rules={[{ type: 'email', message: 'Invalid e-mail address' }]} style={{ marginBottom: 0 }}>
+                            <Input placeholder="name@example.com" maxLength={254} aria-label={`E-mail of responsible person ${i + 1}`} />
+                          </Form.Item>
+                        </Col>
+                        <Col flex="none">
+                          <Button type="text" icon={<MinusCircleOutlined />} onClick={() => remove(field.name)} aria-label={`Remove responsible person ${i + 1}`} />
+                        </Col>
+                      </Row>
+                    ))}
+                    <Button type="dashed" icon={<PlusOutlined />} onClick={() => add({ name: null, email: null })} disabled={fields.length >= MAX_CERT_RESPONSIBLES}>
+                      Add responsible person
+                    </Button>
+                  </Space>
+                )}
+              </Form.List>
             </Form.Item>
           </Col>
           <Col span={24}>

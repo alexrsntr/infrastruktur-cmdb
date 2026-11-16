@@ -51,6 +51,7 @@ import {
 import { errorText, http } from '../../lib/api';
 import { fmtDate, fmtDateTime, fromNow } from '../../lib/format';
 import { usePlants } from '../../lib/queries';
+import { DbStorageTab } from './DbStorageTab';
 import { useSession } from '../../lib/session';
 import { PageHeader } from '../../components/PageHeader';
 import { EntraSettingsTab } from './EntraSettingsTab';
@@ -641,7 +642,7 @@ function CertificateNotificationsTab() {
             <Switch checkedChildren="On" unCheckedChildren="Off" />
           </Form.Item>
           <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
-            Once a day the responsible person of a certificate (and the further addresses entered on it) is reminded when a reminder stage is reached. Each stage is
+            Once a day the responsible persons of a certificate (and the further addresses entered on it) are reminded when a reminder stage is reached. Each stage is
             sent only once per expiry date – after a renewal with a new date the reminders start again.
           </Typography.Paragraph>
           <Row gutter={16}>
@@ -706,7 +707,7 @@ function CertificateNotificationsTab() {
             </Col>
           </Row>
           <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
-            The overview lists every certificate that has expired or expires within the period, with its responsible person – it is only sent when there is something to
+            The overview lists every certificate that has expired or expires within the period, with its responsible persons – it is only sent when there is something to
             report.
           </Typography.Paragraph>
           <Space wrap>
@@ -785,7 +786,7 @@ export function SettingsPage() {
     <div>
       <PageHeader
         title="Settings & notifications"
-        subtitle="E-mail server, warranty and certificate reminders, device types and sign-in with Microsoft. All changes are recorded in the audit log."
+        subtitle="E-mail server, warranty and certificate reminders, database storage warning, device types and sign-in with Microsoft. All changes are recorded in the audit log."
         crumbs={[{ title: 'Administration' }, { title: 'Settings & notifications' }]}
       />
       <Card styles={{ body: { paddingTop: 0 } }}>
@@ -802,6 +803,7 @@ export function SettingsPage() {
             { key: 'warranty', label: 'Warranty notifications', children: <WarrantyTab /> },
             { key: 'certificates', label: 'Certificate notifications', children: <CertificateNotificationsTab /> },
             { key: 'history', label: 'History', children: <HistoryTab /> },
+            { key: 'storage', label: 'Database storage', children: <DbStorageTab /> },
             { key: 'types', label: 'Device types', children: <DeviceTypesTab /> },
             { key: 'integrations', label: 'API & webhooks', children: <IntegrationsTab /> },
             { key: 'entra', label: 'Microsoft Entra ID', children: <EntraSettingsTab /> },

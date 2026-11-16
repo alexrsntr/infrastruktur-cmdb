@@ -6,6 +6,7 @@ import {
   CERT_KINDS,
   CERT_STATUSES,
   CERT_WATCHED_STATUSES,
+  MAX_CERT_RESPONSIBLES,
   type Certificate,
   type CertificateCounts,
   type CertificateList,
@@ -25,6 +26,16 @@ import { isValidTimezone } from '../services/warrantyNotifications';
 
 const email = z.string().trim().toLowerCase().email('Invalid e-mail address').max(254);
 
+const responsibleSchema = z
+  .object({
+    name: optText(200),
+    email: z.union([email, z.literal(''), z.null()]).optional().transform((v) => v || null),
+  })
+  .transform((r) => ({ name: r.name ?? null, email: r.email ?? null }));
+
+/** At least one responsible person has an e-mail address (otherwise nobody of them is reminded) */
+const SQL_HAS_RESPONSIBLE_EMAIL = `jsonb_path_exists(c.responsibles, '$[*] ? (@.email != null && @.email != "")')`;
+
 const certificateSchema = z
   .object({
     name: reqText(200),
@@ -41,12 +52,27 @@ const certificateSchema = z
     plant_id: optUuid,
     application_id: optUuid,
     asset_id: optUuid,
+    responsibles: z.array(responsibleSchema).max(MAX_CERT_RESPONSIBLES, `At most ${MAX_CERT_RESPONSIBLES} responsible persons`).optional(),
+    // earlier API version: one person
     responsible: optText(200),
     responsible_email: z.union([email, z.literal(''), z.null()]).optional().transform((v) => v || null),
     notify_emails: z.array(email).max(20).default([]).transform((l) => [...new Set(l)]),
     description: optText(8000),
   })
-  .refine((v) => !v.valid_from || v.valid_from <= v.expires_on, { message: 'The certificate must be valid before it expires', path: ['valid_from'] });
+  .refine((v) => !v.valid_from || v.valid_from <= v.expires_on, { message: 'The certificate must be valid before it expires', path: ['valid_from'] })
+  .transform(({ responsible, responsible_email, ...v }) => {
+    const list = v.responsibles ?? (responsible || responsible_email ? [{ name: responsible ?? null, email: responsible_email ?? null }] : []);
+    // empty rows are dropped, the same address only once
+    const seen = new Set<string>();
+    const responsibles = list.filter((r) => {
+      if (!r.name && !r.email) return false;
+      if (!r.email) return true;
+      if (seen.has(r.email)) return false;
+      seen.add(r.email);
+      return true;
+    });
+    return { ...v, responsibles };
+  });
 
 const settingsSchema = z.object({
   enabled: z.boolean(),
@@ -66,7 +92,7 @@ const settingsSchema = z.object({
 
 const CERT_SELECT = `c.id, c.name, c.kind, c.status, c.common_name, c.sans, c.issuer, c.serial_number, c.valid_from::text AS valid_from,
   c.expires_on::text AS expires_on, c.auto_renew, c.installed_on, c.plant_id, p.code AS plant_code, p.name AS plant_name,
-  c.application_id, ap.name AS application_name, c.asset_id, a.name AS asset_name, c.responsible, c.responsible_email, c.notify_emails,
+  c.application_id, ap.name AS application_name, c.asset_id, a.name AS asset_name, c.responsibles, c.notify_emails,
   c.description, (c.expires_on - CURRENT_DATE) AS days_left,
   (SELECT max(n.sent_at) FROM certificate_notification n WHERE n.certificate_id = c.id) AS last_notified_at,
   c.created_at, c.updated_at`;
@@ -117,7 +143,7 @@ export function certificatesRouter(pool: Pool, config: Config): Router {
               count(*) FILTER (WHERE c.status = ANY(${base.p(CERT_WATCHED_STATUSES)}::text[]) AND c.expires_on < CURRENT_DATE)::int AS expired,
               count(*) FILTER (WHERE c.status = ANY($${base.params.length}::text[]) AND c.expires_on >= CURRENT_DATE AND c.expires_on - CURRENT_DATE <= ${CERT_DAYS.critical})::int AS critical,
               count(*) FILTER (WHERE c.status = ANY($${base.params.length}::text[]) AND c.expires_on - CURRENT_DATE > ${CERT_DAYS.critical} AND c.expires_on - CURRENT_DATE <= ${CERT_DAYS.warning})::int AS warning,
-              count(*) FILTER (WHERE c.status = ANY($${base.params.length}::text[]) AND c.responsible_email IS NULL)::int AS no_responsible
+              count(*) FILTER (WHERE c.status = ANY($${base.params.length}::text[]) AND NOT ${SQL_HAS_RESPONSIBLE_EMAIL})::int AS no_responsible
        ${CERT_FROM} ${base.whereSql()}`,
       base.params,
     );
@@ -130,7 +156,7 @@ export function certificatesRouter(pool: Pool, config: Config): Router {
     const q = queryString(req.query.q);
     if (q) {
       const like = sql.p(likePattern(q));
-      sql.and(`(c.name ILIKE ${like} OR c.common_name ILIKE ${like} OR c.sans ILIKE ${like} OR c.responsible ILIKE ${like} OR c.responsible_email ILIKE ${like}
+      sql.and(`(c.name ILIKE ${like} OR c.common_name ILIKE ${like} OR c.sans ILIKE ${like} OR c.responsibles::text ILIKE ${like}
                 OR c.issuer ILIKE ${like} OR c.installed_on ILIKE ${like} OR ap.name ILIKE ${like} OR a.name ILIKE ${like})`);
     }
     const status = queryString(req.query.status);
@@ -141,7 +167,7 @@ export function certificatesRouter(pool: Pool, config: Config): Router {
     const due = queryString(req.query.due);
     if (due === 'expired') sql.and(`c.status = ANY(${sql.p(CERT_WATCHED_STATUSES)}::text[]) AND c.expires_on < CURRENT_DATE`);
     else if (due === 'soon') sql.and(`c.status = ANY(${sql.p(CERT_WATCHED_STATUSES)}::text[]) AND c.expires_on - CURRENT_DATE <= ${CERT_DAYS.warning}`);
-    else if (due === 'no_responsible') sql.and(`c.status = ANY(${sql.p(CERT_WATCHED_STATUSES)}::text[]) AND c.responsible_email IS NULL`);
+    else if (due === 'no_responsible') sql.and(`c.status = ANY(${sql.p(CERT_WATCHED_STATUSES)}::text[]) AND NOT ${SQL_HAS_RESPONSIBLE_EMAIL}`);
     else if (due) throw badRequest('Unknown filter');
 
     const { rows } = await pool.query<Certificate>(
@@ -164,10 +190,10 @@ export function certificatesRouter(pool: Pool, config: Config): Router {
       await checkLinks(db, req.user!, input);
       const { rows } = await db.query<{ id: string }>(
         `INSERT INTO certificate (name, kind, status, common_name, sans, issuer, serial_number, valid_from, expires_on, auto_renew, installed_on,
-           plant_id, application_id, asset_id, responsible, responsible_email, notify_emails, description, created_by, updated_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$19) RETURNING id`,
+           plant_id, application_id, asset_id, responsibles, notify_emails, description, created_by, updated_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$18) RETURNING id`,
         [input.name, input.kind, input.status, input.common_name, input.sans, input.issuer, input.serial_number, input.valid_from, input.expires_on,
-          input.auto_renew, input.installed_on, input.plant_id, input.application_id, input.asset_id, input.responsible, input.responsible_email,
+          input.auto_renew, input.installed_on, input.plant_id, input.application_id, input.asset_id, JSON.stringify(input.responsibles),
           input.notify_emails, input.description, req.user!.id],
       );
       const created = await loadCert(db, req.user!, rows[0].id);
@@ -187,10 +213,10 @@ export function certificatesRouter(pool: Pool, config: Config): Router {
       await checkLinks(db, req.user!, input);
       await db.query(
         `UPDATE certificate SET name=$2, kind=$3, status=$4, common_name=$5, sans=$6, issuer=$7, serial_number=$8, valid_from=$9, expires_on=$10,
-           auto_renew=$11, installed_on=$12, plant_id=$13, application_id=$14, asset_id=$15, responsible=$16, responsible_email=$17,
-           notify_emails=$18, description=$19, updated_by=$20, updated_at=now() WHERE id=$1`,
+           auto_renew=$11, installed_on=$12, plant_id=$13, application_id=$14, asset_id=$15, responsibles=$16,
+           notify_emails=$17, description=$18, updated_by=$19, updated_at=now() WHERE id=$1`,
         [id, input.name, input.kind, input.status, input.common_name, input.sans, input.issuer, input.serial_number, input.valid_from, input.expires_on,
-          input.auto_renew, input.installed_on, input.plant_id, input.application_id, input.asset_id, input.responsible, input.responsible_email,
+          input.auto_renew, input.installed_on, input.plant_id, input.application_id, input.asset_id, JSON.stringify(input.responsibles),
           input.notify_emails, input.description, req.user!.id],
       );
       const after = await loadCert(db, req.user!, id);

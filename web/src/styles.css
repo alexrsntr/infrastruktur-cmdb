@@ -553,3 +553,8 @@ button.stat-tile:focus-visible {
 .ant-drawer-left > .ant-drawer-content-wrapper {
   top: 64px;
 }
+
+/* Database storage warning for administrators (above every page) */
+.db-storage-banner {
+  margin-bottom: 16px;
+}
