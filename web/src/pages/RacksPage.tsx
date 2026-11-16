@@ -17,6 +17,7 @@ export function RacksPage() {
   const plantId = params.get('plantId') ?? undefined;
   const [q, setQ] = useState('');
   const racks = useRacks({ plantId });
+  const plant = plantId ? plants.data?.find((p) => p.id === plantId) : undefined;
 
   const rows = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -42,6 +43,7 @@ export function RacksPage() {
   return (
     <div>
       <PageHeader
+        crumbs={[{ title: 'Plants', to: '/plants' }, ...(plant ? [{ title: plant.code, to: `/plants/${plant.id}` }] : []), { title: 'Racks' }]}
         title="Racks"
         subtitle="All racks and wall cabinets with their free space. Open a rack to see its front view and mount devices."
         extra={

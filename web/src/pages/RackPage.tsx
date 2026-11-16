@@ -60,7 +60,7 @@ export function RackPage() {
   if (rack.isLoading) return <Skeleton active paragraph={{ rows: 14 }} />;
   if (rack.error || !r) {
     const status = rack.error instanceof ApiError ? rack.error.status : 500;
-    return <Result status={status === 403 ? '403' : status === 404 ? '404' : 'error'} title={status === 404 ? 'Rack not found' : 'Could not load rack'} subTitle={errorText(rack.error)} extra={<Link to="/racks">Back to racks</Link>} />;
+    return <Result status={status === 403 ? '403' : status === 404 ? '404' : 'error'} title={status === 404 ? 'Rack not found' : 'Could not load rack'} subTitle={errorText(rack.error)} extra={<Link to="/plants">Back to plants</Link>} />;
   }
 
   // mounting moves an existing device (local administrators too); panels, shelves … are new entries

@@ -5,7 +5,6 @@ import {
   AppstoreOutlined,
   AuditOutlined,
   EnvironmentOutlined,
-  HddOutlined,
   HomeOutlined,
   KeyOutlined,
   LogoutOutlined,
@@ -40,11 +39,11 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { key: 'home', label: 'Home', icon: <HomeOutlined />, to: '/', match: (p) => p === '/' },
-  { key: 'sites', label: 'Plants', icon: <EnvironmentOutlined />, to: '/plants', match: (p) => /^\/(plants|buildings|map|plans|datacenters)/.test(p) },
+  // Racks have no entry of their own: they are reached through the plant (and its buildings)
+  { key: 'sites', label: 'Plants', icon: <EnvironmentOutlined />, to: '/plants', match: (p) => /^\/(plants|buildings|map|plans|datacenters|racks)/.test(p) },
   { key: 'devices', label: 'Devices', icon: <AppstoreOutlined />, to: '/inventory', match: (p) => /^\/(inventory|assets)/.test(p) },
   { key: 'apps', label: 'Applications', icon: <BlockOutlined />, to: '/applications', match: (p) => p.startsWith('/applications') },
   { key: 'certs', label: 'Certificates', icon: <FileProtectOutlined />, to: '/certificates', match: (p) => p.startsWith('/certificates') },
-  { key: 'racks', label: 'Racks', icon: <HddOutlined />, to: '/racks', match: (p) => p.startsWith('/racks') },
   { key: 'activities', label: 'Activities', icon: <ScheduleOutlined />, to: '/activities', match: (p) => p.startsWith('/activities') },
 ];
 
