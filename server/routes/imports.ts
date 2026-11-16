@@ -420,6 +420,57 @@ export function importsRouter(pool: Pool): Router {
   });
 
   /**
+   * Excel template for the plant import: sheet 1 "Plants" is empty and gets filled in (the import reads only the
+   * first sheet), sheet 2 "Example" shows filled-in rows, sheet 3 "Help" explains the columns.
+   */
+  r.get('/import/plants/template.xlsx', requirePermission('import'), async (_req, res) => {
+    const wb = new ExcelJS.Workbook();
+    const columns = [
+      { header: 'Code', key: 'code', width: 10, help: 'Required. Short, unique code of the plant, e.g. NEF. An existing plant with this code is updated.' },
+      { header: 'Name', key: 'name', width: 28, help: 'Required. Name of the plant.' },
+      { header: 'Country', key: 'country', width: 16, help: 'Optional.' },
+      { header: 'City', key: 'city', width: 18, help: 'Optional.' },
+      { header: 'Address', key: 'address', width: 32, help: 'Optional. Street and number – shown on Google Maps on the plant page.' },
+      { header: 'Latitude', key: 'latitude', width: 11, help: 'Optional. Decimal degrees, e.g. 48.5532 (otherwise the address is used for the map).' },
+      { header: 'Longitude', key: 'longitude', width: 11, help: 'Optional. Decimal degrees, e.g. 9.3742.' },
+      { header: 'Time zone', key: 'timezone', width: 18, help: 'Optional. e.g. Europe/Berlin, America/Sao_Paulo.' },
+      { header: 'Contact', key: 'contact', width: 26, help: 'Optional. Local IT contact.' },
+      { header: 'Description', key: 'description', width: 40, help: 'Optional. Any notes.' },
+    ];
+    const headerStyle = (ws: ExcelJS.Worksheet) => {
+      ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0B2A4A' } };
+      ws.views = [{ state: 'frozen', ySplit: 1 }];
+    };
+
+    const plants = wb.addWorksheet('Plants');
+    plants.columns = columns.map(({ header, key, width }) => ({ header, key, width }));
+    headerStyle(plants);
+    for (const c of ['A', 'B']) plants.getCell(`${c}1`).note = 'Required';
+
+    const example = wb.addWorksheet('Example');
+    example.columns = columns.map(({ header, key, width }) => ({ header, key, width }));
+    headerStyle(example);
+    example.addRow({ code: 'NEF', name: 'Neuffen', country: 'Germany', city: 'Neuffen', address: 'Example street 1', timezone: 'Europe/Berlin', contact: 'Local IT contact' });
+    example.addRow({ code: 'SAO', name: 'São Paulo', country: 'Brazil', city: 'São Paulo', timezone: 'America/Sao_Paulo' });
+    example.addRow({ code: 'SHA', name: 'Shanghai', country: 'China', city: 'Shanghai', latitude: 31.2304, longitude: 121.4737, timezone: 'Asia/Shanghai' });
+
+    const help = wb.addWorksheet('Help');
+    help.columns = [
+      { header: 'Column', key: 'header', width: 14 },
+      { header: 'Meaning', key: 'help', width: 100 },
+    ];
+    headerStyle(help);
+    for (const c of columns) help.addRow({ header: c.header, help: c.help });
+    help.addRow({});
+    help.addRow({ header: 'How to', help: 'Fill in one row per plant on the first sheet "Plants", then upload the file under Export & import → Import → Plants. Validate first (dry run), then import.' });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="plants_import_template.xlsx"');
+    res.end(Buffer.from(await wb.xlsx.writeBuffer()));
+  });
+
+  /**
    * Plants from Excel / CSV: matched by ID, otherwise by code, and updated; other rows create new plants
    * (only users without plant restriction may create plants, like in the UI).
    */

@@ -93,4 +93,38 @@ describe('plant import', () => {
     ]);
     await pool.query(`UPDATE app_user SET plant_scope = '{}' WHERE email = 'erik.editor@example.local'`);
   });
+
+  it('offers an Excel template: fill in the first sheet, import, all plants are created', async () => {
+    await operator.get('/api/import/plants/template.xlsx').expect(403);
+    const res = await editor.agent
+      .get('/api/import/plants/template.xlsx')
+      .buffer(true)
+      .parse((r, cb) => {
+        const chunks: Buffer[] = [];
+        r.on('data', (c: Buffer) => chunks.push(c));
+        r.on('end', () => cb(null, Buffer.concat(chunks)));
+      })
+      .expect(200)
+      .expect('content-type', /spreadsheetml/);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(res.body as unknown as ArrayBuffer);
+    expect(wb.worksheets.map((w) => w.name)).toEqual(['Plants', 'Example', 'Help']);
+    const sheet = wb.worksheets[0];
+    expect((sheet.getRow(1).values as unknown[]).slice(1)).toEqual(['Code', 'Name', 'Country', 'City', 'Address', 'Latitude', 'Longitude', 'Time zone', 'Contact', 'Description']);
+    expect(sheet.rowCount).toBe(1); // nothing to delete before importing
+
+    // a whole list of plants at once
+    sheet.addRow(['BCN', 'Barcelona', 'Spain', 'Barcelona', 'Carrer Example 5', null, null, 'Europe/Madrid', 'IT Barcelona']);
+    sheet.addRow(['IND', 'Pune', 'India', 'Pune', null, 18.5204, 73.8567, 'Asia/Kolkata']);
+    sheet.addRow(['MEX', 'Ramos Arizpe', 'Mexico', 'Ramos Arizpe']);
+    const filled = Buffer.from(await wb.xlsx.writeBuffer());
+    const dry = (await upload(editor, filled, 'plants.xlsx', true).expect(200)).body as ImportReport;
+    expect(dry).toMatchObject({ created: 3, updated: 0, errors: [] });
+    const report = (await upload(editor, filled, 'plants.xlsx', false).expect(200)).body as ImportReport;
+    expect(report).toMatchObject({ created: 3, errors: [] });
+    const plants = (await admin.get('/api/plants').expect(200)).body as Plant[];
+    expect(plants.find((p) => p.code === 'BCN')).toMatchObject({ name: 'Barcelona', address: 'Carrer Example 5', timezone: 'Europe/Madrid', contact: 'IT Barcelona' });
+    expect(plants.find((p) => p.code === 'IND')).toMatchObject({ latitude: 18.5204, longitude: 73.8567 });
+    expect(plants.find((p) => p.code === 'MEX')).toMatchObject({ country: 'Mexico' });
+  });
 });

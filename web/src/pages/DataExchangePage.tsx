@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import {
   Alert,
   App,
@@ -347,30 +348,8 @@ function ReportView({ report }: { report: ImportReport }) {
   );
 }
 
-const PLANT_TEMPLATE_HEADERS = ['Code', 'Name', 'Country', 'City', 'Address', 'Latitude', 'Longitude', 'Time zone', 'Contact', 'Description'];
-
-function downloadPlantTemplate() {
-  const example: Record<string, string> = {
-    Code: 'NEF',
-    Name: 'Neuffen',
-    Country: 'Germany',
-    City: 'Neuffen',
-    Address: 'Example street 1',
-    'Time zone': 'Europe/Berlin',
-    Contact: 'Local IT contact',
-    Description: 'Example row – delete before importing',
-  };
-  const lines = [PLANT_TEMPLATE_HEADERS.map(csvCell).join(';'), PLANT_TEMPLATE_HEADERS.map((h) => csvCell(example[h] ?? '')).join(';')];
-  const blob = new Blob(['\ufeff' + lines.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'plants_import_template.csv';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
+/** Excel template: sheet "Plants" to fill in, plus an example and a help sheet (built by the server) */
+const downloadPlantTemplate = () => download('/api/import/plants/template.xlsx');
 
 function ImportSection({ kind }: { kind: 'assets' | 'plants' }) {
   const { message } = App.useApp();
@@ -443,9 +422,12 @@ function ImportSection({ kind }: { kind: 'assets' | 'plants' }) {
           <Typography.Text strong>Template</Typography.Text>
           {kind === 'plants' ? (
             <div style={{ marginTop: 8 }}>
-              <Button icon={<DownloadOutlined />} onClick={downloadPlantTemplate}>
-                Download plant template
+              <Button type="primary" ghost icon={<FileExcelOutlined />} onClick={downloadPlantTemplate}>
+                Download Excel template
               </Button>
+              <Typography.Paragraph type="secondary" style={{ fontSize: 12, margin: '8px 0 0' }}>
+                One row per plant on the first sheet “Plants”. The sheets “Example” and “Help” show how to fill it in.
+              </Typography.Paragraph>
             </div>
           ) : (
             <Space.Compact block style={{ marginTop: 8 }}>
@@ -537,7 +519,13 @@ function ImportSection({ kind }: { kind: 'assets' | 'plants' }) {
 
 export function DataExchangePage() {
   const { can } = useSession();
-  const [importKind, setImportKind] = useState<'assets' | 'plants'>('assets');
+  const [params] = useSearchParams();
+  // /data?import=plants (e.g. "Import from Excel" on the plant list) opens the plant import directly
+  const [importKind, setImportKind] = useState<'assets' | 'plants'>(params.get('import') === 'plants' ? 'plants' : 'assets');
+  const importRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (params.get('import')) importRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [params]);
   return (
     <div>
       <PageHeader
@@ -552,16 +540,17 @@ export function DataExchangePage() {
       )}
       {can('import') ? (
         <>
-          <div style={{ height: 24 }} />
+          <div style={{ height: 24, scrollMarginTop: 80 }} ref={importRef} />
           <SectionHead
             title={<><CloudUploadOutlined /> Import <Tag style={{ marginLeft: 6 }}>Editors & administrators</Tag></>}
             extra={
               <Segmented
+                size="large"
                 value={importKind}
                 onChange={(v) => setImportKind(v as 'assets' | 'plants')}
                 options={[
-                  { value: 'assets', label: 'Devices' },
-                  { value: 'plants', label: 'Plants' },
+                  { value: 'assets', label: 'Devices', icon: <AppstoreOutlined /> },
+                  { value: 'plants', label: 'Plants', icon: <BankOutlined /> },
                 ]}
               />
             }

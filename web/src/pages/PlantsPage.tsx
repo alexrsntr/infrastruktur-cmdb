@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Button, Card, Col, Empty, Input, Row, Segmented, Skeleton, Typography } from 'antd';
-import { AppstoreOutlined, BankOutlined, ClusterOutlined, EnvironmentOutlined, FileExcelOutlined, GlobalOutlined, PlusOutlined, ScheduleOutlined, SearchOutlined, UnorderedListOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, BankOutlined, CloudUploadOutlined, ClusterOutlined, DownloadOutlined, EnvironmentOutlined, FileExcelOutlined, GlobalOutlined, PlusOutlined, ScheduleOutlined, SearchOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import { ASSET_TYPES, ASSET_TYPE_KEYS, type Plant } from '../../../shared/model';
 import { PlantFormModal } from '../components/LocationForms';
 import { PageHeader } from '../components/PageHeader';
@@ -71,6 +71,11 @@ export function PlantsPage() {
         subtitle="Choose a plant to see its buildings, racks and devices."
         extra={
           <>
+            {can('import') && !scoped && (
+              <Button size="large" icon={<CloudUploadOutlined />} onClick={() => navigate('/data?import=plants')}>
+                Import from Excel
+              </Button>
+            )}
             {can('location.write') && !scoped && (
               <Button type="primary" size="large" icon={<PlusOutlined />} onClick={() => setCreating(true)}>
                 Add plant
@@ -78,6 +83,7 @@ export function PlantsPage() {
             )}
             <MoreMenu
               items={[
+                { key: 'template', icon: <DownloadOutlined />, label: 'Excel template for the plant import', onClick: () => download('/api/import/plants/template.xlsx'), hidden: !can('import') },
                 { key: 'xlsx', icon: <FileExcelOutlined />, label: 'Export plants (Excel)', onClick: () => download(exportUrl('plants', 'xlsx')), hidden: !can('export') },
                 { key: 'csv', icon: <UnorderedListOutlined />, label: 'Export plants (CSV)', onClick: () => download(exportUrl('plants', 'csv')), hidden: !can('export') },
                 { key: 'map', icon: <GlobalOutlined />, label: 'Open full-screen map', onClick: () => navigate('/map') },
