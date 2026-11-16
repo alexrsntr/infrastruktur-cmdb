@@ -5,9 +5,9 @@ import Papa from 'papaparse';
 import type { Pool, PoolClient } from 'pg';
 import {
   ASSET_STATUS_META,
-  ASSET_TYPES,
   ASSET_TYPE_KEYS,
   CRITICALITY_META,
+  assetTypeByName,
   type AssetType,
   type AssetTypeSettings,
   type ImportReport,
@@ -164,9 +164,7 @@ function mapRow(raw: RawRow, headers: Map<string, string>, lookups: Lookups, def
   }
 
   const typeRaw = str(v.type);
-  const type = typeRaw
-    ? ASSET_TYPE_KEYS.find((k) => k === typeRaw.toLowerCase() || ASSET_TYPES[k].label.toLowerCase() === typeRaw.toLowerCase() || ASSET_TYPES[k].plural.toLowerCase() === typeRaw.toLowerCase())
-    : defaultType;
+  const type = typeRaw ? assetTypeByName(typeRaw) : defaultType;
   if (!type) throw new Error(typeRaw ? `Unknown type "${typeRaw}"` : 'Column "Type" is missing');
 
   const plantKey = str(v.plant_code) ?? str(v.plant_name);

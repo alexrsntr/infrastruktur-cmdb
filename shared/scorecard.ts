@@ -17,7 +17,7 @@ export const DEFAULT_SCORECARD_AREAS = [
   'WAN',
   'Network',
   'Switches',
-  'WLAN',
+  'Wi-Fi',
   'Firewall / security',
   'Servers & storage',
   'Racks',

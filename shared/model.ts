@@ -237,10 +237,11 @@ export const ASSET_TYPES = {
       { key: 'firmware', label: 'Firmware', type: 'text' },
     ],
   },
+  // the key stays "wlan_controller" (database, API); the name is the international "Wi-Fi"
   wlan_controller: {
-    label: 'WLAN Controller',
-    plural: 'WLAN Controllers',
-    slug: 'wlan-controllers',
+    label: 'Wi-Fi Controller',
+    plural: 'Wi-Fi Controllers',
+    slug: 'wifi-controllers',
     short: 'WLC',
     category: 'network',
     hint: 'Controller or gateway that manages the access points',
@@ -477,8 +478,23 @@ export const ASSET_TYPES = {
 export type AssetType = keyof typeof ASSET_TYPES;
 export const ASSET_TYPE_KEYS = Object.keys(ASSET_TYPES) as AssetType[];
 
+/** Former names of device types – old links, bookmarks and import files keep working */
+const LEGACY_TYPE_NAMES: Record<string, AssetType> = {
+  'wlan-controllers': 'wlan_controller',
+  'wlan controller': 'wlan_controller',
+  'wlan controllers': 'wlan_controller',
+  'wlan-controller': 'wlan_controller',
+};
+
 export function assetTypeBySlug(slug: string | undefined): AssetType | undefined {
-  return ASSET_TYPE_KEYS.find((k) => ASSET_TYPES[k].slug === slug);
+  return ASSET_TYPE_KEYS.find((k) => ASSET_TYPES[k].slug === slug) ?? (slug ? LEGACY_TYPE_NAMES[slug.toLowerCase()] : undefined);
+}
+
+/** Device type from a key, label, plural or a former name ("switch", "Access Point", "WLAN Controller" …) */
+export function assetTypeByName(name: string | null | undefined): AssetType | undefined {
+  const v = name?.trim().toLowerCase();
+  if (!v) return undefined;
+  return ASSET_TYPE_KEYS.find((k) => k === v || ASSET_TYPES[k].label.toLowerCase() === v || ASSET_TYPES[k].plural.toLowerCase() === v) ?? LEGACY_TYPE_NAMES[v];
 }
 
 /** Type name inside a sentence: "switch", "access point" – acronyms such as "UPS" stay upper case. */

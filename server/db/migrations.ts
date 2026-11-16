@@ -20,6 +20,7 @@ import { cablingMigration } from './migrations/017_cabling';
 import { localAdminMigration } from './migrations/018_local_admin';
 import { scorecardWanMigration } from './migrations/019_scorecard_wan';
 import { certificatesMigration } from './migrations/020_certificates';
+import { wifiNamingMigration } from './migrations/021_wifi_naming';
 
 export interface Migration {
   id: string;
@@ -230,4 +231,5 @@ export const migrations: Migration[] = [
   localAdminMigration,
   scorecardWanMigration,
   certificatesMigration,
+  wifiNamingMigration,
 ];

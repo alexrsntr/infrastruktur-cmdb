@@ -5,7 +5,7 @@ import type { AssetType } from './model';
 export const DISCOVERY_KINDS = ['snmp', 'ad'] as const;
 export type DiscoveryKind = (typeof DISCOVERY_KINDS)[number];
 export const DISCOVERY_KIND_META: Record<DiscoveryKind, { label: string; description: string }> = {
-  snmp: { label: 'SNMP network scan', description: 'Switches, routers, firewalls, WLAN controllers, UPS … with serial number, model, firmware, ports and LLDP neighbours' },
+  snmp: { label: 'SNMP network scan', description: 'Switches, routers, firewalls, Wi-Fi controllers, UPS … with serial number, model, firmware, ports and LLDP neighbours' },
   ad: { label: 'Active Directory', description: 'Computer objects (by default only servers) with operating system and last logon' },
 };
 
