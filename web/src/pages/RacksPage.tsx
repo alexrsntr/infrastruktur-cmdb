@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { Button, Card, Col, Empty, Input, Progress, Row, Select, Table } from 'antd';
-import { AppstoreOutlined, DatabaseOutlined, FileExcelOutlined, HddOutlined, SearchOutlined, VerticalAlignMiddleOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, DatabaseOutlined, FileExcelOutlined, HddOutlined, PlusOutlined, SearchOutlined, VerticalAlignMiddleOutlined } from '@ant-design/icons';
 import type { Rack } from '../../../shared/model';
 import { PageHeader } from '../components/PageHeader';
+import { RackFormModal } from '../components/RackForms';
 import { download, exportUrl, MoreMenu } from '../components/PageParts';
 import { StatTile } from '../components/Simple';
-import { usePlants, useRacks } from '../lib/queries';
+import { useBuildings, usePlants, useRacks } from '../lib/queries';
 import { useSession } from '../lib/session';
 
 export function RacksPage() {
@@ -18,6 +19,11 @@ export function RacksPage() {
   const [q, setQ] = useState('');
   const racks = useRacks({ plantId });
   const plant = plantId ? plants.data?.find((p) => p.id === plantId) : undefined;
+  const canAdd = can('location.write');
+  const buildings = useBuildings();
+  const [rackModal, setRackModal] = useState(false);
+  // with a plant filter only that plant's buildings are offered
+  const rackBuildings = useMemo(() => (buildings.data ?? []).filter((b) => !plantId || b.plant_id === plantId), [buildings.data, plantId]);
 
   const rows = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -48,6 +54,11 @@ export function RacksPage() {
         subtitle="All racks and wall cabinets with their free space. Open a rack to see its front view and mount devices."
         extra={
           <>
+            {canAdd && (
+              <Button type="primary" size="large" icon={<PlusOutlined />} onClick={() => setRackModal(true)}>
+                Add rack
+              </Button>
+            )}
             <Button size="large" icon={<DatabaseOutlined />} onClick={() => navigate(plantId ? `/datacenters?plantId=${plantId}` : '/datacenters')}>
               Server rooms / DCs
             </Button>
@@ -104,7 +115,7 @@ export function RacksPage() {
           pagination={{ pageSize: 25, hideOnSinglePage: true }}
           scroll={{ x: 760 }}
           onRow={(r) => ({ onClick: () => navigate(`/racks/${r.id}`) })}
-          locale={{ emptyText: <Empty description={q ? 'No rack matches your search.' : 'No racks yet. Open a building and click “New rack”.'} /> }}
+          locale={{ emptyText: <Empty description={q ? 'No rack matches your search.' : canAdd ? 'No racks yet. Click “Add rack” to add the first one.' : 'No racks yet.'} /> }}
           columns={[
             {
               title: 'Rack',
@@ -152,6 +163,7 @@ export function RacksPage() {
           ]}
         />
       </Card>
+      <RackFormModal open={rackModal} buildings={rackBuildings} onClose={() => setRackModal(false)} onSaved={(r) => navigate(`/racks/${r.id}`)} />
     </div>
   );
 }

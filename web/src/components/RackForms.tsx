@@ -7,6 +7,7 @@ import {
   RACK_ITEM_KIND_META,
   formatRackUnits,
   type AssetType,
+  type Building,
   type Rack,
   type RackAsset,
   type RackItem,
@@ -19,22 +20,51 @@ import { AssetTypeTag } from './Tags';
 // Rack create / edit
 // ---------------------------------------------------------------------------
 
-export function RackFormModal({ open, onClose, rack, buildingId, onSaved }: { open: boolean; onClose: () => void; rack?: Rack | null; buildingId: string; onSaved?: (r: Rack) => void }) {
+function buildingLabel(b: Building, withPlant: boolean): string {
+  const name = b.code && b.code !== b.name ? `${b.name} (${b.code})` : b.name;
+  return withPlant && b.plant_code ? `${b.plant_code} / ${name}` : name;
+}
+
+/**
+ * Without a fixed `buildingId` (e.g. when adding a rack from the plant or the rack list),
+ * the form asks for the building first – pass the choices in `buildings`.
+ */
+export function RackFormModal({
+  open,
+  onClose,
+  rack,
+  buildingId,
+  buildings,
+  onSaved,
+}: {
+  open: boolean;
+  onClose: () => void;
+  rack?: Rack | null;
+  buildingId?: string;
+  buildings?: Building[];
+  onSaved?: (r: Rack) => void;
+}) {
   const [form] = Form.useForm();
   const { message } = App.useApp();
   const invalidate = useInvalidate();
-  const building = useBuilding(buildingId);
+  const fixedBuilding = rack?.building_id ?? buildingId;
+  const chosenBuilding = Form.useWatch('building_id', form) as string | undefined;
+  const targetBuilding = fixedBuilding ?? chosenBuilding;
+  const building = useBuilding(targetBuilding);
+  const multiPlant = new Set((buildings ?? []).map((b) => b.plant_id)).size > 1;
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     form.resetFields();
-    form.setFieldsValue(rack ?? { height_u: 42, numbering: 'bottom_up' });
+    // a plant with a single building needs no choice
+    const only = !fixedBuilding && buildings?.length === 1 ? buildings[0].id : undefined;
+    form.setFieldsValue(rack ?? { height_u: 42, numbering: 'bottom_up', building_id: only });
   }, [open, rack?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const submit = async () => {
     const v = await form.validateFields();
-    const body = { building_id: buildingId, floor_id: v.floor_id ?? null, name: v.name, room: v.room ?? null, height_u: v.height_u, numbering: v.numbering, manufacturer: v.manufacturer ?? null, model: v.model ?? null, description: v.description ?? null };
+    const body = { building_id: fixedBuilding ?? v.building_id, floor_id: v.floor_id ?? null, name: v.name, room: v.room ?? null, height_u: v.height_u, numbering: v.numbering, manufacturer: v.manufacturer ?? null, model: v.model ?? null, description: v.description ?? null };
     setSaving(true);
     try {
       const saved = rack ? await http.put<Rack>(`/api/racks/${rack.id}`, body) : await http.post<Rack>('/api/racks', body);
@@ -51,8 +81,28 @@ export function RackFormModal({ open, onClose, rack, buildingId, onSaved }: { op
 
   return (
     <Modal open={open} onCancel={onClose} onOk={submit} confirmLoading={saving} title={rack ? `Edit rack ${rack.name}` : 'New rack'} okText={rack ? 'Save' : 'Create'} destroyOnHidden width={620}>
-      <Form form={form} layout="vertical">
+      <Form
+        form={form}
+        layout="vertical"
+        onValuesChange={(changed) => {
+          // floors belong to a building – a floor of the previous building would be rejected
+          if ('building_id' in changed) form.setFieldValue('floor_id', undefined);
+        }}
+      >
         <Row gutter={12}>
+          {!fixedBuilding && (
+            <Col span={24}>
+              <Form.Item name="building_id" label="Building" rules={[{ required: true, message: 'Choose the building the rack stands in' }]}>
+                <Select
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder="Select building"
+                  options={(buildings ?? []).map((b) => ({ value: b.id, label: buildingLabel(b, multiPlant) }))}
+                  notFoundContent="No building yet – add the building on the plant page first"
+                />
+              </Form.Item>
+            </Col>
+          )}
           <Col span={12}>
             <Form.Item name="name" label="Rack name" rules={[{ required: true, whitespace: true, max: 50 }]}>
               <Input placeholder="e.g. R01 or FD-EG" autoFocus />

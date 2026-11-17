@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
-import { App, Button, Card, Col, Empty, Result, Row, Skeleton, Tabs, Tag, Typography } from 'antd';
+import { App, Button, Card, Col, Empty, Progress, Result, Row, Skeleton, Tabs, Tag, Typography } from 'antd';
 import {
   BankOutlined,
   ClusterOutlined,
@@ -14,7 +14,7 @@ import {
   CodeOutlined,
 } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
-import { ASSET_TYPES, ASSET_TYPE_KEYS, type Building } from '../../../shared/model';
+import { ASSET_TYPES, ASSET_TYPE_KEYS, type Building, type Rack } from '../../../shared/model';
 import { AssetTable } from '../components/AssetTable';
 import { ASSET_TYPE_ICONS } from '../components/icons';
 import { journalTabs } from '../components/Journal';
@@ -28,6 +28,7 @@ import { PlantScorecard } from '../components/Scorecard';
 import { PlansGallery } from '../components/PlansGallery';
 import { useAddDevice } from '../components/AddDeviceWizard';
 import { DatacenterFormModal } from '../components/DatacenterForms';
+import { RackFormModal } from '../components/RackForms';
 import { ApiError, errorText, http } from '../lib/api';
 import { useInvalidate, usePlans, usePlant, useRacks } from '../lib/queries';
 import { useSession } from '../lib/session';
@@ -79,6 +80,32 @@ function BuildingCard({ b, racks, onOpen }: { b: Building; racks: number; onOpen
   );
 }
 
+/** How many racks the overview shows before pointing to the full rack list */
+const RACK_PREVIEW = 6;
+
+function RackCard({ r }: { r: Rack }) {
+  const used = Number(r.used_u ?? 0);
+  return (
+    <Link to={`/racks/${r.id}`} style={{ color: 'inherit', display: 'block', height: '100%' }}>
+      <Card hoverable styles={{ body: { padding: 16 } }} style={{ height: '100%' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+          <Typography.Text strong style={{ fontSize: 16 }} ellipsis>
+            {r.name}
+          </Typography.Text>
+          <Typography.Text type="secondary">{r.height_u} U</Typography.Text>
+        </div>
+        <Typography.Text type="secondary" style={{ display: 'block' }} ellipsis>
+          {[r.building_name, r.room].filter(Boolean).join(' · ')}
+        </Typography.Text>
+        <Progress percent={Math.round((used / r.height_u) * 100)} showInfo={false} strokeWidth={8} status={r.height_u - used <= 2 ? 'exception' : 'normal'} style={{ margin: '6px 0 2px' }} />
+        <div style={{ color: 'var(--cmdb-text-2)' }}>
+          <strong>{r.height_u - used} U</strong> free · <strong>{Number(r.asset_count ?? 0)}</strong> {plural(Number(r.asset_count ?? 0), 'device')}
+        </div>
+      </Card>
+    </Link>
+  );
+}
+
 export function PlantPage() {
   const { plantId = '' } = useParams();
   const { can } = useSession();
@@ -99,6 +126,7 @@ export function PlantPage() {
   const [editing, setEditing] = useState(false);
   const [buildingModal, setBuildingModal] = useState(false);
   const [dcModal, setDcModal] = useState(false);
+  const [rackModal, setRackModal] = useState(false);
 
   if (plant.isLoading) return <Skeleton active paragraph={{ rows: 10 }} />;
   if (plant.error || !plant.data) {
@@ -119,6 +147,9 @@ export function PlantPage() {
   const time = localTime(p.timezone);
   const rackCount = (buildingId: string) => (racks.data ?? []).filter((r) => r.building_id === buildingId).length;
   const dcs = datacenters.data ?? [];
+  const allRacks = racks.data ?? [];
+  const racksLink = `/racks?plantId=${p.id}`;
+  const canAddRack = can('location.write') && p.buildings.length > 0;
 
   const deletePlant = async () => {
     try {
@@ -146,6 +177,8 @@ export function PlantPage() {
             label={ASSET_TYPES[t].plural}
           />
         ))}
+        {/* racks are no device type, but belong to the plant's inventory all the same */}
+        <StatTile to={racksLink} icon={<HddOutlined />} color="#5b6b7c" value={racks.isLoading ? '–' : allRacks.length} label="Racks" />
       </div>
 
       <Row gutter={[24, 24]}>
@@ -180,6 +213,47 @@ export function PlantPage() {
                 )}
               </Empty>
             </Card>
+          )}
+
+          <div style={{ height: 24 }} />
+          <SectionHead
+            title={`Racks (${racks.isLoading ? '–' : allRacks.length})`}
+            extra={
+              <span style={{ display: 'inline-flex', gap: 12, alignItems: 'center' }}>
+                {allRacks.length > 0 && <Link to={racksLink}>Show all</Link>}
+                {canAddRack && (
+                  <Button icon={<PlusOutlined />} onClick={() => setRackModal(true)}>
+                    Add rack
+                  </Button>
+                )}
+              </span>
+            }
+          />
+          {racks.isLoading ? (
+            <Skeleton active paragraph={{ rows: 2 }} />
+          ) : allRacks.length === 0 ? (
+            <Card styles={{ body: { padding: 18 } }}>
+              <Typography.Text type="secondary">
+                {p.buildings.length === 0
+                  ? 'No racks yet. Racks stand in a building – add a building first, then add its racks here.'
+                  : 'No racks documented yet. Add the racks and wall cabinets of this plant to see their free space and mount devices in them.'}
+              </Typography.Text>
+            </Card>
+          ) : (
+            <>
+              <Row gutter={[16, 16]}>
+                {allRacks.slice(0, RACK_PREVIEW).map((r) => (
+                  <Col key={r.id} xs={24} sm={12} lg={8}>
+                    <RackCard r={r} />
+                  </Col>
+                ))}
+              </Row>
+              {allRacks.length > RACK_PREVIEW && (
+                <div style={{ marginTop: 12 }}>
+                  <Link to={racksLink}>Show all {allRacks.length} racks</Link>
+                </div>
+              )}
+            </>
           )}
 
           {(dcs.length > 0 || can('location.write')) && (
@@ -282,7 +356,8 @@ export function PlantPage() {
                 { key: 'edit', icon: <EditOutlined />, label: 'Edit plant', onClick: () => setEditing(true), hidden: !can('location.edit') },
                 { key: 'building', icon: <ClusterOutlined />, label: 'Add building', onClick: () => setBuildingModal(true), hidden: !can('location.write') },
                 { key: 'datacenter', icon: <DatabaseOutlined />, label: 'Add server room / data center', onClick: () => setDcModal(true), hidden: !can('location.write') },
-                { key: 'racks', icon: <HddOutlined />, label: 'Racks of this plant', onClick: () => navigate(`/racks?plantId=${p.id}`) },
+                { key: 'rack', icon: <HddOutlined />, label: 'Add rack', onClick: () => setRackModal(true), hidden: !canAddRack },
+                { key: 'racks', icon: <HddOutlined />, label: 'Racks of this plant', onClick: () => navigate(racksLink) },
                 { key: 'xlsx', icon: <FileExcelOutlined />, label: 'Export plant (Excel)', onClick: () => download(exportUrl('full', 'xlsx', { plantId: p.id })), hidden: !can('export'), divider: true },
                 { key: 'json', icon: <CodeOutlined />, label: 'Export plant (JSON)', onClick: () => download(exportUrl('full', 'json', { plantId: p.id })), hidden: !can('export') },
                 { key: 'zip', icon: <FileZipOutlined />, label: 'Download all files (ZIP)', onClick: () => download(`/api/export/files.zip?plantId=${p.id}`), hidden: !can('export') },
@@ -342,6 +417,7 @@ export function PlantPage() {
       />
       <PlantFormModal open={editing} plant={p} onClose={() => setEditing(false)} />
       <BuildingFormModal open={buildingModal} plantId={p.id} onClose={() => setBuildingModal(false)} onSaved={(b) => navigate(`/buildings/${b.id}`)} />
+      <RackFormModal open={rackModal} buildings={p.buildings} onClose={() => setRackModal(false)} onSaved={(r) => navigate(`/racks/${r.id}`)} />
       <DatacenterFormModal open={dcModal} defaultPlantId={p.id} onClose={() => setDcModal(false)} onSaved={(dc) => navigate(`/datacenters/${dc.id}`)} />
     </div>
   );
