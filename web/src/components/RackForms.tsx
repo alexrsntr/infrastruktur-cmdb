@@ -25,9 +25,13 @@ function buildingLabel(b: Building, withPlant: boolean): string {
   return withPlant && b.plant_code ? `${b.plant_code} / ${name}` : name;
 }
 
+/** Select value for "create a new building together with the rack" */
+const NEW_BUILDING = '__new__';
+
 /**
  * Without a fixed `buildingId` (e.g. when adding a rack from the plant or the rack list),
- * the form asks for the building first – pass the choices in `buildings`.
+ * the form asks for the building first – pass the choices in `buildings`. With `plantId`
+ * it can also create a new building in the same step (a plant without buildings needs that).
  */
 export function RackFormModal({
   open,
@@ -35,6 +39,7 @@ export function RackFormModal({
   rack,
   buildingId,
   buildings,
+  plantId,
   onSaved,
 }: {
   open: boolean;
@@ -42,6 +47,7 @@ export function RackFormModal({
   rack?: Rack | null;
   buildingId?: string;
   buildings?: Building[];
+  plantId?: string;
   onSaved?: (r: Rack) => void;
 }) {
   const [form] = Form.useForm();
@@ -49,7 +55,8 @@ export function RackFormModal({
   const invalidate = useInvalidate();
   const fixedBuilding = rack?.building_id ?? buildingId;
   const chosenBuilding = Form.useWatch('building_id', form) as string | undefined;
-  const targetBuilding = fixedBuilding ?? chosenBuilding;
+  const newBuilding = !fixedBuilding && chosenBuilding === NEW_BUILDING;
+  const targetBuilding = fixedBuilding ?? (newBuilding ? undefined : chosenBuilding);
   const building = useBuilding(targetBuilding);
   const multiPlant = new Set((buildings ?? []).map((b) => b.plant_id)).size > 1;
   const [saving, setSaving] = useState(false);
@@ -57,16 +64,24 @@ export function RackFormModal({
   useEffect(() => {
     if (!open) return;
     form.resetFields();
-    // a plant with a single building needs no choice
-    const only = !fixedBuilding && buildings?.length === 1 ? buildings[0].id : undefined;
-    form.setFieldsValue(rack ?? { height_u: 42, numbering: 'bottom_up', building_id: only });
+    // a plant with a single building needs no choice, one without buildings gets a new one
+    const initial = fixedBuilding ? undefined : buildings?.length === 1 ? buildings[0].id : !buildings?.length && plantId ? NEW_BUILDING : undefined;
+    form.setFieldsValue(rack ?? { height_u: 42, numbering: 'bottom_up', building_id: initial });
   }, [open, rack?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const submit = async () => {
     const v = await form.validateFields();
-    const body = { building_id: fixedBuilding ?? v.building_id, floor_id: v.floor_id ?? null, name: v.name, room: v.room ?? null, height_u: v.height_u, numbering: v.numbering, manufacturer: v.manufacturer ?? null, model: v.model ?? null, description: v.description ?? null };
     setSaving(true);
     try {
+      let target: string = fixedBuilding ?? v.building_id;
+      if (target === NEW_BUILDING) {
+        const b = await http.post<Building>('/api/buildings', { plant_id: plantId, name: v.new_building_name, code: v.new_building_code || null });
+        target = b.id;
+        // should the rack fail now, a second "Create" must not add the building twice
+        form.setFieldValue('building_id', b.id);
+        await invalidate();
+      }
+      const body = { building_id: target, floor_id: v.floor_id ?? null, name: v.name, room: v.room ?? null, height_u: v.height_u, numbering: v.numbering, manufacturer: v.manufacturer ?? null, model: v.model ?? null, description: v.description ?? null };
       const saved = rack ? await http.put<Rack>(`/api/racks/${rack.id}`, body) : await http.post<Rack>('/api/racks', body);
       message.success(rack ? 'Rack saved' : 'Rack created');
       await invalidate();
@@ -97,11 +112,33 @@ export function RackFormModal({
                   showSearch
                   optionFilterProp="label"
                   placeholder="Select building"
-                  options={(buildings ?? []).map((b) => ({ value: b.id, label: buildingLabel(b, multiPlant) }))}
+                  options={[
+                    ...(buildings ?? []).map((b) => ({ value: b.id, label: buildingLabel(b, multiPlant) })),
+                    ...(plantId ? [{ value: NEW_BUILDING, label: '+ New building' }] : []),
+                  ]}
                   notFoundContent="No building yet – add the building on the plant page first"
                 />
               </Form.Item>
             </Col>
+          )}
+          {newBuilding && (
+            <>
+              <Col span={24}>
+                <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
+                  {buildings?.length ? 'The building is created together with the rack.' : 'This plant has no building yet – it is created together with the rack.'}
+                </Typography.Paragraph>
+              </Col>
+              <Col span={16}>
+                <Form.Item name="new_building_name" label="Building name" rules={[{ required: true, whitespace: true, max: 200 }]}>
+                  <Input placeholder="e.g. Main building or Production hall 1" />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item name="new_building_code" label="Building code" rules={[{ max: 30 }]} extra="Optional">
+                  <Input placeholder="e.g. B01" />
+                </Form.Item>
+              </Col>
+            </>
           )}
           <Col span={12}>
             <Form.Item name="name" label="Rack name" rules={[{ required: true, whitespace: true, max: 50 }]}>
@@ -115,7 +152,12 @@ export function RackFormModal({
           </Col>
           <Col span={12}>
             <Form.Item name="floor_id" label="Floor">
-              <Select allowClear placeholder="Select floor" options={(building.data?.floors ?? []).map((f) => ({ value: f.id, label: f.name }))} />
+              <Select
+                allowClear
+                disabled={newBuilding}
+                placeholder={newBuilding ? 'Add floors on the building page later' : 'Select floor'}
+                options={(building.data?.floors ?? []).map((f) => ({ value: f.id, label: f.name }))}
+              />
             </Form.Item>
           </Col>
           <Col span={12}>

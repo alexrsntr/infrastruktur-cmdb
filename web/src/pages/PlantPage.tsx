@@ -149,7 +149,8 @@ export function PlantPage() {
   const dcs = datacenters.data ?? [];
   const allRacks = racks.data ?? [];
   const racksLink = `/racks?plantId=${p.id}`;
-  const canAddRack = can('location.write') && p.buildings.length > 0;
+  // a plant without buildings still gets "Add rack" – the form creates the building as well
+  const canAddRack = can('location.write');
 
   const deletePlant = async () => {
     try {
@@ -165,7 +166,7 @@ export function PlantPage() {
   const overview = (
     <div>
       {/* all device types in one row on wide screens, two per row on phones */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 16, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 16, marginBottom: 24 }}>
         {/* only the types that exist in this plant */}
         {ASSET_TYPE_KEYS.filter((t) => (p.asset_counts?.[t] ?? 0) > 0).map((t) => (
           <StatTile
@@ -234,9 +235,7 @@ export function PlantPage() {
           ) : allRacks.length === 0 ? (
             <Card styles={{ body: { padding: 18 } }}>
               <Typography.Text type="secondary">
-                {p.buildings.length === 0
-                  ? 'No racks yet. Racks stand in a building – add a building first, then add its racks here.'
-                  : 'No racks documented yet. Add the racks and wall cabinets of this plant to see their free space and mount devices in them.'}
+                No racks documented yet. Add the racks and wall cabinets of this plant to see their free space and mount devices in them.
               </Typography.Text>
             </Card>
           ) : (
@@ -346,6 +345,11 @@ export function PlantPage() {
         subtitle={[[p.city, p.country].filter(Boolean).join(', '), p.timezone, `${p.asset_count ?? 0} devices`].filter(Boolean).join(' · ')}
         extra={
           <>
+            {canAddRack && (
+              <Button size="large" icon={<HddOutlined />} onClick={() => setRackModal(true)}>
+                Add rack
+              </Button>
+            )}
             {can('asset.write') && (
               <Button type="primary" size="large" icon={<PlusOutlined />} onClick={() => openAddDevice({ plant_id: p.id })}>
                 Add device
@@ -356,7 +360,6 @@ export function PlantPage() {
                 { key: 'edit', icon: <EditOutlined />, label: 'Edit plant', onClick: () => setEditing(true), hidden: !can('location.edit') },
                 { key: 'building', icon: <ClusterOutlined />, label: 'Add building', onClick: () => setBuildingModal(true), hidden: !can('location.write') },
                 { key: 'datacenter', icon: <DatabaseOutlined />, label: 'Add server room / data center', onClick: () => setDcModal(true), hidden: !can('location.write') },
-                { key: 'rack', icon: <HddOutlined />, label: 'Add rack', onClick: () => setRackModal(true), hidden: !canAddRack },
                 { key: 'racks', icon: <HddOutlined />, label: 'Racks of this plant', onClick: () => navigate(racksLink) },
                 { key: 'xlsx', icon: <FileExcelOutlined />, label: 'Export plant (Excel)', onClick: () => download(exportUrl('full', 'xlsx', { plantId: p.id })), hidden: !can('export'), divider: true },
                 { key: 'json', icon: <CodeOutlined />, label: 'Export plant (JSON)', onClick: () => download(exportUrl('full', 'json', { plantId: p.id })), hidden: !can('export') },
@@ -417,7 +420,7 @@ export function PlantPage() {
       />
       <PlantFormModal open={editing} plant={p} onClose={() => setEditing(false)} />
       <BuildingFormModal open={buildingModal} plantId={p.id} onClose={() => setBuildingModal(false)} onSaved={(b) => navigate(`/buildings/${b.id}`)} />
-      <RackFormModal open={rackModal} buildings={p.buildings} onClose={() => setRackModal(false)} onSaved={(r) => navigate(`/racks/${r.id}`)} />
+      <RackFormModal open={rackModal} buildings={p.buildings} plantId={p.id} onClose={() => setRackModal(false)} onSaved={(r) => navigate(`/racks/${r.id}`)} />
       <DatacenterFormModal open={dcModal} defaultPlantId={p.id} onClose={() => setDcModal(false)} onSaved={(dc) => navigate(`/datacenters/${dc.id}`)} />
     </div>
   );

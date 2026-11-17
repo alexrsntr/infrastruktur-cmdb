@@ -163,7 +163,7 @@ export function RacksPage() {
           ]}
         />
       </Card>
-      <RackFormModal open={rackModal} buildings={rackBuildings} onClose={() => setRackModal(false)} onSaved={(r) => navigate(`/racks/${r.id}`)} />
+      <RackFormModal open={rackModal} buildings={rackBuildings} plantId={plantId} onClose={() => setRackModal(false)} onSaved={(r) => navigate(`/racks/${r.id}`)} />
     </div>
   );
 }
