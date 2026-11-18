@@ -1,5 +1,22 @@
 // Attachments (files) and plan markers – shared between API and UI.
-import type { AssetStatus, AssetType, EntityType } from './model';
+import { ENTITY_TYPES, type AssetStatus, type AssetType } from './model';
+
+/**
+ * Objects files can be attached to: the locations and devices (which also carry notes and activities)
+ * plus applications (contracts, licenses, manuals …).
+ */
+export const ATTACHMENT_ENTITY_TYPES = [...ENTITY_TYPES, 'application'] as const;
+export type AttachmentEntityType = (typeof ATTACHMENT_ENTITY_TYPES)[number];
+export const ATTACHMENT_ENTITY_LABEL: Record<AttachmentEntityType, string> = {
+  plant: 'Plant',
+  building: 'Building',
+  floor: 'Floor',
+  rack: 'Rack',
+  asset: 'Asset',
+  application: 'Application',
+};
+/** Objects whose pictures may be used as plans (site plans with placed devices) */
+export const PLAN_ENTITY_TYPES: readonly AttachmentEntityType[] = ENTITY_TYPES;
 
 export const ATTACHMENT_CATEGORIES = ['photo', 'plan', 'document', 'contract', 'config', 'other'] as const;
 export type AttachmentCategory = (typeof ATTACHMENT_CATEGORIES)[number];
@@ -19,7 +36,7 @@ export const INLINE_SAFE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'imag
 
 export interface Attachment {
   id: string;
-  entity_type: EntityType;
+  entity_type: AttachmentEntityType;
   entity_id: string;
   entity_label?: string | null;
   plant_id: string | null;

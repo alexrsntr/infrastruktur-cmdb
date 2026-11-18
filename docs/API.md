@@ -124,6 +124,21 @@ attributes are dropped.
 The impact analysis follows the relations `uplink`, `runs_on`, `powered_by` and `depends_on` (the
 source depends on the target) recursively. Redundancy partners (`redundant_with`) are listed separately.
 
+Files of an application (contracts, license certificates, SLAs, manuals …) use the general file API with
+`entityType=application`:
+
+| Method | Path | Permission | |
+|---|---|---|---|
+| GET | `/api/attachments?entityType=application&entityId={id}` | read | Files of the application |
+| POST | `/api/attachments` | attachment.write | `multipart/form-data`: `entityType=application`, `entityId`, `file`, optional `category` (e.g. `contract`), `title`, `description` |
+| GET | `/api/attachments/{id}/file` | read | The file (`?download=1` forces a download) |
+| PUT / DELETE | `/api/attachments/{id}` | attachment.write | `{ "title", "description", "category" }` |
+| GET | `/api/export/files.zip?entityType=application&entityId={id}` | export | All files of the application as ZIP |
+
+Files of a central application (no plant) can be read by every user, but only users without plant
+restriction can add, change or delete them. Pictures of an application cannot be used as plans. Deleting
+an application deletes its files.
+
 ## Monitoring status
 
 Monitoring systems report the state of devices; it is shown on the device page and `up`/`warning` also

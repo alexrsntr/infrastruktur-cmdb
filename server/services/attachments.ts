@@ -1,8 +1,11 @@
 import type { Pool } from 'pg';
+import type { AttachmentEntityType } from '../../shared/attachments';
+import type { CurrentUser } from '../../shared/model';
 import type { Config } from '../config';
 import type { DbClient } from '../db/pool';
-import type { EntityType } from '../../shared/model';
+import { forbidden, notFound } from '../lib/http';
 import { log } from '../lib/log';
+import { hasPlantAccess, resolveEntity, type EntityRef } from '../lib/scope';
 import { ENTITY_LABEL_SQL } from '../routes/journal';
 import { createStorage, type FileStorage } from './storage';
 
@@ -48,7 +51,41 @@ export const ATTACHMENT_PLANT_SQL = (alias: string) => `
     WHEN 'floor' THEN (SELECT b.plant_id FROM floor x JOIN building b ON b.id = x.building_id WHERE x.id = ${alias}.entity_id)
     WHEN 'rack' THEN (SELECT b.plant_id FROM rack x JOIN building b ON b.id = x.building_id WHERE x.id = ${alias}.entity_id)
     WHEN 'asset' THEN (SELECT x.plant_id FROM asset x WHERE x.id = ${alias}.entity_id)
+    WHEN 'application' THEN (SELECT x.plant_id FROM application x WHERE x.id = ${alias}.entity_id)
   END`;
+
+/**
+ * SQL condition: the attachment (with plant expression `plantExpr`) is visible to a plant-scoped user.
+ * Files of central applications (no plant) are visible to everyone, like the applications themselves.
+ */
+export const ATTACHMENT_SCOPE_SQL = (alias: string, plantExpr: string, scopeParam: string) =>
+  `(${plantExpr} = ANY(${scopeParam}::uuid[]) OR (${alias}.entity_type = 'application' AND ${plantExpr} IS NULL))`;
+
+/**
+ * Resolves the object a file belongs to and checks the user's plant scope.
+ * "read" = list and download, "write" = upload, edit and delete. They only differ for central
+ * applications (no plant): everyone may read their files, only users without plant restriction may
+ * change them – the same rule as for editing the application.
+ */
+export async function resolveAttachmentTarget(
+  db: DbClient,
+  user: CurrentUser,
+  type: AttachmentEntityType,
+  id: string,
+  mode: 'read' | 'write',
+): Promise<EntityRef> {
+  let ref: EntityRef;
+  if (type === 'application') {
+    const { rows } = await db.query<{ plant_id: string | null; name: string }>('SELECT plant_id, name FROM application WHERE id = $1', [id]);
+    if (!rows[0]) throw notFound('Application');
+    ref = { plantId: rows[0].plant_id, label: rows[0].name };
+    if (mode === 'read' && ref.plantId === null) return ref;
+  } else {
+    ref = await resolveEntity(db, type, id);
+  }
+  if (!hasPlantAccess(user, ref.plantId)) throw forbidden('This file is outside of your plant scope');
+  return ref;
+}
 
 export const ATTACHMENT_SELECT = `
   att.id, att.entity_type, att.entity_id, ${ENTITY_LABEL_SQL('att')} AS entity_label, att.plant_id, att.file_name,
@@ -60,7 +97,7 @@ export const ATTACHMENT_FROM = `FROM attachment att LEFT JOIN app_user u ON u.id
  * Deletes the attachment rows of the given objects inside the caller's transaction and returns the
  * storage keys. Call purgeBlobs() with them after the transaction committed.
  */
-export async function deleteAttachmentsFor(db: DbClient, entityType: EntityType, ids: string[]): Promise<string[]> {
+export async function deleteAttachmentsFor(db: DbClient, entityType: AttachmentEntityType, ids: string[]): Promise<string[]> {
   if (!ids.length) return [];
   const { rows } = await db.query<{ storage_key: string }>(
     'DELETE FROM attachment WHERE entity_type = $1 AND entity_id = ANY($2::uuid[]) RETURNING storage_key',

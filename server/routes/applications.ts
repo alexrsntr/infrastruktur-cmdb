@@ -9,6 +9,7 @@ import { audit, diff, snapshot } from '../lib/audit';
 import { conflict, likePattern, notFound, parse, queryString, requireUuid, SqlBuilder } from '../lib/http';
 import { optText, optUuid, reqText } from '../lib/schemas';
 import { assertPlantAccess, hasPlantAccess, isUnscoped } from '../lib/scope';
+import { deleteAttachmentsFor, purgeBlobs } from '../services/attachments';
 import { impactOf, walkDependencies } from '../services/impact';
 
 const applicationSchema = z.object({
@@ -118,6 +119,9 @@ export function applicationsRouter(pool: Pool): Router {
           [id, input.name, input.status, input.criticality, input.plant_id, input.owner, input.url, input.description, req.user!.id],
         )
         .catch((e) => uniqueName(e, input.name));
+      // the files follow the application (plant clean-up and storage statistics use the stored plant)
+      if ((before.plant_id ?? null) !== (input.plant_id ?? null))
+        await db.query(`UPDATE attachment SET plant_id = $2 WHERE entity_type = 'application' AND entity_id = $1`, [id, input.plant_id]);
       const after = await loadApp(db, req.user!, id);
       const changes = diff(before as unknown as Record<string, unknown>, after as unknown as Record<string, unknown>);
       delete changes.asset_count;
@@ -129,12 +133,22 @@ export function applicationsRouter(pool: Pool): Router {
 
   r.delete('/applications/:id', requirePermission('asset.delete'), async (req, res) => {
     const id = requireUuid(req.params.id);
-    await withTransaction(pool, async (db) => {
+    const keys = await withTransaction(pool, async (db) => {
       const before = await loadApp(db, req.user!, id);
       assertPlantAccess(req.user!, before.plant_id);
+      const fileKeys = await deleteAttachmentsFor(db, 'application', [id]);
       await db.query('DELETE FROM application WHERE id = $1', [id]);
-      await audit(db, req, { action: 'delete', entityType: 'application', entityId: id, entityLabel: before.name, plantId: before.plant_id, changes: { name: before.name } });
+      await audit(db, req, {
+        action: 'delete',
+        entityType: 'application',
+        entityId: id,
+        entityLabel: before.name,
+        plantId: before.plant_id,
+        changes: { name: before.name, ...(fileKeys.length ? { files_deleted: fileKeys.length } : {}) },
+      });
+      return fileKeys;
     });
+    await purgeBlobs(pool, keys);
     res.status(204).end();
   });
 

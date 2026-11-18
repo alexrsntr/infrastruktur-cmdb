@@ -16,6 +16,7 @@ export const ENTITY_LABEL_SQL = (alias: string) => `
     WHEN 'floor' THEN (SELECT b.name || ' / ' || x.name FROM floor x JOIN building b ON b.id = x.building_id WHERE x.id = ${alias}.entity_id)
     WHEN 'rack' THEN (SELECT b.name || ' / ' || x.name FROM rack x JOIN building b ON b.id = x.building_id WHERE x.id = ${alias}.entity_id)
     WHEN 'asset' THEN (SELECT x.name FROM asset x WHERE x.id = ${alias}.entity_id)
+    WHEN 'application' THEN (SELECT x.name FROM application x WHERE x.id = ${alias}.entity_id)
   END`;
 
 function entityFilter(sql: SqlBuilder, query: Record<string, unknown>, alias: string) {

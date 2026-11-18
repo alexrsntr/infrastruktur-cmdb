@@ -5,7 +5,7 @@ import { ASSET_TYPE_KEYS, ASSET_TYPES, RACK_ITEM_KIND_META, can, formatRackUnits
 import { requirePermission } from '../auth/context';
 import { audit } from '../lib/audit';
 import { badRequest, forbidden, notFound, queryString, requireUuid, SqlBuilder } from '../lib/http';
-import { applyScope, assertPlantAccess, resolveEntityWithAccess } from '../lib/scope';
+import { applyScope, assertPlantAccess, isUnscoped } from '../lib/scope';
 import { ASSET_FROM, ASSET_SELECT, buildAssetQuery, parseAssetFilters } from '../services/assets';
 import {
   ACTIVITY_COLUMNS,
@@ -30,9 +30,22 @@ import { AUDIT_SELECT, buildAuditQuery } from './admin';
 import { RACK_FROM, RACK_SELECT, loadRackDetail } from './racks';
 import { loadDatacenterExportRows } from './datacenters';
 import { DATACENTER_KIND_META, DC_SITE_ROLE_META, type DatacenterKind, type DcSiteRole } from '../../shared/datacenters';
-import { ATTACHMENT_CATEGORY_META, formatBytes, type AttachmentCategory } from '../../shared/attachments';
-import { ENTITY_TYPES, type EntityType } from '../../shared/model';
-import { ATTACHMENT_FROM, ATTACHMENT_PLANT_SQL, ATTACHMENT_SELECT, attachmentContext } from '../services/attachments';
+import {
+  ATTACHMENT_CATEGORY_META,
+  ATTACHMENT_ENTITY_LABEL,
+  ATTACHMENT_ENTITY_TYPES,
+  formatBytes,
+  type AttachmentCategory,
+  type AttachmentEntityType,
+} from '../../shared/attachments';
+import {
+  ATTACHMENT_FROM,
+  ATTACHMENT_PLANT_SQL,
+  ATTACHMENT_SCOPE_SQL,
+  ATTACHMENT_SELECT,
+  attachmentContext,
+  resolveAttachmentTarget,
+} from '../services/attachments';
 import { log } from '../lib/log';
 import { loadAssetTypeSettings } from '../services/assetTypes';
 
@@ -209,11 +222,9 @@ function assetSheets(rows: Record<string, unknown>[], perType: boolean, settings
 
 // ------------------------------------------------------------- attachments
 
-const ENTITY_TYPE_LABEL: Record<EntityType, string> = { plant: 'Plant', building: 'Building', floor: 'Floor', rack: 'Rack', asset: 'Asset' };
-
 function attachmentColumns(baseUrl: string): Column[] {
   return [
-    { key: 'entity_type', header: 'Object type', width: 12, get: (r) => ENTITY_TYPE_LABEL[r.entity_type as EntityType] ?? r.entity_type },
+    { key: 'entity_type', header: 'Object type', width: 12, get: (r) => ATTACHMENT_ENTITY_LABEL[r.entity_type as AttachmentEntityType] ?? r.entity_type },
     { key: 'entity_label', header: 'Object', width: 26 },
     { key: 'file_name', header: 'File name', width: 30 },
     { key: 'title', header: 'Title', width: 24 },
@@ -230,7 +241,7 @@ function attachmentColumns(baseUrl: string): Column[] {
 
 interface AttachmentFilter {
   plantId?: string;
-  entityType?: EntityType;
+  entityType?: AttachmentEntityType;
   entityId?: string;
 }
 
@@ -238,10 +249,10 @@ function attachmentFilter(query: Record<string, unknown>): AttachmentFilter {
   const plantId = queryString(query.plantId);
   const entityType = queryString(query.entityType);
   const entityId = queryString(query.entityId);
-  if (entityType && !ENTITY_TYPES.includes(entityType as EntityType)) throw badRequest('Invalid entityType');
+  if (entityType && !ATTACHMENT_ENTITY_TYPES.includes(entityType as AttachmentEntityType)) throw badRequest('Invalid entityType');
   return {
     plantId: plantId ? requireUuid(plantId, 'plantId') : undefined,
-    entityType: entityType as EntityType | undefined,
+    entityType: entityType as AttachmentEntityType | undefined,
     entityId: entityId ? requireUuid(entityId, 'entityId') : undefined,
   };
 }
@@ -249,7 +260,7 @@ function attachmentFilter(query: Record<string, unknown>): AttachmentFilter {
 async function loadAttachmentList(pool: Pool, user: CurrentUser, f: AttachmentFilter) {
   const sql = new SqlBuilder();
   const plantExpr = `(${ATTACHMENT_PLANT_SQL('att')})`;
-  applyScope(sql, user, plantExpr);
+  if (!isUnscoped(user)) sql.and(ATTACHMENT_SCOPE_SQL('att', plantExpr, sql.p(user.plantScope)));
   if (f.plantId) sql.and(`${plantExpr} = ${sql.p(f.plantId)}`);
   if (f.entityType) sql.and(`att.entity_type = ${sql.p(f.entityType)}`);
   if (f.entityId) sql.and(`att.entity_id = ${sql.p(f.entityId)}`);
@@ -430,7 +441,7 @@ export function exportsRouter(pool: Pool, appName = 'IT Infrastructure'): Router
     const rows = await loadAttachmentList(pool, req.user!, f);
     if (f.entityType && f.entityId && !rows.length) {
       // still verify access to the object so a scoped user gets 403 instead of an empty archive
-      await resolveEntityWithAccess(pool, req.user!, f.entityType, f.entityId);
+      await resolveAttachmentTarget(pool, req.user!, f.entityType, f.entityId, 'read');
     }
     await done(req, 'files', 'zip', rows.length, { files: rows.length });
     const { storage } = attachmentContext(pool);
@@ -448,7 +459,7 @@ export function exportsRouter(pool: Pool, appName = 'IT Infrastructure'): Router
     zip.pipe(res);
     const used = new Set<string>();
     for (const row of rows) {
-      const folder = zipSafe(`${ENTITY_TYPE_LABEL[row.entity_type as EntityType]} ${row.entity_label ?? row.entity_id}`);
+      const folder = zipSafe(`${ATTACHMENT_ENTITY_LABEL[row.entity_type as AttachmentEntityType]} ${row.entity_label ?? row.entity_id}`);
       const dot = row.file_name.lastIndexOf('.');
       const stem = zipSafe(dot > 0 ? row.file_name.slice(0, dot) : row.file_name);
       const ext = dot > 0 ? zipSafe(row.file_name.slice(dot)) : '';

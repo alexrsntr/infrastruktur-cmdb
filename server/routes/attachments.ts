@@ -4,8 +4,16 @@ import { Router, type NextFunction, type Request, type Response } from 'express'
 import multer from 'multer';
 import type { Pool } from 'pg';
 import { z } from 'zod';
-import { ATTACHMENT_CATEGORIES, INLINE_SAFE_TYPES, PLAN_IMAGE_TYPES, type AttachmentCategory } from '../../shared/attachments';
-import { ENTITY_TYPES, can, type EntityType } from '../../shared/model';
+import {
+  ATTACHMENT_CATEGORIES,
+  ATTACHMENT_ENTITY_TYPES,
+  INLINE_SAFE_TYPES,
+  PLAN_ENTITY_TYPES,
+  PLAN_IMAGE_TYPES,
+  type AttachmentCategory,
+  type AttachmentEntityType,
+} from '../../shared/attachments';
+import { can } from '../../shared/model';
 import type { Config } from '../config';
 import { requirePermission } from '../auth/context';
 import { withTransaction } from '../db/pool';
@@ -14,8 +22,7 @@ import { badRequest, forbidden, HttpError, notFound, parse, queryString, require
 import { readImageSize } from '../lib/image';
 import { log } from '../lib/log';
 import { optText } from '../lib/schemas';
-import { hasPlantAccess, resolveEntity, resolveEntityWithAccess } from '../lib/scope';
-import { ATTACHMENT_FROM, ATTACHMENT_SELECT, initAttachments, purgeBlobs } from '../services/attachments';
+import { ATTACHMENT_FROM, ATTACHMENT_SELECT, initAttachments, purgeBlobs, resolveAttachmentTarget } from '../services/attachments';
 import { sanitizeFileName, StorageNotFoundError, storageKey } from '../services/storage';
 
 /** Never accepted: executables, scripts and active web content */
@@ -79,7 +86,7 @@ export function contentDisposition(type: 'inline' | 'attachment', fileName: stri
 }
 
 const uploadFieldsSchema = z.object({
-  entityType: z.enum(ENTITY_TYPES),
+  entityType: z.enum(ATTACHMENT_ENTITY_TYPES),
   entityId: z.string().uuid(),
   category: z
     .enum([...ATTACHMENT_CATEGORIES, 'auto'] as [string, ...string[]])
@@ -107,11 +114,11 @@ async function loadAttachment(pool: Pool, id: string) {
 }
 
 /** Access check via the attachment's object (always current, even if the object moved to another plant). */
-async function assertAccess(pool: Pool, req: Request, att: { entity_type: EntityType; entity_id: string }) {
-  const ref = await resolveEntity(pool, att.entity_type, att.entity_id);
-  if (!hasPlantAccess(req.user!, ref.plantId)) throw forbidden('This file is outside of your plant scope');
-  return ref;
+function assertAccess(pool: Pool, req: Request, att: { entity_type: AttachmentEntityType; entity_id: string }, mode: 'read' | 'write') {
+  return resolveAttachmentTarget(pool, req.user!, att.entity_type, att.entity_id, mode);
 }
+
+const PLAN_NOT_POSSIBLE = 'Files of applications cannot be used as a plan. Plans belong to plants, buildings, floors, racks or devices.';
 
 const PUBLIC_FIELDS = (row: Record<string, unknown>) => {
   const { sha256: _sha, ...rest } = row;
@@ -134,9 +141,9 @@ export function attachmentsRouter(pool: Pool, config: Config): Router {
   r.get('/attachments', async (req, res) => {
     const entityType = queryString(req.query.entityType);
     const entityId = queryString(req.query.entityId);
-    if (!entityType || !ENTITY_TYPES.includes(entityType as EntityType)) throw badRequest('entityType is required');
+    if (!entityType || !ATTACHMENT_ENTITY_TYPES.includes(entityType as AttachmentEntityType)) throw badRequest('entityType is required');
     const id = requireUuid(entityId, 'entityId');
-    await resolveEntityWithAccess(pool, req.user!, entityType as EntityType, id);
+    await resolveAttachmentTarget(pool, req.user!, entityType as AttachmentEntityType, id, 'read');
     const { rows } = await pool.query(
       `SELECT ${ATTACHMENT_SELECT} ${ATTACHMENT_FROM} WHERE att.entity_type = $1 AND att.entity_id = $2 ORDER BY att.created_at DESC`,
       [entityType, id],
@@ -152,7 +159,8 @@ export function attachmentsRouter(pool: Pool, config: Config): Router {
     if (BLOCKED_EXTENSIONS.has(ext)) throw badRequest(`Files of type ${ext} are not allowed (executables, scripts and web pages are blocked).`);
     if (req.file.size === 0) throw badRequest('The file is empty');
 
-    const ref = await resolveEntityWithAccess(pool, req.user!, fields.entityType, fields.entityId);
+    const ref = await resolveAttachmentTarget(pool, req.user!, fields.entityType, fields.entityId, 'write');
+    if (fields.isPlan && !PLAN_ENTITY_TYPES.includes(fields.entityType)) throw badRequest(PLAN_NOT_POSSIBLE);
     const detected = detectFile(req.file.buffer, fileName);
     if (fields.isPlan && !PLAN_IMAGE_TYPES.includes(detected.contentType as never))
       throw badRequest('Only PNG, JPEG or WebP pictures can be used as a plan.');
@@ -189,7 +197,7 @@ export function attachmentsRouter(pool: Pool, config: Config): Router {
 
   r.get('/attachments/:id', async (req, res) => {
     const att = await loadAttachment(pool, requireUuid(req.params.id));
-    await assertAccess(pool, req, att);
+    await assertAccess(pool, req, att, 'read');
     res.json(PUBLIC_FIELDS(att));
   });
 
@@ -198,7 +206,7 @@ export function attachmentsRouter(pool: Pool, config: Config): Router {
     const { rows } = await pool.query('SELECT entity_type, entity_id, file_name, content_type, size_bytes, sha256, storage_key FROM attachment WHERE id = $1', [id]);
     const att = rows[0];
     if (!att) throw notFound('Attachment');
-    await assertAccess(pool, req, att);
+    await assertAccess(pool, req, att, 'read');
 
     const etag = `"${att.sha256}"`;
     res.setHeader('ETag', etag);
@@ -232,7 +240,8 @@ export function attachmentsRouter(pool: Pool, config: Config): Router {
     const id = requireUuid(req.params.id);
     const input = parse(updateSchema, req.body);
     const before = await loadAttachment(pool, id);
-    const ref = await assertAccess(pool, req, before);
+    const ref = await assertAccess(pool, req, before, 'write');
+    if (input.is_plan && !PLAN_ENTITY_TYPES.includes(before.entity_type)) throw badRequest(PLAN_NOT_POSSIBLE);
     if (input.is_plan && !PLAN_IMAGE_TYPES.includes(before.content_type)) throw badRequest('Only PNG, JPEG or WebP pictures can be used as a plan.');
     await withTransaction(pool, async (db) => {
       await db.query('UPDATE attachment SET title=$2, description=$3, category=$4, is_plan=$5, updated_at=now() WHERE id=$1', [
@@ -257,7 +266,7 @@ export function attachmentsRouter(pool: Pool, config: Config): Router {
   r.delete('/attachments/:id', async (req, res) => {
     const id = requireUuid(req.params.id);
     const att = await loadAttachment(pool, id);
-    const ref = await assertAccess(pool, req, att);
+    const ref = await assertAccess(pool, req, att, 'write');
     const user = req.user!;
     const mayDelete = can(user.role, 'asset.delete') || (att.created_by === user.id && can(user.role, 'attachment.write'));
     if (!mayDelete) throw forbidden('Only the uploader, editors or administrators can delete this file');

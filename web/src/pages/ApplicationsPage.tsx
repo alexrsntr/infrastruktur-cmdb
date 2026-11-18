@@ -9,6 +9,7 @@ import { errorText, http } from '../lib/api';
 import { fmtDateTime } from '../lib/format';
 import { useInvalidate, usePlants } from '../lib/queries';
 import { useSession } from '../lib/session';
+import { AttachmentsPanel } from '../components/AttachmentsPanel';
 import { PageHeader } from '../components/PageHeader';
 import { StatusDot, TypeIcon } from '../components/Simple';
 
@@ -219,9 +220,32 @@ function LinkDeviceModal({ open, appId, onClose }: { open: boolean; appId: strin
   );
 }
 
+/** One line per history entry of an application */
+function historyText(h: AuditEntry): string {
+  const c = h.changes ?? {};
+  switch (h.action) {
+    case 'application.link':
+      return `Device added: ${String(c.device ?? '')}`;
+    case 'application.unlink':
+      return `Device removed: ${String(c.device ?? '')}`;
+    case 'attachment.add':
+      return `File added: ${String(c.file ?? '')}`;
+    case 'attachment.update':
+      return `File details changed: ${String(c.file ?? '')}`;
+    case 'attachment.delete':
+      return `File deleted: ${String(c.file ?? '')}`;
+    case 'create':
+      return 'Created';
+    case 'update':
+      return `Changed ${Object.keys(c).join(', ')}`;
+    default:
+      return h.action;
+  }
+}
+
 export function ApplicationPage() {
   const { applicationId } = useParams();
-  const { can } = useSession();
+  const { can, scoped } = useSession();
   const { message } = App.useApp();
   const navigate = useNavigate();
   const invalidate = useInvalidate();
@@ -387,9 +411,7 @@ export function ApplicationPage() {
                 items={history.data.slice(0, 20).map((h) => ({
                   children: (
                     <div>
-                      <div>
-                        {h.action === 'application.link' ? `Device added: ${String(h.changes?.device ?? '')}` : h.action === 'application.unlink' ? `Device removed: ${String(h.changes?.device ?? '')}` : h.action === 'create' ? 'Created' : h.action === 'update' ? `Changed ${Object.keys(h.changes ?? {}).join(', ')}` : h.action}
-                      </div>
+                      <div>{historyText(h)}</div>
                       <div className="muted" style={{ fontSize: 12.5 }}>
                         {fmtDateTime(h.at)}
                         {h.user_name ? ` · ${h.user_name}` : ''}
@@ -404,6 +426,17 @@ export function ApplicationPage() {
           </Card>
         </Col>
       </Row>
+      <Card title="Documents & contracts" style={{ marginTop: 20 }}>
+        <AttachmentsPanel
+          entityType="application"
+          entityId={a.id}
+          embedded
+          // central applications (all plants) can only be changed by users without plant restriction
+          readOnly={scoped && !a.plant_id}
+          uploadHint="Contracts, license certificates, SLAs, offers and invoices, manuals, operating concepts …"
+          emptyText="No documents yet. Upload contracts, license certificates, SLAs, manuals or operating concepts of this application."
+        />
+      </Card>
       <ApplicationFormModal open={editing} app={a} onClose={() => setEditing(false)} />
       <LinkDeviceModal open={linking} appId={a.id} onClose={() => setLinking(false)} />
     </div>

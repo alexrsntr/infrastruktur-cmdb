@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -41,12 +41,13 @@ import {
 import {
   ATTACHMENT_CATEGORIES,
   ATTACHMENT_CATEGORY_META,
+  PLAN_ENTITY_TYPES,
   PLAN_IMAGE_TYPES,
   formatBytes,
   type Attachment,
   type AttachmentCategory,
+  type AttachmentEntityType,
 } from '../../../shared/attachments';
-import type { EntityType } from '../../../shared/model';
 import { api, buildUrl, errorText, http } from '../lib/api';
 import { fmtDateTime, fromNow } from '../lib/format';
 import { useInvalidate } from '../lib/queries';
@@ -70,12 +71,15 @@ function fileIcon(a: Attachment) {
   return <FileOutlined />;
 }
 
+/** "Plan / drawing" only where pictures can become plans (not on applications) */
+const categoriesFor = (allowPlans: boolean) => ATTACHMENT_CATEGORIES.filter((c) => allowPlans || c !== 'plan');
+
 function CategoryTag({ value }: { value: AttachmentCategory }) {
   const meta = ATTACHMENT_CATEGORY_META[value] ?? ATTACHMENT_CATEGORY_META.other;
   return <Tag color={meta.color}>{meta.label}</Tag>;
 }
 
-function EditAttachmentModal({ attachment, onClose }: { attachment: Attachment | null; onClose: () => void }) {
+function EditAttachmentModal({ attachment, allowPlans, onClose }: { attachment: Attachment | null; allowPlans: boolean; onClose: () => void }) {
   const [form] = Form.useForm();
   const { message } = App.useApp();
   const invalidate = useInvalidate();
@@ -115,30 +119,48 @@ function EditAttachmentModal({ attachment, onClose }: { attachment: Attachment |
           <Input placeholder={attachment?.file_name} maxLength={200} />
         </Form.Item>
         <Form.Item name="category" label="Category" rules={[{ required: true }]}>
-          <Select options={ATTACHMENT_CATEGORIES.map((c) => ({ value: c, label: ATTACHMENT_CATEGORY_META[c].label }))} />
+          <Select options={categoriesFor(allowPlans).map((c) => ({ value: c, label: ATTACHMENT_CATEGORY_META[c].label }))} />
         </Form.Item>
         <Form.Item name="description" label="Description">
           <Input.TextArea autoSize={{ minRows: 2, maxRows: 6 }} maxLength={4000} />
         </Form.Item>
-        <Form.Item
-          name="is_plan"
-          label="Use as plan"
-          valuePropName="checked"
-          extra={
-            attachment && isPlanCapable(attachment)
-              ? 'Plans can be opened to place access points, switches and other devices on the picture. Switching it off removes the placed markers.'
-              : 'Only PNG, JPEG or WebP pictures can be used as a plan.'
-          }
-        >
-          <Switch disabled={!attachment || !isPlanCapable(attachment)} />
-        </Form.Item>
+        {allowPlans && (
+          <Form.Item
+            name="is_plan"
+            label="Use as plan"
+            valuePropName="checked"
+            extra={
+              attachment && isPlanCapable(attachment)
+                ? 'Plans can be opened to place access points, switches and other devices on the picture. Switching it off removes the placed markers.'
+                : 'Only PNG, JPEG or WebP pictures can be used as a plan.'
+            }
+          >
+            <Switch disabled={!attachment || !isPlanCapable(attachment)} />
+          </Form.Item>
+        )}
       </Form>
     </Modal>
   );
 }
 
-export function AttachmentsPanel({ entityType, entityId }: { entityType: EntityType; entityId: string }) {
-  const { can, me } = useSession();
+interface AttachmentsPanelProps {
+  entityType: AttachmentEntityType;
+  entityId: string;
+  /** Upload area without its own card, for use inside another card */
+  embedded?: boolean;
+  /** Files can be viewed but not changed (e.g. a central application seen by a plant-restricted user) */
+  readOnly?: boolean;
+  /** Hint under the upload area */
+  uploadHint?: ReactNode;
+  /** Text when there are no files yet */
+  emptyText?: ReactNode;
+}
+
+export function AttachmentsPanel({ entityType, entityId, embedded = false, readOnly = false, uploadHint, emptyText }: AttachmentsPanelProps) {
+  const session = useSession();
+  const { me } = session;
+  const can: typeof session.can = (permission) => !readOnly && session.can(permission);
+  const allowPlans = PLAN_ENTITY_TYPES.includes(entityType);
   const { message } = App.useApp();
   const invalidate = useInvalidate();
   const [category, setCategory] = useState<AttachmentCategory | 'auto'>('auto');
@@ -166,7 +188,7 @@ export function AttachmentsPanel({ entityType, entityId }: { entityType: EntityT
       fd.append('entityId', entityId);
       fd.append('category', category);
       const picture = file.type === 'image/png' || file.type === 'image/jpeg' || file.type === 'image/webp';
-      fd.append('isPlan', asPlan && picture ? 'true' : 'false');
+      fd.append('isPlan', allowPlans && asPlan && picture ? 'true' : 'false');
       fd.append('file', file);
       try {
         await api('/api/attachments', { method: 'POST', formData: fd });
@@ -210,10 +232,12 @@ export function AttachmentsPanel({ entityType, entityId }: { entityType: EntityT
       : []),
   ];
 
+  const UploadBox = embedded ? EmbeddedBox : Card;
+
   return (
     <div>
       {can('attachment.write') && (
-        <Card style={{ marginBottom: 16 }}>
+        <UploadBox style={{ marginBottom: 16 }}>
           <Upload.Dragger
             multiple
             showUploadList={false}
@@ -226,7 +250,9 @@ export function AttachmentsPanel({ entityType, entityId }: { entityType: EntityT
               <InboxOutlined />
             </p>
             <p className="ant-upload-text">Drop files here or click to upload</p>
-            <p className="ant-upload-hint">Photos of the site, rack or device, data sheets, contracts, configuration backups … (executables and web pages are not allowed)</p>
+            <p className="ant-upload-hint">
+              {uploadHint ?? 'Photos of the site, rack or device, data sheets, contracts, configuration backups …'} (executables and web pages are not allowed)
+            </p>
           </Upload.Dragger>
           <Space wrap style={{ marginTop: 12 }}>
             <span>Category</span>
@@ -234,14 +260,16 @@ export function AttachmentsPanel({ entityType, entityId }: { entityType: EntityT
               style={{ width: 200 }}
               value={category}
               onChange={setCategory}
-              options={[{ value: 'auto', label: 'Detect automatically' }, ...ATTACHMENT_CATEGORIES.map((c) => ({ value: c, label: ATTACHMENT_CATEGORY_META[c].label }))]}
+              options={[{ value: 'auto', label: 'Detect automatically' }, ...categoriesFor(allowPlans).map((c) => ({ value: c, label: ATTACHMENT_CATEGORY_META[c].label }))]}
             />
-            <Checkbox checked={asPlan} onChange={(e) => setAsPlan(e.target.checked)}>
-              Use pictures as plan (place devices on them)
-            </Checkbox>
+            {allowPlans && (
+              <Checkbox checked={asPlan} onChange={(e) => setAsPlan(e.target.checked)}>
+                Use pictures as plan (place devices on them)
+              </Checkbox>
+            )}
             {uploading > 0 && <Typography.Text type="secondary">Uploading {uploading} file(s)…</Typography.Text>}
           </Space>
-        </Card>
+        </UploadBox>
       )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -260,11 +288,13 @@ export function AttachmentsPanel({ entityType, entityId }: { entityType: EntityT
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
           description={
-            <span>
-              No files yet. Upload photos of the site, the rack or the device, data sheets, contracts or configuration backups.
-              <br />
-              Pictures marked as plan can be used to place access points, switches and other devices.
-            </span>
+            emptyText ?? (
+              <span>
+                No files yet. Upload photos of the site, the rack or the device, data sheets, contracts or configuration backups.
+                <br />
+                Pictures marked as plan can be used to place access points, switches and other devices.
+              </span>
+            )
           }
         />
       )}
@@ -328,7 +358,7 @@ export function AttachmentsPanel({ entityType, entityId }: { entityType: EntityT
             rowKey="id"
             dataSource={documents}
             pagination={{ pageSize: 20, hideOnSinglePage: true }}
-            scroll={{ x: 760 }}
+            scroll={{ x: 790 }}
             columns={[
               {
                 title: 'Name',
@@ -356,15 +386,19 @@ export function AttachmentsPanel({ entityType, entityId }: { entityType: EntityT
                   </span>
                 ),
               },
-              { title: '', key: 'actions', width: 110, render: (_, a) => <Space size={0}>{actions(a)}</Space> },
+              { title: '', key: 'actions', width: 136, render: (_, a) => <Space size={0}>{actions(a)}</Space> },
             ]}
             expandable={{ rowExpandable: (a) => !!a.description, expandedRowRender: (a) => <div className="note-body">{a.description}</div> }}
           />
         </>
       )}
 
-      <EditAttachmentModal attachment={editing} onClose={() => setEditing(null)} />
+      <EditAttachmentModal attachment={editing} allowPlans={allowPlans} onClose={() => setEditing(null)} />
       <style>{'.attachment-thumb { width: 100%; display: block; }'}</style>
     </div>
   );
+}
+
+function EmbeddedBox({ style, children }: { style?: CSSProperties; children: ReactNode }) {
+  return <div style={style}>{children}</div>;
 }
