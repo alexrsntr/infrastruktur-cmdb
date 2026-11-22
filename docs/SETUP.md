@@ -279,6 +279,22 @@ both host names there.
 
 **Emergency access:** if the sign-in with Microsoft fails and password sign-in is off, set the App Service setting
 `LOCAL_LOGIN_EMERGENCY=true` and restart – administrators can then sign in with their password again.
+
+**Administrator password lost?** Set a new one on the command line, from a computer that can reach the database (with
+private endpoints: from your company network or the virtual network). Take `PGHOST`, `PGDATABASE`, `PGUSER` and
+`PGPASSWORD` from the web app's *Environment variables* in the Azure portal; Docker types the new password in hidden
+and asks for it twice:
+
+```bash
+read -rs PGPASSWORD && export PGPASSWORD
+```
+
+```bash
+docker run --rm -it -e PGHOST=<server>.postgres.database.azure.com -e PGDATABASE=cmdb -e PGUSER=<user> -e PGPASSWORD -e PGSSLMODE=require ghcr.io/alexrsntr/infrastruktur-cmdb node dist/cli.mjs set-password admin@example.com
+```
+
+The account is signed out everywhere and the change is written to the audit log. Without Docker, in a checkout of
+the code: `npm run set-password -- admin@example.com` (database settings from `.env`).
 **Secret expiry:** enter the new client secret in the same form before the old one expires (possible while active),
 then run *Test connection* again.
 

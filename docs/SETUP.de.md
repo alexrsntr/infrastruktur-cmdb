@@ -383,7 +383,25 @@ müssen dort beide Hostnamen freigegeben sein.
 
 **Notzugang:** Fällt die Microsoft-Anmeldung aus und ist die Passwort-Anmeldung abgeschaltet, im App Service die
 Einstellung `LOCAL_LOGIN_EMERGENCY=true` setzen und neu starten – Administratoren können sich dann wieder mit Passwort
-anmelden. **Ablauf des Secrets:** das neue Client Secret vor Ablauf des alten im selben Formular eintragen (geht auch
+anmelden.
+
+**Administrator-Passwort verloren?** Ein neues lässt sich auf der Kommandozeile setzen, von einem Rechner, der die
+Datenbank erreicht (bei Private Endpoints: aus dem Firmennetz bzw. dem virtuellen Netzwerk). `PGHOST`, `PGDATABASE`,
+`PGUSER` und `PGPASSWORD` stehen im Azure-Portal bei der Web-App unter *Umgebungsvariablen*; das neue Passwort wird
+verdeckt eingegeben und zur Kontrolle zweimal abgefragt:
+
+```bash
+read -rs PGPASSWORD && export PGPASSWORD
+```
+
+```bash
+docker run --rm -it -e PGHOST=<server>.postgres.database.azure.com -e PGDATABASE=cmdb -e PGUSER=<benutzer> -e PGPASSWORD -e PGSSLMODE=require ghcr.io/alexrsntr/infrastruktur-cmdb node dist/cli.mjs set-password admin@example.com
+```
+
+Das Konto wird überall abgemeldet, die Änderung steht im Audit-Log. Ohne Docker, in einem Checkout des Codes:
+`npm run set-password -- admin@example.com` (Datenbank-Einstellungen aus `.env`).
+
+**Ablauf des Secrets:** das neue Client Secret vor Ablauf des alten im selben Formular eintragen (geht auch
 im aktiven Betrieb) und danach *Test connection* ausführen.
 
 ## Auto-Discovery
