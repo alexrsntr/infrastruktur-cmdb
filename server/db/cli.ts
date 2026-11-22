@@ -12,33 +12,53 @@ const USAGE = `Usage:
 
 const command = process.argv[2];
 
-/** Reads a line from the terminal without showing what is typed. */
-function promptHidden(question: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const stdin = process.stdin;
-    let value = '';
-    process.stderr.write(question);
-    stdin.setRawMode(true);
-    stdin.resume();
+/**
+ * Asks the questions one after the other and reads the answers from the terminal without showing them. The terminal
+ * stays in raw mode the whole time – also before the first prompt and between the prompts – so nothing typed or pasted
+ * is ever echoed, and answers pasted in one go ("pw⏎pw⏎") are split correctly.
+ */
+async function promptHidden(questions: string[]): Promise<string[]> {
+  const stdin = process.stdin;
+  const answers: string[] = [];
+  let current = '';
+  let lastWasCr = false;
+  stdin.setRawMode(true);
+  try {
     stdin.setEncoding('utf8');
-    const done = (err?: Error) => {
-      stdin.setRawMode(false);
-      stdin.pause();
-      stdin.removeListener('data', onData);
-      process.stderr.write('\n');
-      if (err) reject(err);
-      else resolve(value);
-    };
-    const onData = (chunk: string) => {
-      for (const ch of chunk) {
-        if (ch === '\r' || ch === '\n' || ch === '\u0004') return done();
-        if (ch === '\u0003') return done(new LocalAccountError('Cancelled.'));
-        if (ch === '\u007f' || ch === '\b') value = value.slice(0, -1);
-        else value += ch;
-      }
-    };
-    stdin.on('data', onData);
-  });
+    process.stderr.write(questions[0]);
+    await new Promise<void>((resolve, reject) => {
+      const finish = (err?: Error) => {
+        stdin.removeListener('data', onData);
+        stdin.pause();
+        if (err) reject(err);
+        else resolve();
+      };
+      const onData = (chunk: string) => {
+        for (const ch of chunk) {
+          const cr = lastWasCr;
+          lastWasCr = ch === '\r';
+          if (ch === '\n' && cr) continue; // "\r\n" from a pasted Windows text is one line break
+          if (ch === '\u0003') {
+            process.stderr.write('\n');
+            return finish(new LocalAccountError('Cancelled.'));
+          }
+          if (ch === '\r' || ch === '\n' || ch === '\u0004') {
+            answers.push(current);
+            current = '';
+            process.stderr.write('\n');
+            if (answers.length === questions.length) return finish();
+            process.stderr.write(questions[answers.length]);
+          } else if (ch === '\u007f' || ch === '\b') current = current.slice(0, -1);
+          else current += ch;
+        }
+      };
+      stdin.on('data', onData);
+      stdin.resume();
+    });
+  } finally {
+    stdin.setRawMode(false);
+  }
+  return answers;
 }
 
 /** The new password: CMDB_NEW_PASSWORD, typed in twice (terminal) or the first line of stdin (pipe). Never an argument. */
@@ -46,8 +66,7 @@ async function readNewPassword(): Promise<string> {
   const fromEnv = process.env.CMDB_NEW_PASSWORD;
   if (fromEnv) return fromEnv;
   if (process.stdin.isTTY) {
-    const first = await promptHidden('New password: ');
-    const second = await promptHidden('Repeat the new password: ');
+    const [first, second] = await promptHidden(['New password: ', 'Repeat the new password: ']);
     if (first !== second) throw new LocalAccountError('The two passwords are not the same.');
     return first;
   }
