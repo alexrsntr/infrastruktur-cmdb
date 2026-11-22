@@ -20,6 +20,7 @@ import type { Config } from '../config';
 import type { DbClient } from '../db/pool';
 import { log } from '../lib/log';
 import { describeMailError, escapeHtml, isSmtpConfigured, loadSmtpSettings, readSetting, sendMail, writeSetting } from './mailer';
+import { effectiveNames } from './appearance';
 
 export const DB_STORAGE_KEY = 'monitoring.db-storage';
 /** Level of the last e-mail – a new e-mail is only sent when the level rises above it */
@@ -236,8 +237,7 @@ export async function checkDbStorage(pool: Pool, config: Config, now: Date = new
     return { status, emails: 0, error: 'No recipients: no administrator has an e-mail address and no additional recipient is set.' };
   }
   const mail = renderDbStorageMail(status, {
-    appName: config.ui.appName,
-    brandName: config.ui.brandName,
+    ...(await effectiveNames(pool, config)),
     baseUrl: config.baseUrl,
     limitGb: settings.limitGb,
     tables: await largestTables(pool, 5),

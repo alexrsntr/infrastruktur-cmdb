@@ -18,6 +18,7 @@ import type { DbClient } from '../db/pool';
 import { log } from '../lib/log';
 import { describeMailError, escapeHtml, isSmtpConfigured, loadSmtpSettings, readSetting, sendMail } from './mailer';
 import { localParts } from './warrantyNotifications';
+import { effectiveNames } from './appearance';
 
 export const CERTIFICATE_KEY = 'notifications.certificates';
 const KIND = 'certificates';
@@ -260,7 +261,7 @@ export async function runCertificateJob(
   if (!settings.enabled) return skip('Certificate notifications are disabled.');
   const { settings: smtp } = await loadSmtpSettings(pool);
   if (!isSmtpConfigured(smtp)) return skip('The e-mail server (SMTP) is not configured.');
-  const mailOpts = { appName: config.ui.appName, brandName: config.ui.brandName, baseUrl: config.baseUrl };
+  const mailOpts = { ...(await effectiveNames(pool, config)), baseUrl: config.baseUrl };
 
   const client: PoolClient = await pool.connect();
   let emails = 0;

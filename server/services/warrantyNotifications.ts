@@ -12,6 +12,7 @@ import type { Config } from '../config';
 import type { DbClient } from '../db/pool';
 import { log } from '../lib/log';
 import { describeMailError, escapeHtml, isSmtpConfigured, loadSmtpSettings, readSetting, sendMail } from './mailer';
+import { effectiveNames } from './appearance';
 
 export const WARRANTY_KEY = 'notifications.warranty';
 const KIND = 'warranty';
@@ -279,10 +280,11 @@ export async function runWarrantyJob(pool: Pool, config: Config, opts: { trigger
     }
 
     const sent: RunResult['sent'] = [];
+    const names = await effectiveNames(pool, config);
     for (const r of recipients) {
       const items = r.items.filter((i) => claimed.has(i));
       if (!items.length) continue;
-      const mail = renderWarrantyMail(items, { appName: config.ui.appName, brandName: config.ui.brandName, baseUrl: config.baseUrl });
+      const mail = renderWarrantyMail(items, { ...names, baseUrl: config.baseUrl });
       await sendMail(config, smtp, { to: r.email, ...mail });
       sent.push({ email: r.email, items: items.length });
     }

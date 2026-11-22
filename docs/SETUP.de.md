@@ -175,7 +175,15 @@ Nützliche Befehle:
 
 ### 1.4 Eigenes Erscheinungsbild
 
-In der `.env` (in Azure: Terraform-Variable `extra_app_settings`, siehe [AZURE.md](AZURE.md)):
+Administratoren stellen das Erscheinungsbild in der App ein: *Administration → Settings → Appearance* – Firmen- und
+App-Name, Hauptfarbe (sechs Voreinstellungen oder eine eigene Farbe; ist sie schlecht lesbar, wird sie automatisch
+angepasst), Navigationsleiste (dunkel, in der Hauptfarbe oder hell), Logo (PNG, JPEG oder WebP für helle und dunkle
+Hintergründe) und die Standard-Dichte (komfortabel oder kompakt; jede Person kann im Anzeige-Menü der
+Navigationsleiste umschalten).
+
+Alternativ lassen sich Werte per Variable in der `.env` festlegen (in Azure: Terraform-Variable `extra_app_settings`,
+siehe [AZURE.md](AZURE.md)). Eine gesetzte Variable gewinnt und sperrt das Feld in der App – zum Pflegen in der App
+die Variable entfernen (in Azure die App-Service-Einstellung, z. B. `BRAND_NAME` aus der Ein-Klick-Installation):
 
 ```bash
 BRAND_NAME=Beispiel GmbH      # kleine Zeile über dem App-Namen, z. B. der Firmenname

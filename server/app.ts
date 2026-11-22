@@ -35,6 +35,7 @@ import { certificatesRouter } from './routes/certificates';
 import type { DiscoveryDeps } from './discovery/service';
 import type { FetchLike } from './services/webhooks';
 import { EntraService, type EntraDeps } from './entra/service';
+import { logoHandler } from './services/appearance';
 
 function tileHosts(tileUrl: string): string[] {
   try {
@@ -137,7 +138,9 @@ export function createApp(pool: Pool, config: Config, deps: AppDeps = {}) {
   app.use('/auth', authRouter(pool, config, entra));
 
   // ---- API ----
-  app.get('/api/public-config', async (_req, res) => res.json(await publicConfig(config, entra)));
+  app.get('/api/public-config', async (_req, res) => res.json(await publicConfig(pool, config, entra)));
+  // the configured logo – public, the sign-in page shows it
+  app.get('/api/branding/logo/:variant', logoHandler(pool));
   const api = Router();
   api.use(requireAuth, csrfProtection);
   api.use((_req, res, next) => {
@@ -149,7 +152,7 @@ export function createApp(pool: Pool, config: Config, deps: AppDeps = {}) {
   api.use(assetsRouter(pool));
   api.use(journalRouter(pool));
   api.use(adminRouter(pool));
-  api.use(exportsRouter(pool, config.ui.appName));
+  api.use(exportsRouter(pool, config));
   api.use(importsRouter(pool));
   api.use(racksRouter(pool));
   api.use(settingsRouter(pool, config));

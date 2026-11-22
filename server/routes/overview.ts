@@ -9,14 +9,18 @@ import { ACTIVITY_FROM, ACTIVITY_SELECT } from './journal';
 import { ATTENTION_BASE, ATTENTION_SQL } from '../services/assets';
 import type { EntraService } from '../entra/service';
 import { effectiveLocalLogin } from '../entra/settings';
+import { loadEffectiveAppearance } from '../services/appearance';
 
 /** Configuration for the browser, including which sign-in options are currently offered. */
-export async function publicConfig(config: Config, entra: EntraService): Promise<AppConfig> {
-  const rt = await entra.runtime();
+export async function publicConfig(pool: Pool, config: Config, entra: EntraService): Promise<AppConfig> {
+  const [rt, look] = await Promise.all([entra.runtime(), loadEffectiveAppearance(pool, config)]);
   return {
-    brandName: config.ui.brandName,
-    appName: config.ui.appName,
-    primaryColor: config.ui.primaryColor,
+    brandName: look.brandName,
+    appName: look.appName,
+    primaryColor: look.primaryColor,
+    headerStyle: look.headerStyle,
+    density: look.density,
+    logoUrl: look.logoUrl,
     mapTileUrl: config.ui.mapTileUrl,
     mapTileAttribution: config.ui.mapTileAttribution,
     authMode: config.authMode,
@@ -42,7 +46,7 @@ export function overviewRouter(pool: Pool, config: Config, entra: EntraService):
 
   r.get('/me', async (req, res) => {
     const user = req.user!;
-    const cfg = await publicConfig(config, entra);
+    const cfg = await publicConfig(pool, config, entra);
     const body: MeResponse = {
       user,
       permissions: ROLE_PERMISSIONS[user.role],

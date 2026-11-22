@@ -73,7 +73,14 @@ Useful commands:
 
 ### 1.4 Branding
 
-Set your own look in `.env` (on Azure: Terraform variable `extra_app_settings`, see [AZURE.md](AZURE.md)):
+Administrators set the look in the app: *Administration → Settings → Appearance* – company and app name, primary
+colour (six presets or an own colour; it is adjusted automatically if it would be hard to read), navigation bar
+(dark, in the primary colour or light), logo (PNG, JPEG or WebP for light and dark backgrounds) and the default
+density (comfortable or compact; everyone can switch in the display menu of the navigation bar).
+
+Alternatively fix values with variables in `.env` (on Azure: Terraform variable `extra_app_settings`, see
+[AZURE.md](AZURE.md)). A variable that is set wins and locks that field in the app – remove it (on Azure: the App
+Service setting, e.g. `BRAND_NAME` from the one-click deployment) to manage the value in the app:
 
 ```bash
 BRAND_NAME=Example Corp       # small caption above the app name, e.g. your company

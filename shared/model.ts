@@ -1,5 +1,6 @@
 // Shared domain model used by both the API server and the web client.
 // Keep this file free of runtime dependencies.
+import type { Density, HeaderStyle } from './appearance';
 
 // ---------------------------------------------------------------------------
 // Roles & permissions
@@ -646,6 +647,11 @@ export interface AppConfig {
   brandName: string;
   appName: string;
   primaryColor: string;
+  /** Navigation bar style and density (Administration → Settings → Appearance) */
+  headerStyle: HeaderStyle;
+  density: Density;
+  /** Uploaded logos (null = built-in mark): light = for light backgrounds, dark = for the dark navigation bar */
+  logoUrl: { light: string | null; dark: string | null };
   mapTileUrl: string;
   mapTileAttribution: string;
   authMode: 'entra' | 'local' | 'dev';

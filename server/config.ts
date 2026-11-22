@@ -105,6 +105,8 @@ export interface Config {
     mapTileUrl: string;
     mapTileAttribution: string;
   };
+  /** Which appearance values come from environment variables – they win over Administration → Settings → Appearance */
+  uiEnv: { brandName: boolean; appName: boolean; primaryColor: boolean };
 }
 
 export function loadConfig(): Config {
@@ -178,6 +180,7 @@ export function loadConfig(): Config {
       mapTileUrl: str('MAP_TILE_URL'),
       mapTileAttribution: str('MAP_TILE_ATTRIBUTION'),
     },
+    uiEnv: { brandName: has('BRAND_NAME'), appName: has('APP_NAME'), primaryColor: has('BRAND_PRIMARY_COLOR') },
   };
 
   validate(config);
@@ -198,6 +201,8 @@ function validate(c: Config) {
   if (c.storage.driver === 'azure-blob' && !c.storage.accountUrl && !c.storage.connectionString)
     errors.push('STORAGE_DRIVER=azure-blob requires AZURE_STORAGE_ACCOUNT_URL (managed identity) or AZURE_STORAGE_CONNECTION_STRING');
   if (c.db.storageLimitGb < 0 || c.db.storageLimitGb > 65536) errors.push('DB_STORAGE_LIMIT_GB must be between 0 (no storage warning) and 65536');
+  if (c.uiEnv.primaryColor && !/^#[0-9a-fA-F]{6}$/.test(c.ui.primaryColor))
+    errors.push(`BRAND_PRIMARY_COLOR must be a colour like #2563eb (got "${c.ui.primaryColor}")`);
   if (c.storage.maxUploadMb < 1 || c.storage.maxUploadMb > 500) errors.push('ATTACHMENT_MAX_MB must be between 1 and 500');
   if (c.authMode === 'entra') {
     if (!c.entra.tenantId) errors.push('ENTRA_TENANT_ID is required when AUTH_MODE=entra');

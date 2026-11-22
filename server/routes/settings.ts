@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import multer from 'multer';
 import type { Pool } from 'pg';
 import { z } from 'zod';
 import { ASSET_STATUSES } from '../../shared/model';
@@ -6,7 +7,7 @@ import { SMTP_SECURITY, type NotificationLogEntry, type NotificationRun, type No
 import type { Config } from '../config';
 import { requirePermission } from '../auth/context';
 import { audit, diff } from '../lib/audit';
-import { badRequest, clampInt, parse } from '../lib/http';
+import { badRequest, clampInt, HttpError, notFound, parse } from '../lib/http';
 import { encryptSecret } from '../lib/secrets';
 import {
   SMTP_KEY,
@@ -19,6 +20,8 @@ import {
   type StoredSmtpSettings,
 } from '../services/mailer';
 import { ASSET_TYPES_KEY, assetTypeSettingsSchema, loadAssetTypeSettings, normaliseAssetTypeSettings } from '../services/assetTypes';
+import { appearanceStatus, deleteLogo, effectiveNames, isLogoVariant, loadAppearanceSettings, saveAppearanceSettings, saveLogo } from '../services/appearance';
+import { DENSITIES, HEADER_STYLES, HEX_COLOR_RE, LOGO_MAX_BYTES } from '../../shared/appearance';
 import { WARRANTY_KEY, isValidTimezone, loadWarrantySettings, localParts, nextRunAt, previewWarranty, runWarrantyJob } from '../services/warrantyNotifications';
 
 const email = z.string().trim().toLowerCase().email('Invalid e-mail address').max(254);
@@ -48,6 +51,21 @@ const warrantySettingsSchema = z.object({
   excludeStatuses: z.array(z.enum(ASSET_STATUSES)).default(['retired']),
 });
 
+const optionalName = z
+  .string()
+  .trim()
+  .max(60)
+  .nullable()
+  .transform((v) => v || null);
+
+const appearanceSchema = z.object({
+  brandName: optionalName,
+  appName: optionalName,
+  primaryColor: z.string().regex(HEX_COLOR_RE, 'A colour like #2563eb').nullable(),
+  headerStyle: z.enum(HEADER_STYLES),
+  density: z.enum(DENSITIES),
+});
+
 const RUN_SELECT = `id::text, kind, started_at, finished_at, trigger, local_date::text, items, emails, status, error`;
 
 export function settingsRouter(pool: Pool, config: Config): Router {
@@ -67,6 +85,50 @@ export function settingsRouter(pool: Pool, config: Config): Router {
     const changes = diff(before as unknown as Record<string, unknown>, next as unknown as Record<string, unknown>);
     if (Object.keys(changes).length) await audit(pool, req, { action: 'settings.update', entityType: 'settings', entityLabel: 'Device types', changes });
     res.json(await loadAssetTypeSettings(pool));
+  });
+
+  // ------------------------------------------------------------ appearance (names, colour, header, logo, density)
+  r.get('/settings/appearance', async (_req, res) => {
+    res.json(await appearanceStatus(pool, config));
+  });
+
+  r.put('/settings/appearance', async (req, res) => {
+    const input = parse(appearanceSchema, req.body);
+    const { settings: before } = await loadAppearanceSettings(pool);
+    const next = await saveAppearanceSettings(pool, input, req.user!.id);
+    const changes = diff(before as unknown as Record<string, unknown>, next as unknown as Record<string, unknown>);
+    if (Object.keys(changes).length) await audit(pool, req, { action: 'settings.update', entityType: 'settings', entityLabel: 'Appearance', changes });
+    res.json(await appearanceStatus(pool, config));
+  });
+
+  const logoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: LOGO_MAX_BYTES, files: 1, fields: 0 } });
+  r.put('/settings/appearance/logo/:variant', (req, res, next) => {
+    logoUpload.single('file')(req, res, (err: unknown) => {
+      if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') return next(new HttpError(413, `The logo is too large – at most ${LOGO_MAX_BYTES / 1024} KB.`));
+      if (err) return next(err instanceof multer.MulterError ? badRequest(err.message) : err);
+      next();
+    });
+  });
+  r.put('/settings/appearance/logo/:variant', async (req, res) => {
+    const variant = req.params.variant;
+    if (!isLogoVariant(variant)) throw notFound('Logo');
+    if (!req.file) throw badRequest('Please choose an image file.');
+    const info = await saveLogo(pool, variant, req.file.buffer, req.user!.id);
+    await audit(pool, req, {
+      action: 'settings.update',
+      entityType: 'settings',
+      entityLabel: 'Appearance',
+      changes: { [`logo.${variant}`]: { from: null, to: `${info.width} × ${info.height} px, ${Math.round(info.bytes / 1024)} KB` } },
+    });
+    res.json(await appearanceStatus(pool, config));
+  });
+
+  r.delete('/settings/appearance/logo/:variant', async (req, res) => {
+    const variant = req.params.variant;
+    if (!isLogoVariant(variant)) throw notFound('Logo');
+    if (await deleteLogo(pool, variant))
+      await audit(pool, req, { action: 'settings.update', entityType: 'settings', entityLabel: 'Appearance', changes: { [`logo.${variant}`]: { from: 'uploaded', to: null } } });
+    res.json(await appearanceStatus(pool, config));
   });
 
   // ------------------------------------------------------------ e-mail (SMTP)
@@ -112,13 +174,14 @@ export function settingsRouter(pool: Pool, config: Config): Router {
   r.post('/settings/email/test', async (req, res) => {
     const { to } = parse(z.object({ to: email }), req.body);
     const { settings } = await loadSmtpSettings(pool);
+    const { appName } = await effectiveNames(pool, config);
     try {
       const info = await sendMail(config, settings, {
         to,
-        subject: `[${config.ui.appName}] Test e-mail`,
-        text: `This is a test e-mail from the ${config.ui.appName}.\n\nSMTP server: ${settings.host}:${settings.port} (${settings.security})\nSent by: ${req.user!.displayName}\n\nIf you can read this, e-mail notifications are configured correctly.`,
+        subject: `[${appName}] Test e-mail`,
+        text: `This is a test e-mail from the ${appName}.\n\nSMTP server: ${settings.host}:${settings.port} (${settings.security})\nSent by: ${req.user!.displayName}\n\nIf you can read this, e-mail notifications are configured correctly.`,
         html: `<div style="font-family:'Segoe UI',Arial,sans-serif;font-size:14px;color:#1f2937">
-          <p><strong>This is a test e-mail from the ${escapeHtml(config.ui.appName)}.</strong></p>
+          <p><strong>This is a test e-mail from the ${escapeHtml(appName)}.</strong></p>
           <p>SMTP server: ${escapeHtml(settings.host)}:${settings.port} (${escapeHtml(settings.security)})<br>Sent by: ${escapeHtml(req.user!.displayName)}</p>
           <p>If you can read this, e-mail notifications are configured correctly.</p></div>`,
       });

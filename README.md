@@ -177,7 +177,7 @@ Actions (automatic deployments), groups and go-live checklist: **[docs/SETUP.md]
 | **Import** | Excel/CSV import of **devices** and **plants** (same columns as the export) with **dry run** validation, upsert by ID or type+name (plants: ID or code), per-row error report, templates |
 | **Warranty e-mails** | Daily digest e-mail of devices whose warranty/support ends in e.g. 90/30/7 days (and once when expired). Global recipients plus recipients per plant. Each device is reported once per stage; safe with several app instances. SMTP server configured in the app (*Administration → Settings*), password stored encrypted. Preview, "send now", test e-mail and send history |
 | **Dashboard** | Greeting with the first name (also for directory names such as “Last, First”), KPIs per device type in use, devices that need attention, expiring certificates, upcoming activities, recent changes |
-| **Appearance** | **Light and dark mode** (or follow the operating system) – switch with the sun/moon button in the header |
+| **Appearance** | **Light and dark mode** (or follow the operating system) and **comfortable or compact density** – in the display menu (sun/moon button). Administrators set **company and app name, primary colour** (6 presets or an own colour, automatically kept readable), **navigation bar style** (dark, primary colour, light) and **logo** in *Settings → Appearance*. Works on tablets and phones too |
 
 ## Roles & permissions
 
@@ -293,7 +293,7 @@ The most important ones for Azure:
 | `SETTINGS_ENCRYPTION_KEY` | Key Vault reference | encrypts secrets stored in the app settings (SMTP password) |
 | `NOTIFICATIONS_SCHEDULER` | `true` | daily warranty e-mails (App Service *Always On* must be enabled) |
 | `MAP_TILE_URL` | OSM / Azure Maps / internal | map tiles (allowed automatically in the CSP) |
-| `BRAND_NAME`, `APP_NAME`, `BRAND_PRIMARY_COLOR` | `Example Corp`, `IT Infrastructure`, `#2563eb` | your corporate look (defaults: `Infrastruktur`, `IT Infrastructure`, `#2563eb`) |
+| `BRAND_NAME`, `APP_NAME`, `BRAND_PRIMARY_COLOR` | `Example Corp`, `IT Infrastructure`, `#2563eb` | optional – normally set in the app (*Administration → Settings → Appearance*, with logo, navigation bar style and density); a variable that is set wins and locks the field there |
 
 **New here? Start with the [setup guide](docs/SETUP.md)** ([Deutsch](docs/SETUP.de.md)). Deployment step by step (Terraform, app registration, database grants, GitHub Actions): **[docs/AZURE.md](docs/AZURE.md)**. E-mail notifications: **[docs/NOTIFICATIONS.md](docs/NOTIFICATIONS.md)**. Backlog: **[docs/BACKLOG.md](docs/BACKLOG.md)**.
 

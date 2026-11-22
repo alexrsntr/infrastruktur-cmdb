@@ -20,10 +20,11 @@ services:
     environment:
       # Address people type into the browser (used for links in e-mails)
       APP_BASE_URL: http://localhost:8080
-      # Shown in the header, on the login page and in e-mails
-      BRAND_NAME: Infrastruktur
-      APP_NAME: IT Infrastructure
-      BRAND_PRIMARY_COLOR: "#2563eb"
+      # Company name, app name, colour and logo: set them in the app (Administration → Settings → Appearance).
+      # Variables set here win over the app and lock those fields there:
+      # BRAND_NAME: Example Corp
+      # APP_NAME: IT Infrastructure
+      # BRAND_PRIMARY_COLOR: "#2563eb"
       # Database connection (the database below)
       PGHOST: db
       PGDATABASE: cmdb
