@@ -85,11 +85,6 @@ export function AboutCard({ title = 'About', rows, extra, empty = 'No details ye
       ) : (
         <span className="muted">{empty}</span>
       )}
-      <style>{`
-        .about-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px 24px; }
-        .about-label { font-size: 13px; color: var(--cmdb-muted); margin-bottom: 2px; }
-        .about-value { font-size: 15.5px; word-break: break-word; white-space: pre-wrap; }
-      `}</style>
     </Card>
   );
 }
@@ -97,8 +92,8 @@ export function AboutCard({ title = 'About', rows, extra, empty = 'No details ye
 /** Section heading inside a page with an optional action on the right */
 export function SectionHead({ title, extra }: { title: React.ReactNode; extra?: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, margin: '8px 0 14px', flexWrap: 'wrap' }}>
-      <div style={{ fontSize: 19, fontWeight: 700 }}>{title}</div>
+    <div className="section-head">
+      <div className="section-title">{title}</div>
       {extra}
     </div>
   );

@@ -365,12 +365,12 @@ export function DatacenterDiagram({ dc }: { dc: DatacenterDetail }) {
         .dc-site-room { font-size: 14px; color: var(--cmdb-text-2); }
         .dc-site-counts { font-size: 13px; color: var(--cmdb-muted); margin-top: 2px; }
         .dc-rack { background: var(--cmdb-surface); border: 1px solid var(--cmdb-border); border-radius: 10px; overflow: hidden; }
-        .dc-rack-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 9px 12px; background: #2f3740; }
+        .dc-rack-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 9px 12px; background: var(--cmdb-rack-frame); }
         .dc-rack-name { color: #fff !important; font-weight: 700; font-size: 15px; }
         .dc-rack-name.muted { color: #cfd6de !important; }
         .dc-rack-usage { display: inline-flex; align-items: center; gap: 8px; color: #cfd6de; font-size: 12.5px; white-space: nowrap; }
         .dc-rack-bar { display: inline-block; width: 54px; height: 6px; background: #4a5561; border-radius: 3px; overflow: hidden; }
-        .dc-rack-bar span { display: block; height: 100%; background: #69b1ff; }
+        .dc-rack-bar span { display: block; height: 100%; background: color-mix(in srgb, var(--cmdb-primary) 60%, #fff); }
         .dc-device { position: relative; display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-top: 1px solid var(--cmdb-border-soft); transition: background .12s; }
         .dc-rack-head + .dc-device { border-top: 0; }
         .dc-device.hl { background: var(--cmdb-primary-soft); }

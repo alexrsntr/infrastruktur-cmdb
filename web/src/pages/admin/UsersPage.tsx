@@ -40,6 +40,7 @@ import { download, exportUrl, MoreMenu } from '../../components/PageParts';
 import { RoleTag } from '../../components/Tags';
 import { EntraDirectoryTab } from './EntraDirectoryTab';
 import type { EntraSettingsDto } from '../../../../shared/entra';
+import { C } from '../../theme';
 
 const PERMISSION_LABELS: Record<Permission, string> = {
   read: 'Read',
@@ -301,7 +302,7 @@ function PermissionMatrix() {
           width: 120,
           align: 'center' as const,
           render: (_: unknown, row: { permission: Permission }) =>
-            ROLE_PERMISSIONS[r].includes(row.permission) ? <CheckOutlined style={{ color: '#389e0d' }} /> : <span className="muted">–</span>,
+            ROLE_PERMISSIONS[r].includes(row.permission) ? <CheckOutlined style={{ color: C.okText }} /> : <span className="muted">–</span>,
         })),
       ]}
     />
@@ -385,7 +386,7 @@ export function UsersPage() {
                     <Typography.Text strong>{u.display_name}</Typography.Text>
                     {u.id === me.user.id && <Tag style={{ marginLeft: 6 }}>you</Tag>}
                     <div>
-                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      <Typography.Text type="secondary" className="fs-caption">
                         {u.email ?? '–'}
                       </Typography.Text>
                     </div>

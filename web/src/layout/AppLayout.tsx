@@ -59,6 +59,9 @@ export function AppLayout() {
   const [changingPassword, setChangingPassword] = useState(false);
   const wide = !!screens.lg;
   const role = ROLE_META[me.user.role];
+  // the logo for the navigation bar's background (light bar: logo for light backgrounds, else the one for dark)
+  const darkHeader = config.headerStyle !== 'light';
+  const logo = darkHeader ? (config.logoUrl?.dark ?? config.logoUrl?.light) : (config.logoUrl?.light ?? config.logoUrl?.dark);
 
   const scopeCodes = useMemo(() => {
     if (!scoped) return null;
@@ -86,7 +89,7 @@ export function AppLayout() {
               {me.user.displayName}
             </Typography.Text>
             <br />
-            <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+            <Typography.Text type="secondary" className="fs-small">
               {me.user.email}
             </Typography.Text>
             <div style={{ marginTop: 8 }}>
@@ -132,10 +135,10 @@ export function AppLayout() {
     <Layout style={{ minHeight: '100vh' }}>
       <Layout.Header className="app-header">
         {!wide && <Button type="text" className="header-icon-btn" icon={<MenuOutlined />} onClick={() => setDrawer(true)} aria-label="Menu" />}
-        <Link to="/" className="brand">
-          <BrandMark size={34} inverted />
+        <Link to="/" className="brand" aria-label={`${config.appName} – home`}>
+          {logo ? <img src={logo} alt={config.brandName} className="brand-logo" /> : <BrandMark size={34} inverted={darkHeader} />}
           <span className="brand-text">
-            <span className="brand-name">{config.brandName}</span>
+            {!logo && <span className="brand-name">{config.brandName}</span>}
             <span className="brand-app">{config.appName}</span>
           </span>
         </Link>
@@ -163,7 +166,7 @@ export function AppLayout() {
         <ColorModeSwitch className="header-icon-btn" />
         <Dropdown menu={userMenu} placement="bottomRight" trigger={['click']}>
           <Button type="text" className="header-user" aria-label="User menu">
-            <Avatar size={34} icon={<UserOutlined />} style={{ background: '#2f8fd8' }} />
+            <Avatar size={34} icon={<UserOutlined />} className="header-avatar" />
             {screens.xl && <span className="header-user-name">{firstName(me.user.displayName) || me.user.displayName}</span>}
           </Button>
         </Dropdown>

@@ -60,7 +60,7 @@ export function AttentionList({ plantId, limit = 6 }: { plantId?: string; limit?
             <Link to={`/assets/${item.id}`} style={{ fontWeight: 600 }}>
               {item.name}
             </Link>
-            <div className="muted" style={{ fontSize: 13.5 }}>
+            <div className="muted fs-small">
               {[...new Set(item.kinds.map((k) => reason(item, k)))].join(' · ')}
               {item.plant_code ? ` · ${item.plant_code}` : ''}
             </div>

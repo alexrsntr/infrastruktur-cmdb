@@ -10,6 +10,7 @@ import { useSession } from '../lib/session';
 import { StatusDot, TypeIcon } from './Simple';
 import { SectionHead } from './PageParts';
 import { WanLinesCard } from './WanLines';
+import { C } from '../theme';
 
 export const usePlantNetwork = (plantId: string) =>
   useQuery({ queryKey: ['network', plantId], queryFn: () => http.get<PlantNetwork>(`/api/plants/${plantId}/network`) });
@@ -20,7 +21,7 @@ function Usage({ s }: { s: Subnet }) {
   return (
     <div style={{ minWidth: 150 }}>
       <Progress percent={pct} size="small" status={pct >= 90 ? 'exception' : 'normal'} showInfo={false} />
-      <span className="muted" style={{ fontSize: 12.5 }}>
+      <span className="caption">
         {s.used} of {s.size} used · {s.size - s.used} free
       </span>
     </div>
@@ -117,7 +118,7 @@ export function NetworkTab({ plantId }: { plantId: string }) {
                   <div className="mono" style={{ fontWeight: 650 }}>
                     {s.cidr}
                   </div>
-                  <div className="muted" style={{ fontSize: 13 }}>
+                  <div className="caption">
                     {s.name}
                   </div>
                 </div>
@@ -268,7 +269,7 @@ function SubnetDrawer({ id, onClose }: { id: string | null; onClose: () => void 
                   dataIndex: 'ip',
                   width: 140,
                   render: (ip, r) => (
-                    <span className="mono" style={{ color: r.duplicate ? '#cf1322' : undefined, fontWeight: r.duplicate ? 650 : undefined }}>
+                    <span className="mono" style={{ color: r.duplicate ? C.badText : undefined, fontWeight: r.duplicate ? 650 : undefined }}>
                       {ip}
                     </span>
                   ),

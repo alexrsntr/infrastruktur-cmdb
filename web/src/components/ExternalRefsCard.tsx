@@ -69,7 +69,7 @@ export function ExternalRefsCard({ assetId }: { assetId: string }) {
                 )}
                 {r.status && <Tag style={{ marginInlineStart: 8 }}>{r.status}</Tag>}
                 {r.title && (
-                  <div className="muted" style={{ fontSize: 13 }}>
+                  <div className="caption">
                     {r.title}
                   </div>
                 )}

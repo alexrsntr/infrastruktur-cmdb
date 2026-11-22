@@ -13,12 +13,13 @@ import type { ScorecardSummary } from '../../../shared/scorecard';
 import { useDashboard, usePlants } from '../lib/queries';
 import { useSession } from '../lib/session';
 import { tintBg, tintFg } from '../lib/palette';
+import { C } from '../theme';
 
 function PlantCard({ p, score, onOpen }: { p: Plant; score?: ScorecardSummary; onOpen: () => void }) {
   return (
     <Card hoverable onClick={onOpen} styles={{ body: { padding: 22 } }} style={{ height: '100%' }}>
       <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginBottom: 14 }}>
-        <span className="stat-icon" style={{ background: tintBg('#2563eb'), color: tintFg('#2563eb'), fontSize: 15, fontWeight: 800, width: 56 }}>
+        <span className="stat-icon" style={{ background: tintBg(C.primary), color: tintFg(C.primary), fontSize: 15, fontWeight: 800, width: 56 }}>
           {p.code}
         </span>
         <div style={{ minWidth: 0, flex: 1 }}>
@@ -98,13 +99,13 @@ export function PlantsPage() {
           <StatTile icon={<BankOutlined />} value={totals?.plants ?? '–'} label="Plants" />
         </Col>
         <Col xs={12} lg={6}>
-          <StatTile icon={<ClusterOutlined />} value={totals?.buildings ?? '–'} label="Buildings" color="#127a7a" />
+          <StatTile icon={<ClusterOutlined />} value={totals?.buildings ?? '–'} label="Buildings" color={C.teal} />
         </Col>
         <Col xs={12} lg={6}>
-          <StatTile icon={<AppstoreOutlined />} value={totals?.assets ?? '–'} label="Devices" color="#6b35b5" to="/inventory" />
+          <StatTile icon={<AppstoreOutlined />} value={totals?.assets ?? '–'} label="Devices" color={C.violet} to="/inventory" />
         </Col>
         <Col xs={12} lg={6}>
-          <StatTile icon={<ScheduleOutlined />} value={totals?.openActivities ?? '–'} label="Open activities" color="#b26a00" to="/activities" />
+          <StatTile icon={<ScheduleOutlined />} value={totals?.openActivities ?? '–'} label="Open activities" color={C.amber} to="/activities" />
         </Col>
       </Row>
 

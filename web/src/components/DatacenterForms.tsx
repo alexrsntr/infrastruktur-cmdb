@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { App, AutoComplete, Button, Col, Form, Input, InputNumber, Modal, Row, Segmented, Select, Typography } from 'antd';
+import { App, AutoComplete, Button, Col, Form, Input, InputNumber, Row, Segmented, Select, Typography } from 'antd';
+import { ResponsiveModal } from './ResponsiveModal';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import {
   DC_LINK_KINDS,
@@ -222,7 +223,7 @@ export function DatacenterFormModal({
   );
 
   return (
-    <Modal
+    <ResponsiveModal
       open={open}
       onCancel={onClose}
       onOk={submit}
@@ -274,7 +275,7 @@ export function DatacenterFormModal({
         )}
       </Form>
       <style>{`.dcf-site { background: var(--cmdb-surface-2); border: 1px solid var(--cmdb-border); border-radius: 10px; padding: 12px 14px; }`}</style>
-    </Modal>
+    </ResponsiveModal>
   );
 }
 
@@ -314,7 +315,7 @@ export function DatacenterLinkModal({ open, onClose, datacenter, link }: { open:
   const siteOptions = datacenter.sites.map((s) => ({ value: s.id, label: `${s.name} · ${s.building_code}${s.room ? ` ${s.room}` : ''}` }));
 
   return (
-    <Modal open={open} onCancel={onClose} onOk={submit} confirmLoading={saving} okText={link ? 'Save' : 'Add link'} title={link ? 'Edit site link' : 'Add a link between the sites'} width={620} destroyOnHidden>
+    <ResponsiveModal open={open} onCancel={onClose} onOk={submit} confirmLoading={saving} okText={link ? 'Save' : 'Add link'} title={link ? 'Edit site link' : 'Add a link between the sites'} width={620} destroyOnHidden>
       <Form form={form} layout="vertical">
         <Form.Item name="label" label="Name" rules={[{ required: true, whitespace: true, max: 100 }]}>
           <Input placeholder="e.g. Trunk North" autoFocus />
@@ -358,6 +359,6 @@ export function DatacenterLinkModal({ open, onClose, datacenter, link }: { open:
           <Input placeholder="e.g. cable route, patch panel positions" />
         </Form.Item>
       </Form>
-    </Modal>
+    </ResponsiveModal>
   );
 }

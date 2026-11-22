@@ -294,7 +294,7 @@ export function EntraSettingsTab() {
                 description={
                   <>
                     {s.login.message && <div>{s.login.message}</div>}
-                    <Typography.Text type="secondary" style={{ fontSize: 12.5 }}>
+                    <Typography.Text type="secondary" className="fs-caption">
                       {s.login.userName}, {fmtDateTime(s.login.at)}
                     </Typography.Text>
                   </>

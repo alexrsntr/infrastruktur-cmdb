@@ -1,7 +1,7 @@
 // Small building blocks of the simple UI: stat tiles, status dots, device type icons.
 import { Link } from 'react-router';
 import { ASSET_STATUS_META, ASSET_TYPES, type AssetStatus, type AssetType } from '../../../shared/model';
-import { STATUS } from '../theme';
+import { C } from '../theme';
 import { ASSET_TYPE_ICONS } from './icons';
 import { tintBg, tintFg } from '../lib/palette';
 
@@ -9,7 +9,7 @@ export function StatTile({
   icon,
   value,
   label,
-  color = '#2563eb',
+  color = C.primary,
   to,
   onClick,
   active,
@@ -49,11 +49,11 @@ export function StatTile({
 }
 
 export const STATUS_COLOR: Record<AssetStatus, string> = {
-  active: STATUS.ok,
-  planned: '#4a7fd4',
-  maintenance: STATUS.warn,
-  defective: STATUS.bad,
-  retired: STATUS.idle,
+  active: C.ok,
+  planned: C.info,
+  maintenance: C.warn,
+  defective: C.bad,
+  retired: C.idle,
 };
 
 /** Coloured dot + word – readable without relying on colour alone */

@@ -42,19 +42,20 @@ const ENTRY_KINDS: { value: EntryKind; label: string; icon: React.ReactNode }[] 
   { value: 'inspection', label: 'Inspection', icon: <SearchOutlined /> },
 ];
 
-const KIND_STYLE: Record<string, { bg: string; fg: string; icon: React.ReactNode }> = {
-  note: { bg: '#fff4d6', fg: '#a86a00', icon: <CommentOutlined /> },
-  maintenance: { bg: '#fff1d9', fg: '#b26a00', icon: <ToolOutlined /> },
-  incident: { bg: '#fde3e4', fg: '#c4262e', icon: <WarningOutlined /> },
-  change: { bg: '#e2edfb', fg: '#1a5fb4', icon: <SwapOutlined /> },
-  installation: { bg: '#def3e6', fg: '#1e7a46', icon: <PlusCircleOutlined /> },
-  inspection: { bg: '#dff4f4', fg: '#127a7a', icon: <SearchOutlined /> },
-  replacement: { bg: '#efe5fb', fg: '#6b35b5', icon: <SyncOutlined /> },
-  other: { bg: '#eef1f4', fg: '#4a5a6c', icon: <CommentOutlined /> },
-  changeLog: { bg: '#eef1f4', fg: '#4a5a6c', icon: <EditOutlined /> },
-  file: { bg: '#e6ecfa', fg: '#3b55a8', icon: <FileOutlined /> },
-  placement: { bg: '#dff4f4', fg: '#127a7a', icon: <EnvironmentOutlined /> },
-  created: { bg: '#def3e6', fg: '#1e7a46', icon: <PlusCircleOutlined /> },
+/** Accent colour per entry kind – shown through tintBg / tintFg, so it works in both colour schemes */
+const KIND_STYLE: Record<string, { fg: string; icon: React.ReactNode }> = {
+  note: { fg: '#a86a00', icon: <CommentOutlined /> },
+  maintenance: { fg: '#b26a00', icon: <ToolOutlined /> },
+  incident: { fg: '#c4262e', icon: <WarningOutlined /> },
+  change: { fg: '#1a5fb4', icon: <SwapOutlined /> },
+  installation: { fg: '#1e7a46', icon: <PlusCircleOutlined /> },
+  inspection: { fg: '#127a7a', icon: <SearchOutlined /> },
+  replacement: { fg: '#6b35b5', icon: <SyncOutlined /> },
+  other: { fg: '#4a5a6c', icon: <CommentOutlined /> },
+  changeLog: { fg: '#4a5a6c', icon: <EditOutlined /> },
+  file: { fg: '#3b55a8', icon: <FileOutlined /> },
+  placement: { fg: '#127a7a', icon: <EnvironmentOutlined /> },
+  created: { fg: '#1e7a46', icon: <PlusCircleOutlined /> },
 };
 
 const ACTION_TEXT: Record<string, string> = {
@@ -187,7 +188,7 @@ export function ActivityLog({ entityType, entityId, compact = false }: { entityT
   return (
     <div>
       {showComposer && (
-        <div style={{ background: 'var(--cmdb-surface-2)', border: '1px solid var(--cmdb-border)', borderRadius: 12, padding: 16, marginBottom: 20 }}>
+        <div className="activity-composer" style={{ background: 'var(--cmdb-surface-2)', border: '1px solid var(--cmdb-border)', borderRadius: 12, padding: 16, marginBottom: 20 }}>
           <Segmented
             value={kind}
             onChange={(v) => setKind(v as EntryKind)}
@@ -223,7 +224,7 @@ export function ActivityLog({ entityType, entityId, compact = false }: { entityT
               </>
             )}
             <div style={{ flex: 1 }} />
-            <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+            <Typography.Text type="secondary" className="fs-small">
               Ctrl + Enter
             </Typography.Text>
             <Button type="primary" size="large" onClick={add} loading={saving} disabled={!text.trim() || !canWrite}>
@@ -284,7 +285,7 @@ export function ActivityLog({ entityType, entityId, compact = false }: { entityT
                           : ACTION_TEXT[item.action ?? ''] ?? item.action}
                     </Typography.Text>
                     <Tooltip title={fmtDateTime(item.at)}>
-                      <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+                      <Typography.Text type="secondary" className="fs-small">
                         · {fromNow(item.at)}
                       </Typography.Text>
                     </Tooltip>
@@ -386,7 +387,7 @@ export function RecentActivityFeed({ limit = 15 }: { limit?: number }) {
                     <EntityLink type={item.entity_type} id={item.entity_id} label={item.entity_label} />
                   </span>
                 )}
-                <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+                <Typography.Text type="secondary" className="fs-small">
                   {item.user_name ?? 'System'} · <Tooltip title={fmtDateTime(item.at)}>{fromNow(item.at)}</Tooltip>
                 </Typography.Text>
               </div>

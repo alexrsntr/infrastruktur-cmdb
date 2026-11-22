@@ -58,6 +58,7 @@ import { EntraSettingsTab } from './EntraSettingsTab';
 import { DeviceTypesTab } from './DeviceTypesTab';
 import { IntegrationsTab } from './IntegrationsTab';
 import { AssetTypeTag, WarrantyDate } from '../../components/Tags';
+import { AppearanceTab } from './AppearanceTab';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -786,7 +787,7 @@ export function SettingsPage() {
     <div>
       <PageHeader
         title="Settings & notifications"
-        subtitle="E-mail server, warranty and certificate reminders, database storage warning, device types and sign-in with Microsoft. All changes are recorded in the audit log."
+        subtitle="E-mail server, appearance, warranty and certificate reminders, database storage warning, device types and sign-in with Microsoft. All changes are recorded in the audit log."
         crumbs={[{ title: 'Administration' }, { title: 'Settings & notifications' }]}
       />
       <Card styles={{ body: { paddingTop: 0 } }}>
@@ -800,6 +801,7 @@ export function SettingsPage() {
           }}
           items={[
             { key: 'email', label: 'E-mail server (SMTP)', children: <SmtpTab /> },
+            { key: 'appearance', label: 'Appearance', children: <AppearanceTab /> },
             { key: 'warranty', label: 'Warranty notifications', children: <WarrantyTab /> },
             { key: 'certificates', label: 'Certificate notifications', children: <CertificateNotificationsTab /> },
             { key: 'history', label: 'History', children: <HistoryTab /> },

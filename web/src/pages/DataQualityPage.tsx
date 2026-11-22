@@ -7,8 +7,7 @@ import { http } from '../lib/api';
 import { usePlants } from '../lib/queries';
 import { PageHeader } from '../components/PageHeader';
 import { TypeIcon } from '../components/Simple';
-
-export const scoreColor = (score: number) => (score >= 90 ? '#1e9e5a' : score >= 70 ? '#d48806' : '#cf1322');
+import { scoreFill } from '../lib/palette';
 
 /** How complete and consistent the documentation is: score, gaps per rule, duplicates and the devices to fix first */
 export function DataQualityPage() {
@@ -44,7 +43,7 @@ export function DataQualityPage() {
             <Col xs={24} md={8}>
               <Card style={{ height: '100%' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-                  <Progress type="dashboard" percent={r.score} strokeColor={scoreColor(r.score)} format={(p) => `${p}`} size={120} />
+                  <Progress type="dashboard" percent={r.score} strokeColor={scoreFill(r.score)} format={(p) => `${p}`} size={120} />
                   <div>
                     <div style={{ fontSize: 18, fontWeight: 700 }}>Average score</div>
                     <div className="muted">
@@ -59,7 +58,7 @@ export function DataQualityPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '8px 24px' }}>
                   {QUALITY_ISSUES.map((k) => (
                     <Tooltip key={k} title={`${QUALITY_META[k].hint} (−${QUALITY_META[k].weight} points)`}>
-                      <Link to={`/inventory?issue=${k}${qs}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, color: r.counts[k] ? undefined : 'var(--cmdb-text-3, #999)' }}>
+                      <Link to={`/inventory?issue=${k}${qs}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, color: r.counts[k] ? undefined : 'var(--cmdb-muted)' }}>
                         <span>{QUALITY_META[k].label}</span>
                         <Tag color={r.counts[k] ? (k.startsWith('duplicate') ? 'red' : 'orange') : 'default'} style={{ marginInlineEnd: 0 }}>
                           {r.counts[k]}
@@ -122,7 +121,7 @@ export function DataQualityPage() {
                   title: 'Score',
                   key: 'score',
                   width: 160,
-                  render: (_, a) => <Progress percent={a.score} size="small" strokeColor={scoreColor(a.score)} format={(p) => `${p}`} />,
+                  render: (_, a) => <Progress percent={a.score} size="small" strokeColor={scoreFill(a.score)} format={(p) => `${p}`} />,
                 },
                 {
                   title: 'Gaps',

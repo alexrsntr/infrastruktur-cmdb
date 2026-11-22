@@ -33,6 +33,7 @@ import { ApiError, errorText, http } from '../lib/api';
 import { useInvalidate, usePlans, usePlant, useRacks } from '../lib/queries';
 import { useSession } from '../lib/session';
 import { tintBg, tintFg } from '../lib/palette';
+import { C } from '../theme';
 
 interface DatacenterSummary {
   id: string;
@@ -57,7 +58,7 @@ function BuildingCard({ b, racks, onOpen }: { b: Building; racks: number; onOpen
   return (
     <Card hoverable onClick={onOpen} styles={{ body: { padding: 18 } }} style={{ height: '100%' }}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-        <span className="stat-icon" style={{ background: tintBg('#127a7a'), color: tintFg('#127a7a'), width: 46, height: 46, fontSize: 20 }}>
+        <span className="stat-icon" style={{ background: tintBg(C.teal), color: tintFg(C.teal), width: 46, height: 46, fontSize: 20 }}>
           <ClusterOutlined />
         </span>
         <div style={{ minWidth: 0 }}>
@@ -179,7 +180,7 @@ export function PlantPage() {
           />
         ))}
         {/* racks are no device type, but belong to the plant's inventory all the same */}
-        <StatTile to={racksLink} icon={<HddOutlined />} color="#5b6b7c" value={racks.isLoading ? '–' : allRacks.length} label="Racks" />
+        <StatTile to={racksLink} icon={<HddOutlined />} color={C.slate} value={racks.isLoading ? '–' : allRacks.length} label="Racks" />
       </div>
 
       <Row gutter={[24, 24]}>
@@ -284,7 +285,7 @@ export function PlantPage() {
                   <Col key={dc.id} xs={24} md={12}>
                     <Card hoverable onClick={() => navigate(`/datacenters/${dc.id}`)} styles={{ body: { padding: 18 } }} style={{ height: '100%' }}>
                       <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 10 }}>
-                        <span className="stat-icon" style={{ background: tintBg('#6b35b5'), color: tintFg('#6b35b5'), width: 46, height: 46, fontSize: 20 }}>
+                        <span className="stat-icon" style={{ background: tintBg(C.violet), color: tintFg(C.violet), width: 46, height: 46, fontSize: 20 }}>
                           <DatabaseOutlined />
                         </span>
                         <div>
@@ -338,7 +339,7 @@ export function PlantPage() {
         title={label}
         crumbs={[{ title: 'Plants', to: '/plants' }, { title: p.code }]}
         icon={
-          <span className="stat-icon" style={{ background: tintBg('#2563eb'), color: tintFg('#2563eb'), width: 60, height: 60, fontSize: 28 }}>
+          <span className="stat-icon" style={{ background: tintBg(C.primary), color: tintFg(C.primary), width: 60, height: 60, fontSize: 28 }}>
             <BankOutlined />
           </span>
         }

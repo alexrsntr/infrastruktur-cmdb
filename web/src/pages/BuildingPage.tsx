@@ -16,6 +16,7 @@ import { RackRow } from '../components/RackRow';
 import { RackFormModal } from '../components/RackForms';
 import { useSession } from '../lib/session';
 import { tintBg, tintFg } from '../lib/palette';
+import { C } from '../theme';
 
 export function BuildingPage() {
   const { buildingId = '' } = useParams();
@@ -145,7 +146,7 @@ export function BuildingPage() {
   const racksTab = (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
-        <Typography.Text type="secondary" style={{ fontSize: 15 }}>
+        <Typography.Text type="secondary">
           Front view of every rack in this building. Click a rack to mount devices and document patch panels.
         </Typography.Text>
         {can('location.write') && (
@@ -164,7 +165,7 @@ export function BuildingPage() {
         title={b.name}
         crumbs={[{ title: 'Plants', to: '/plants' }, { title: plantCode ?? b.plant_name ?? 'Plant', to: `/plants/${b.plant_id}` }, { title: b.name }]}
         icon={
-          <span className="stat-icon" style={{ background: tintBg('#127a7a'), color: tintFg('#127a7a'), width: 60, height: 60, fontSize: 28 }}>
+          <span className="stat-icon" style={{ background: tintBg(C.teal), color: tintFg(C.teal), width: 60, height: 60, fontSize: 28 }}>
             <ClusterOutlined />
           </span>
         }

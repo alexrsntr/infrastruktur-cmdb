@@ -33,7 +33,7 @@ export function RackRow({ racks, loading }: { racks: RackDetail[] | undefined; l
         );
       })}
       <style>{`.rack-card { width: 236px; padding: 16px; border: 1px solid var(--cmdb-border); border-radius: 12px; background: var(--cmdb-surface); transition: box-shadow .15s, border-color .15s; }
-        .rack-card:hover { border-color: color-mix(in srgb, var(--ant-color-primary, #2563eb) 45%, var(--cmdb-border)); box-shadow: 0 4px 14px var(--cmdb-shadow); }`}</style>
+        .rack-card:hover { border-color: color-mix(in srgb, var(--cmdb-primary) 45%, var(--cmdb-border)); box-shadow: 0 4px 14px var(--cmdb-shadow); }`}</style>
     </div>
   );
 }

@@ -68,7 +68,7 @@ export function ImpactCard({ assetId, assetName }: { assetId: string; assetName:
                       <Link to={`/assets/${d.id}`} style={{ fontWeight: 600 }}>
                         {d.name}
                       </Link>
-                      <div className="muted" style={{ fontSize: 12.5 }}>
+                      <div className="caption">
                         {RELATION_TYPES[d.relation].label} {d.via_name === assetName ? 'this device' : d.via_name}
                       </div>
                     </div>

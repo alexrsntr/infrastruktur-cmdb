@@ -119,7 +119,7 @@ export function RelationFormModal({ open, onClose, asset }: { open: boolean; onC
                       <Space size={6}>
                         <AssetTypeTag type={o.type} short />
                         <strong>{o.name}</strong>
-                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                        <Typography.Text type="secondary" className="fs-caption">
                           {[o.plant_code, o.ip_address].filter(Boolean).join(' · ')}
                         </Typography.Text>
                       </Space>

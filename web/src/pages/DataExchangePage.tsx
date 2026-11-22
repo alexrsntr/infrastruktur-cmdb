@@ -50,6 +50,7 @@ import { useSession } from '../lib/session';
 import { PageHeader } from '../components/PageHeader';
 import { SectionHead } from '../components/PageParts';
 import { ExportMenu } from '../components/ExportMenu';
+import { C } from '../theme';
 
 // ---------------------------------------------------------------------------
 // Export
@@ -83,7 +84,7 @@ function DatasetGrid({ cards }: { cards: DatasetCard[] }) {
                     display: 'grid',
                     placeItems: 'center',
                     background: 'var(--cmdb-primary-soft)',
-                    color: 'var(--ant-color-primary, #2563eb)',
+                    color: 'var(--cmdb-primary)',
                     fontSize: 18,
                   }}
                 >
@@ -92,7 +93,7 @@ function DatasetGrid({ cards }: { cards: DatasetCard[] }) {
                 <div>
                   <Typography.Text strong>{c.title}</Typography.Text>
                   <div>
-                    <Typography.Text type="secondary" style={{ fontSize: 12.5 }}>
+                    <Typography.Text type="secondary" className="fs-caption">
                       {c.description}
                     </Typography.Text>
                   </div>
@@ -320,16 +321,16 @@ function ReportView({ report }: { report: ImportReport }) {
           <Statistic title="Rows" value={report.total} />
         </Col>
         <Col xs={12} md={5}>
-          <Statistic title={report.dryRun ? 'Would create' : 'Created'} value={report.created} styles={{ content: { color: '#389e0d' } }} />
+          <Statistic title={report.dryRun ? 'Would create' : 'Created'} value={report.created} styles={{ content: { color: C.okText } }} />
         </Col>
         <Col xs={12} md={5}>
-          <Statistic title={report.dryRun ? 'Would update' : 'Updated'} value={report.updated} styles={{ content: { color: '#1677ff' } }} />
+          <Statistic title={report.dryRun ? 'Would update' : 'Updated'} value={report.updated} styles={{ content: { color: C.primary } }} />
         </Col>
         <Col xs={12} md={5}>
           <Statistic title="Unchanged" value={report.skipped} />
         </Col>
         <Col xs={12} md={5}>
-          <Statistic title="Errors" value={report.errors.length} styles={{ content: { color: report.errors.length ? '#cf1322' : undefined } }} />
+          <Statistic title="Errors" value={report.errors.length} styles={{ content: { color: report.errors.length ? C.badText : undefined } }} />
         </Col>
       </Row>
       {report.errors.length > 0 && (

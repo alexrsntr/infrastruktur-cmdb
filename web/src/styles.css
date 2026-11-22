@@ -1,8 +1,31 @@
-/* ---------- colour scheme (light / dark) ----------
-   Components use these variables (or the Ant Design tokens) instead of fixed colours.
-   The active scheme is set on <html data-theme="light|dark"> by App.tsx. */
+/* ---------- design tokens ----------
+   One place for spacing, type sizes and colours. Components use these variables (or the Ant Design tokens) instead
+   of fixed values, so both colour schemes and the configured primary colour apply everywhere.
+   The active scheme is set on <html data-theme="light|dark">, the primary colour on <html style="--cmdb-primary">
+   (both by App.tsx). */
 :root {
   color-scheme: light;
+
+  /* spacing scale */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+
+  /* type scale */
+  --fs-caption: 12.5px;
+  --fs-small: 13.5px;
+  --fs-body: 15px;
+  --fs-emphasis: 16px;
+  --fs-section: 19px;
+  --fs-title: 26px;
+
+  /* primary colour (set from the configuration by App.tsx) */
+  --cmdb-primary: #2563eb;
+  --cmdb-primary-soft: color-mix(in srgb, var(--cmdb-primary) 11%, var(--cmdb-surface));
+
   --cmdb-bg: #f2f4f7;
   --cmdb-surface: #ffffff;
   --cmdb-surface-2: #f6f8fa;
@@ -10,23 +33,56 @@
   --cmdb-hover: #eef4fb;
   --cmdb-text: #14202e;
   --cmdb-text-2: #4a5a6c;
-  --cmdb-muted: #7b8a9b;
+  /* hints and captions – still 4.5:1 on white */
+  --cmdb-muted: #5f6e81;
   --cmdb-border: #dfe4ea;
   --cmdb-border-soft: #edf0f3;
   --cmdb-border-strong: #cfd6de;
-  --cmdb-primary-soft: #e8effd;
   --cmdb-header: #0b1f33;
   --cmdb-header-2: #12304d;
+  --cmdb-header-text: #ffffff;
+  --cmdb-header-text-2: rgba(255, 255, 255, 0.78);
+  --cmdb-header-hover: rgba(255, 255, 255, 0.08);
+  --cmdb-header-accent: #4cc3ff;
   --cmdb-shadow: rgba(0, 50, 100, 0.08);
+  --cmdb-shadow-lg: 0 8px 28px rgba(15, 35, 60, 0.1);
   --cmdb-map-water: #d9e6f2;
   --cmdb-map-land: #f7f7f2;
   --cmdb-map-border: #b4bfca;
   --cmdb-tint-bg: 14%;
   --cmdb-tint-fg: 100%;
+
+  /* signal colours: fills (dots, bars, icons) and text variants with 4.5:1 contrast */
+  --cmdb-ok: #1e9e5a;
+  --cmdb-warn: #c47d00;
+  --cmdb-bad: #d9363e;
+  --cmdb-info: #2f6fd6;
+  --cmdb-idle: #7f8c9b;
+  --cmdb-ok-text: #137a43;
+  --cmdb-warn-text: #8a5800;
+  --cmdb-bad-text: #b42318;
+  --cmdb-info-text: #1d5bc4;
+
+  /* accent colours for tiles and icons (always used through tintBg / tintFg) */
+  --cmdb-teal: #127a7a;
+  --cmdb-violet: #6b35b5;
+  --cmdb-slate: #5b6b7c;
+  --cmdb-amber: #b26a00;
+
+  /* racks and data center diagrams */
+  --cmdb-rack-frame: #2f3740;
+  --cmdb-rack-rail: #3a434d;
+  --cmdb-rack-slot: #1f262d;
+  --cmdb-rack-slot-line: #2a323a;
+  --cmdb-rack-device: #fbfcfd;
+  --cmdb-rack-device-text: #14202e;
+  --cmdb-rack-device-text-2: #4a5a6c;
+  --cmdb-plan-bg: #ffffff;
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
+  --cmdb-primary-soft: color-mix(in srgb, var(--cmdb-primary) 20%, var(--cmdb-surface));
   --cmdb-bg: #0e1319;
   --cmdb-surface: #161d26;
   --cmdb-surface-2: #1b2430;
@@ -34,19 +90,38 @@
   --cmdb-hover: #1f2b3a;
   --cmdb-text: #e5eaf0;
   --cmdb-text-2: #a7b4c3;
-  --cmdb-muted: #7f8c9b;
+  --cmdb-muted: #8b98a8;
   --cmdb-border: #2a3441;
   --cmdb-border-soft: #232c38;
   --cmdb-border-strong: #364252;
-  --cmdb-primary-soft: rgba(59, 130, 246, 0.18);
   --cmdb-header: #0a1017;
   --cmdb-header-2: #121c28;
   --cmdb-shadow: rgba(0, 0, 0, 0.35);
+  --cmdb-shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.45);
   --cmdb-map-water: #0f1b28;
   --cmdb-map-land: #24303d;
   --cmdb-map-border: #3e4c5d;
   --cmdb-tint-bg: 22%;
   --cmdb-tint-fg: 55%;
+
+  --cmdb-ok: #2fb36d;
+  --cmdb-warn: #e5a00d;
+  --cmdb-bad: #e5484d;
+  --cmdb-info: #4a8cf0;
+  --cmdb-idle: #7f8c9b;
+  --cmdb-ok-text: #4cc38a;
+  --cmdb-warn-text: #f0b041;
+  --cmdb-bad-text: #ff7b72;
+  --cmdb-info-text: #7fb0ff;
+
+  --cmdb-rack-frame: #2c3540;
+  --cmdb-rack-rail: #36404c;
+  --cmdb-rack-slot: #12171d;
+  --cmdb-rack-slot-line: #1f262d;
+  --cmdb-rack-device: #263140;
+  --cmdb-rack-device-text: #e5eaf0;
+  --cmdb-rack-device-text-2: #a7b4c3;
+  --cmdb-plan-bg: #e9edf2;
 }
 
 html,
@@ -71,15 +146,44 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--cmdb-header-shadow, 0 2px 8px rgba(0, 0, 0, 0.25));
   background: var(--cmdb-header) !important;
+  border-bottom: var(--cmdb-header-border, none);
+}
+
+/* Header styles (Administration → Settings → Appearance): dark (default), in the primary colour, light */
+/* in a bar of the primary colour the primary "Add device" button would disappear: it turns white */
+:root[data-header='primary'] .app-header .header-add.ant-btn-primary {
+  background: #ffffff;
+  color: var(--cmdb-primary);
+}
+
+:root[data-header='primary'] .app-header .header-add.ant-btn-primary:hover {
+  background: color-mix(in srgb, #ffffff 88%, var(--cmdb-primary));
+  color: var(--cmdb-primary);
+}
+
+:root[data-header='primary'] {
+  --cmdb-header: color-mix(in srgb, var(--cmdb-primary) 82%, #000);
+  --cmdb-header-2: color-mix(in srgb, var(--cmdb-primary) 70%, #000);
+  --cmdb-header-accent: #ffffff;
+}
+
+:root[data-header='light'] {
+  --cmdb-header: var(--cmdb-surface);
+  --cmdb-header-2: var(--cmdb-surface-2);
+  --cmdb-header-text: var(--cmdb-text);
+  --cmdb-header-text-2: var(--cmdb-text-2);
+  --cmdb-header-hover: var(--cmdb-hover);
+  --cmdb-header-accent: var(--cmdb-primary);
+  --cmdb-header-shadow: 0 1px 0 var(--cmdb-border), 0 4px 14px var(--cmdb-shadow);
 }
 
 .brand {
   display: flex;
   align-items: center;
   gap: 12px;
-  color: #fff;
+  color: var(--cmdb-header-text);
   text-decoration: none;
   margin-right: 20px;
   flex: none;
@@ -95,13 +199,14 @@ body {
   font-size: 11px;
   letter-spacing: 1.4px;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--cmdb-header-text-2);
+  opacity: 0.8;
 }
 
 .brand-app {
   font-size: 18px;
   font-weight: 700;
-  color: #fff;
+  color: var(--cmdb-header-text);
 }
 
 .top-nav {
@@ -116,7 +221,7 @@ body {
   align-items: center;
   gap: 8px;
   padding: 0 16px;
-  color: rgba(255, 255, 255, 0.78);
+  color: var(--cmdb-header-text-2);
   font-size: 16px;
   font-weight: 600;
   text-decoration: none;
@@ -126,14 +231,14 @@ body {
 }
 
 .top-nav-item:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.06);
+  color: var(--cmdb-header-text);
+  background: var(--cmdb-header-hover);
 }
 
 .top-nav-item.active {
-  color: #fff;
-  border-bottom-color: #4cc3ff;
-  background: rgba(255, 255, 255, 0.08);
+  color: var(--cmdb-header-text);
+  border-bottom-color: var(--cmdb-header-accent);
+  background: var(--cmdb-header-hover);
 }
 
 .top-nav-icon {
@@ -151,7 +256,7 @@ body {
 
 .top-nav-item.vertical.active {
   background: var(--cmdb-primary-soft);
-  color: var(--ant-color-primary, #2563eb);
+  color: var(--cmdb-primary);
 }
 
 .header-search {
@@ -205,7 +310,7 @@ body {
 
 .header-icon-btn,
 .header-icon-btn:hover {
-  color: #fff !important;
+  color: var(--cmdb-header-text) !important;
   font-size: 20px;
 }
 
@@ -214,7 +319,7 @@ body {
   align-items: center;
   height: 48px !important;
   padding: 0 6px !important;
-  color: #fff !important;
+  color: var(--cmdb-header-text) !important;
 }
 
 .header-user-name {
@@ -269,6 +374,70 @@ body {
   color: var(--cmdb-muted);
 }
 
+/* type sizes and captions (instead of inline font sizes) */
+.fs-caption {
+  font-size: var(--fs-caption);
+}
+
+.fs-small {
+  font-size: var(--fs-small);
+}
+
+.caption {
+  font-size: var(--fs-caption);
+  color: var(--cmdb-muted);
+}
+
+.section-title {
+  font-size: var(--fs-section);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin: var(--sp-2) 0 14px;
+  flex-wrap: wrap;
+}
+
+.text-ok {
+  color: var(--cmdb-ok-text);
+}
+
+.text-warn {
+  color: var(--cmdb-warn-text);
+}
+
+.text-bad {
+  color: var(--cmdb-bad-text);
+}
+
+.header-avatar {
+  background: color-mix(in srgb, var(--cmdb-primary) 72%, var(--cmdb-header-text)) !important;
+}
+
+/* "About" card: label / value pairs, two or more columns on wide screens */
+.about-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px 24px;
+}
+
+.about-label {
+  font-size: 13px;
+  color: var(--cmdb-muted);
+  margin-bottom: 2px;
+}
+
+.about-value {
+  font-size: 15.5px;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
 .mono {
   font-family: 'Cascadia Mono', Consolas, 'SFMono-Regular', Menlo, monospace;
   font-size: 13.5px;
@@ -296,7 +465,7 @@ body {
 
 a.stat-tile:hover,
 button.stat-tile:hover {
-  border-color: color-mix(in srgb, var(--ant-color-primary, #2563eb) 45%, var(--cmdb-border));
+  border-color: color-mix(in srgb, var(--cmdb-primary) 45%, var(--cmdb-border));
   box-shadow: 0 4px 14px var(--cmdb-shadow);
 }
 
@@ -309,7 +478,7 @@ button.stat-tile {
 
 /* Keyboard focus on tiles: a rounded ring in the primary colour instead of the browser's default frame */
 button.stat-tile:focus-visible {
-  outline: 2px solid var(--ant-color-primary, #2563eb);
+  outline: 2px solid var(--cmdb-primary);
   outline-offset: 2px;
 }
 
@@ -321,8 +490,8 @@ button.stat-tile:focus-visible {
 }
 
 .stat-tile.active {
-  border-color: var(--ant-color-primary, #2563eb);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ant-color-primary, #2563eb) 20%, transparent);
+  border-color: var(--cmdb-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--cmdb-primary) 20%, transparent);
 }
 
 .stat-icon {
@@ -544,7 +713,7 @@ button.stat-tile:focus-visible {
   place-items: center;
   font-size: 26px;
   background: var(--cmdb-primary-soft);
-  color: var(--ant-color-primary, #2563eb);
+  color: var(--cmdb-primary);
   flex: 0 0 auto;
 }
 
@@ -557,4 +726,621 @@ button.stat-tile:focus-visible {
 /* Database storage warning for administrators (above every page) */
 .db-storage-banner {
   margin-bottom: 16px;
+}
+
+/* ---------- detail page header (DetailHeader.tsx) ---------- */
+.detail-header {
+  margin-bottom: var(--sp-5);
+}
+
+.detail-crumbs {
+  font-size: 14px;
+  margin-bottom: var(--sp-2);
+}
+
+.detail-header-main {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+
+.detail-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-size: 26px;
+  flex: none;
+}
+
+.detail-header-text {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.detail-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-3);
+}
+
+.detail-title.ant-typography {
+  margin: 0 !important;
+  font-weight: 700 !important;
+  font-size: var(--fs-title);
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.fact-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3) var(--sp-6);
+  margin: var(--sp-4) 0 0;
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--cmdb-surface);
+  border: 1px solid var(--cmdb-border);
+  border-radius: 12px;
+}
+
+.fact {
+  min-width: 0;
+}
+
+.fact-label {
+  font-size: var(--fs-caption);
+  color: var(--cmdb-muted);
+  margin-bottom: 2px;
+}
+
+.fact-value {
+  margin: 0;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  word-break: break-word;
+}
+
+@media (max-width: 767px) {
+  .detail-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    font-size: 21px;
+  }
+  .detail-header-text {
+    flex-basis: calc(100% - 64px);
+  }
+  .detail-title.ant-typography {
+    font-size: 22px;
+  }
+  .detail-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+  .detail-actions > .ant-btn,
+  .detail-actions > .ant-dropdown-trigger {
+    flex: 1 1 0;
+  }
+  .fact-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-3) var(--sp-4);
+  }
+}
+
+/* ---------- list toolbar (ListToolbar.tsx) ---------- */
+.list-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: var(--sp-4);
+}
+
+.list-toolbar-search {
+  flex: 1 1 260px;
+  max-width: 420px;
+  min-width: 0;
+}
+
+.list-toolbar-actions {
+  display: flex;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.list-toolbar.phone {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.list-toolbar.phone .list-toolbar-search {
+  max-width: none;
+  flex-basis: auto;
+}
+
+.list-toolbar-phone-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.list-toolbar-drawer .ant-drawer-section,
+.list-toolbar-drawer.ant-drawer-content {
+  max-height: 85dvh;
+}
+
+.list-toolbar-drawer-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.list-toolbar-drawer-body .ant-select,
+.list-toolbar-drawer-body .ant-picker,
+.list-toolbar-drawer-body .ant-input-affix-wrapper,
+.list-toolbar-drawer-body .ant-segmented {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+}
+
+/* ---------- empty and loading states ---------- */
+.empty-state {
+  margin-block: var(--sp-5);
+}
+
+.loading-state {
+  padding: var(--sp-2) 0;
+}
+
+/* ---------- dialogs on phones (ResponsiveModal.tsx): full screen, buttons at the bottom ---------- */
+@media (max-width: 767px) {
+  .modal-fullscreen.ant-modal {
+    max-width: 100vw;
+    margin: 0;
+    top: 0;
+    padding-bottom: 0;
+  }
+  .modal-fullscreen .ant-modal-container {
+    min-height: 100dvh;
+    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 16px 16px 0;
+  }
+  .modal-fullscreen .ant-modal-body {
+    flex: 1;
+    max-height: none !important;
+  }
+  .modal-fullscreen .ant-modal-footer {
+    position: sticky;
+    bottom: 0;
+    margin: 0 -16px;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    background: var(--cmdb-surface);
+    border-top: 1px solid var(--cmdb-border);
+  }
+}
+
+/* ---------- compact density (Administration → Settings → Appearance, or per user in the display menu) ---------- */
+:root[data-density='compact'] .app-content {
+  padding: 20px 24px 44px;
+}
+
+:root[data-density='compact'] .stat-tile {
+  padding: 14px 16px;
+  min-height: 76px;
+  gap: 12px;
+}
+
+:root[data-density='compact'] .stat-icon {
+  width: 42px;
+  height: 42px;
+  font-size: 20px;
+  border-radius: 10px;
+}
+
+:root[data-density='compact'] .stat-value {
+  font-size: 23px;
+}
+
+:root[data-density='compact'] .tile-grid {
+  gap: 10px;
+}
+
+:root[data-density='compact'] .page-header,
+:root[data-density='compact'] .detail-header {
+  margin-bottom: 18px;
+}
+
+:root[data-density='compact'] .fact-row {
+  padding: 10px 14px;
+}
+
+:root[data-density='compact'] .timeline-item {
+  padding: 10px 0;
+}
+
+/* ---------- logo in the navigation bar and on the sign-in page ---------- */
+.brand-logo {
+  height: 34px;
+  max-width: 180px;
+  object-fit: contain;
+  display: block;
+}
+
+.login-logo {
+  height: 44px;
+  max-width: 220px;
+  object-fit: contain;
+  display: block;
+}
+
+/* ---------- Settings → Appearance ---------- */
+.appearance-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 52px;
+  padding: 0 16px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.appearance-preview-nav {
+  font-weight: 600;
+  font-size: 13.5px;
+  padding: 15px 6px 13px;
+  border-bottom: 3px solid transparent;
+  white-space: nowrap;
+}
+
+.appearance-preview-nav.muted-nav {
+  border-bottom-color: transparent !important;
+}
+
+.appearance-preview-button {
+  color: #fff;
+  font-weight: 600;
+  font-size: 12.5px;
+  padding: 6px 12px;
+  border-radius: 14px;
+  white-space: nowrap;
+}
+
+@media (max-width: 575px) {
+  .appearance-preview-nav.muted-nav,
+  .appearance-preview-button {
+    display: none;
+  }
+}
+
+.color-choice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.color-swatch {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid var(--cmdb-surface);
+  box-shadow: 0 0 0 1px var(--cmdb-border-strong);
+  color: #fff;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  padding: 0;
+}
+
+.color-swatch.selected {
+  box-shadow: 0 0 0 2px var(--cmdb-text);
+}
+
+.color-swatch:focus-visible {
+  outline: 2px solid var(--cmdb-primary);
+  outline-offset: 3px;
+}
+
+.color-swatch:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.color-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  vertical-align: -1px;
+  border: 1px solid var(--cmdb-border-strong);
+}
+
+.header-style-choice.ant-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.header-style-choice .ant-radio-button-wrapper {
+  height: auto;
+  padding: 10px 14px;
+  border-radius: 10px !important;
+  border-inline-start-width: 1px;
+  line-height: 1.35;
+}
+
+.header-style-choice .ant-radio-button-wrapper::before {
+  display: none;
+}
+
+.header-style-choice .ant-radio-button-wrapper > span:last-child {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-style-swatch {
+  width: 56px;
+  height: 30px;
+  border-radius: 6px;
+  flex: none;
+  position: relative;
+}
+
+.header-style-swatch > span {
+  position: absolute;
+  left: 10px;
+  right: 26px;
+  bottom: 5px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.logo-slot {
+  border: 1px solid var(--cmdb-border);
+  border-radius: 12px;
+  overflow: hidden;
+  height: 100%;
+}
+
+.logo-slot-preview {
+  height: 96px;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  font-size: 13px;
+  text-align: center;
+}
+
+.logo-slot-preview img {
+  max-height: 56px;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.logo-slot-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--cmdb-border);
+}
+
+/* ---------- filters in list toolbars: flexible instead of fixed widths ---------- */
+.filter-sm {
+  width: 160px;
+}
+
+.filter-md {
+  width: 200px;
+}
+
+.filter-lg {
+  min-width: 220px;
+  max-width: 320px;
+}
+
+/* ---------- device list on phones (AssetTable.tsx) ---------- */
+.asset-cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.asset-card {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  border: 1px solid var(--cmdb-border);
+  border-radius: 12px;
+  background: var(--cmdb-surface);
+  color: inherit;
+  text-decoration: none;
+  min-height: 64px;
+}
+
+.asset-card:active,
+.asset-card:hover {
+  border-color: color-mix(in srgb, var(--cmdb-primary) 45%, var(--cmdb-border));
+  background: var(--cmdb-hover);
+}
+
+.asset-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.asset-card-title {
+  font-weight: 650;
+  font-size: var(--fs-emphasis);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asset-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  font-size: var(--fs-small);
+  color: var(--cmdb-text-2);
+  margin-top: 2px;
+}
+
+.asset-card-meta .status-dot {
+  font-weight: 600;
+  color: var(--cmdb-text);
+}
+
+.asset-card-chevron {
+  color: var(--cmdb-muted);
+  flex: none;
+}
+
+.asset-cards-pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--sp-4);
+}
+
+/* type tiles above the device list: one swipeable row on phones instead of a tall grid */
+@media (max-width: 767px) {
+  .tile-grid.swipe-row {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scroll-padding-inline: 14px;
+    gap: var(--sp-2);
+    margin-inline: -14px;
+    padding: 2px 14px 6px;
+    scrollbar-width: none;
+  }
+  .tile-grid.swipe-row::-webkit-scrollbar {
+    display: none;
+  }
+  .tile-grid.swipe-row > .stat-tile {
+    flex: 0 0 auto;
+    min-width: 150px;
+    min-height: 0;
+    padding: 10px 12px;
+    gap: 10px;
+    scroll-snap-align: start;
+  }
+  .tile-grid.swipe-row .stat-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 17px;
+    border-radius: 10px;
+  }
+  .tile-grid.swipe-row .stat-value {
+    font-size: 19px;
+  }
+  .tile-grid.swipe-row .stat-label {
+    font-size: 13px;
+    white-space: nowrap;
+  }
+}
+
+/* ---------- detail pages: tabs on page level, stacked cards ---------- */
+.page-tabs > .ant-tabs-nav {
+  margin-bottom: var(--sp-5);
+}
+
+.card-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.relation-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.relation-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+/* ---------- quick actions on phones (device page): a bar at the bottom of the screen ---------- */
+.quick-actions {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .hide-on-phone {
+    display: none !important;
+  }
+  .quick-actions {
+    display: flex;
+    gap: var(--sp-2);
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    background: var(--cmdb-surface);
+    border-top: 1px solid var(--cmdb-border);
+    box-shadow: 0 -6px 18px var(--cmdb-shadow);
+  }
+  .quick-actions > .ant-btn {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .has-quick-actions {
+    padding-bottom: 76px;
+  }
+  .page-tabs > .ant-tabs-nav {
+    margin-bottom: var(--sp-4);
+  }
+}
+
+/* ---------- phones: less padding in cards, toolbar buttons side by side ---------- */
+@media (max-width: 767px) {
+  .app-content .ant-card-body {
+    padding: 14px;
+  }
+  .app-content .ant-card-head {
+    padding-inline: 14px;
+  }
+  .list-toolbar.phone .list-toolbar-actions {
+    display: contents;
+  }
+  /* filter button and the actions share the row equally (the actions' box is dissolved, see display: contents) */
+  .list-toolbar-phone-row > *,
+  .list-toolbar-phone-row > .list-toolbar-actions > * {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .list-toolbar-phone-row .ant-badge > .ant-btn {
+    width: 100%;
+  }
 }

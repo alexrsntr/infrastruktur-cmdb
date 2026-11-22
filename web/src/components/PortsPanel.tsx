@@ -87,7 +87,7 @@ export function PortsPanel({ assetId, assetName }: { assetId: string; assetName:
                   <span className="mono" style={{ fontWeight: 600, opacity: p.enabled ? 1 : 0.5 }}>
                     {p.name}
                   </span>
-                  {p.speed && <div className="muted" style={{ fontSize: 12 }}>{p.speed}</div>}
+                  {p.speed && <div className="caption">{p.speed}</div>}
                 </span>
               ),
             },
@@ -406,7 +406,7 @@ function ConnectModal({ port, assetName, onClose }: { port: AssetPort | null; as
         <Form.Item name="cable_label" label="Cable label">
           <Input placeholder="e.g. K-0815" />
         </Form.Item>
-        <Typography.Text type="secondary" style={{ fontSize: 12.5 }}>
+        <Typography.Text type="secondary" className="fs-caption">
           An existing cable on either port is replaced.
         </Typography.Text>
       </Form>

@@ -14,7 +14,7 @@ export interface BarItem {
  * Horizontal single-series bar list (magnitude). One hue, value at the bar tip,
  * 4px rounded data end, square at the baseline, hover tooltip per row.
  */
-export function BarList({ items, color = 'var(--ant-color-primary, #2563eb)', unit = '' }: { items: BarItem[]; color?: string; unit?: string }) {
+export function BarList({ items, color = 'var(--cmdb-primary)', unit = '' }: { items: BarItem[]; color?: string; unit?: string }) {
   const max = Math.max(1, ...items.map((i) => i.value));
   const total = items.reduce((s, i) => s + i.value, 0);
   return (

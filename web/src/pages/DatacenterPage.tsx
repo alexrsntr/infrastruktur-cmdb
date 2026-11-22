@@ -13,6 +13,7 @@ import { StatTile } from '../components/Simple';
 import { DatacenterDiagram } from '../components/DatacenterDiagram';
 import { DatacenterFormModal, DatacenterLinkModal } from '../components/DatacenterForms';
 import { kindLabel } from './DatacentersPage';
+import { C } from '../theme';
 
 export function DatacenterPage() {
   const { datacenterId } = useParams();
@@ -118,10 +119,10 @@ export function DatacenterPage() {
 
       <div className="dc-tiles">
         <StatTile icon={<ApartmentOutlined />} value={dc.sites.length} label={dc.sites.length === 1 ? 'Site' : 'Sites'} />
-        <StatTile icon={<DatabaseOutlined />} value={racks} label="Racks" color="#5b6b7c" />
-        <StatTile icon={<CloudServerOutlined />} value={devices} label="Devices" color="#722ed1" />
-        <StatTile icon={<NodeIndexOutlined />} value={dc.links.length} label="Site links" color="#d48806" />
-        {stretchedClusters > 0 && <StatTile icon={<ApartmentOutlined />} value={stretchedClusters} label="Stretched clusters" color="#531dab" />}
+        <StatTile icon={<DatabaseOutlined />} value={racks} label="Racks" color={C.slate} />
+        <StatTile icon={<CloudServerOutlined />} value={devices} label="Devices" color={C.violet} />
+        <StatTile icon={<NodeIndexOutlined />} value={dc.links.length} label="Site links" color={C.amber} />
+        {stretchedClusters > 0 && <StatTile icon={<ApartmentOutlined />} value={stretchedClusters} label="Stretched clusters" color={C.violet} />}
       </div>
 
       <Card title="Diagram" style={{ marginBottom: 20 }}>
@@ -189,7 +190,6 @@ export function DatacenterPage() {
       <DatacenterFormModal open={editing} datacenter={dc} onClose={() => setEditing(false)} />
       <DatacenterLinkModal open={linkModal.open} link={linkModal.link} datacenter={dc} onClose={() => setLinkModal({ open: false })} />
       <style>{`
-        .page-icon { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; font-size: 26px; background: var(--cmdb-primary-soft); color: var(--ant-color-primary, #2563eb); flex: 0 0 auto; }
         .dc-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 20px; }
       `}</style>
     </div>

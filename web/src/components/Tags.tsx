@@ -15,6 +15,7 @@ import {
 } from '../../../shared/model';
 import { ASSET_TYPE_ICONS } from './icons';
 import { daysUntil, fmtDate } from '../lib/format';
+import { C } from '../theme';
 
 export const AssetStatusTag = ({ status }: { status: AssetStatus }) => (
   <Tag color={ASSET_STATUS_META[status]?.color}>{ASSET_STATUS_META[status]?.label ?? status}</Tag>
@@ -48,7 +49,7 @@ export const RoleTag = ({ role }: { role: Role }) => <Tag color={ROLE_META[role]
 export function WarrantyDate({ value, warnDays = 90 }: { value: string | null; warnDays?: number }) {
   const days = daysUntil(value);
   if (days === null) return <span className="muted">–</span>;
-  const color = days < 0 ? '#cf1322' : days <= warnDays ? '#d46b08' : undefined;
+  const color = days < 0 ? C.badText : days <= warnDays ? C.warnText : undefined;
   const hint = days < 0 ? `expired ${-days} days ago` : `in ${days} days`;
   return (
     <Tooltip title={hint}>
@@ -61,6 +62,6 @@ export function DueDate({ value, status }: { value: string | null; status: Activ
   const days = daysUntil(value);
   if (days === null) return <span className="muted">–</span>;
   const open = !['done', 'cancelled'].includes(status);
-  const color = open && days < 0 ? '#cf1322' : open && days <= 7 ? '#d46b08' : undefined;
+  const color = open && days < 0 ? C.badText : open && days <= 7 ? C.warnText : undefined;
   return <span style={{ color, fontWeight: color ? 600 : undefined }}>{fmtDate(value)}</span>;
 }

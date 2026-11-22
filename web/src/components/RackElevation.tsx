@@ -11,6 +11,7 @@ import {
   type RackItemKind,
   type AssetType,
 } from '../../../shared/model';
+import { STATUS_COLOR } from './Simple';
 
 export type RackSelection = { kind: 'asset' | 'item'; id: string } | null;
 
@@ -65,7 +66,7 @@ export function RackElevation({
       style={{
         width,
         maxWidth: '100%',
-        background: '#2f3740',
+        background: 'var(--cmdb-rack-frame)',
         borderRadius: 6,
         padding: compact ? '6px 0' : '10px 0',
         boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.4)',
@@ -133,7 +134,7 @@ export function RackElevation({
                   top: top(a.rack_u!, a.rack_height_u),
                   height: a.rack_height_u * unitHeight - 1,
                   borderLeft: `${compact ? 3 : 5}px solid ${t.color}`,
-                  background: `linear-gradient(90deg, ${t.color}26, ${t.color}0d 60%), #fbfcfd`,
+                  background: `linear-gradient(90deg, ${t.color}26, ${t.color}0d 60%), var(--cmdb-rack-device)`,
                   fontSize: fs,
                   cursor: onSelect ? 'pointer' : 'default',
                   flexDirection: tall ? 'column' : 'row',
@@ -141,17 +142,17 @@ export function RackElevation({
                   justifyContent: 'center',
                 }}
               >
-                <span className="rack-block-label" style={{ fontWeight: 600, color: '#14202e' }}>
+                <span className="rack-block-label" style={{ fontWeight: 600, color: 'var(--cmdb-rack-device-text)' }}>
                   {a.status !== 'active' && (
                     <span
                       title={ASSET_STATUS_META[a.status].label}
-                      style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', marginRight: 5, background: a.status === 'defective' ? '#ff4d4f' : a.status === 'maintenance' ? '#faad14' : '#bfbfbf' }}
+                      style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', marginRight: 5, background: STATUS_COLOR[a.status] }}
                     />
                   )}
                   {a.name}
                 </span>
                 {!compact && (
-                  <span className="rack-block-label" style={{ color: '#4a5a6c', fontSize: fs - 1, marginLeft: tall ? 0 : 8 }}>
+                  <span className="rack-block-label" style={{ color: 'var(--cmdb-rack-device-text-2)', fontSize: fs - 1, marginLeft: tall ? 0 : 8 }}>
                     {[a.model, a.ip_address].filter(Boolean).join(' · ')}
                   </span>
                 )}
@@ -162,15 +163,15 @@ export function RackElevation({
       </div>
       <style>{`
         .rack-rail { display: flex; align-items: center; justify-content: center; color: #c7d0d9;
-          font-family: 'Cascadia Mono', Consolas, monospace; background: #3a434d; border-bottom: 1px solid #2f3740; user-select: none; }
-        .rack-slot { background: #1f262d; border-bottom: 1px solid #2a323a; position: relative; }
+          font-family: 'Cascadia Mono', Consolas, monospace; background: var(--cmdb-rack-rail); border-bottom: 1px solid var(--cmdb-rack-frame); user-select: none; }
+        .rack-slot { background: var(--cmdb-rack-slot); border-bottom: 1px solid var(--cmdb-rack-slot-line); position: relative; }
         .rack-slot.clickable { cursor: pointer; }
         .rack-slot.clickable:hover { background: #2c4a66; }
         .rack-slot-add { display: none; position: absolute; inset: 0; align-items: center; justify-content: center; color: #d6e8f8; font-size: 11px; gap: 4px; }
         .rack-slot.clickable:hover .rack-slot-add { display: flex; }
         .rack-block { position: absolute; left: 1px; right: 1px; border-radius: 2px; display: flex; align-items: center;
           padding: 0 8px; overflow: hidden; box-shadow: 0 0 0 1px rgba(0,0,0,.35); transition: box-shadow .12s; }
-        .rack-block:hover { box-shadow: 0 0 0 2px #91caff; z-index: 2; }
+        .rack-block:hover { box-shadow: 0 0 0 2px color-mix(in srgb, var(--cmdb-primary) 55%, #fff); z-index: 2; }
         .rack-block.selected { box-shadow: 0 0 0 3px #36cfc9; z-index: 3; }
         .rack-block-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; line-height: 1.25; }
       `}</style>
@@ -186,14 +187,14 @@ export function RackLegend({ types = ['switch', 'server', 'ups'] }: { types?: As
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, fontSize: 12.5, color: 'var(--cmdb-text-2)' }}>
       {types.map((t) => (
         <span key={t}>
-          {sw('#fbfcfd', { borderLeft: `4px solid ${ASSET_TYPES[t].color}` })}
+          {sw('var(--cmdb-rack-device)', { borderLeft: `4px solid ${ASSET_TYPES[t].color}` })}
           {ASSET_TYPES[t].label}
         </span>
       ))}
       <span>{sw(ITEM_STYLE.patch_panel.bg)}Patch panel</span>
       <span>{sw(ITEM_STYLE.cable_management.bg)}Cable mgmt.</span>
       <span>{sw(ITEM_STYLE.ups.bg)}UPS (rack item)</span>
-      <span>{sw('#1f262d')}Free</span>
+      <span>{sw('var(--cmdb-rack-slot)')}Free</span>
     </div>
   );
 }

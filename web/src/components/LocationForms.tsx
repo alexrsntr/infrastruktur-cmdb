@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import L from 'leaflet';
 import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet';
-import { App, Col, Form, Input, InputNumber, Modal, Row, Select, Typography } from 'antd';
+import { App, Col, Form, Input, InputNumber, Row, Select, Typography } from 'antd';
+import { ResponsiveModal } from './ResponsiveModal';
 import type { Building, Floor, Plant } from '../../../shared/model';
 import { errorText, http } from '../lib/api';
 import { useInvalidate, usePlants } from '../lib/queries';
@@ -55,7 +56,7 @@ function CoordinatePicker({ lat, lng, fallback, zoom, onPick }: { lat?: number |
           {has && <Marker position={[lat, lng]} icon={pinIcon} />}
         </MapContainer>
       </div>
-      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+      <Typography.Text type="secondary" className="fs-caption">
         Click on the map to set the coordinates.
       </Typography.Text>
     </div>
@@ -122,7 +123,7 @@ export function PlantFormModal({ open, onClose, plant, onSaved }: { open: boolea
   };
 
   return (
-    <Modal open={open} onCancel={onClose} onOk={submit} confirmLoading={saving} okText={plant ? 'Save' : 'Create'} title={plant ? `Edit plant ${plant.code}` : 'New plant'} width={820} destroyOnHidden>
+    <ResponsiveModal open={open} onCancel={onClose} onOk={submit} confirmLoading={saving} okText={plant ? 'Save' : 'Create'} title={plant ? `Edit plant ${plant.code}` : 'New plant'} width={820} destroyOnHidden>
       <Form form={form} layout="vertical" requiredMark="optional">
         <Row gutter={16}>
           <Col xs={8} md={6}>
@@ -184,7 +185,7 @@ export function PlantFormModal({ open, onClose, plant, onSaved }: { open: boolea
           </Col>
         </Row>
       </Form>
-    </Modal>
+    </ResponsiveModal>
   );
 }
 
@@ -242,7 +243,7 @@ export function BuildingFormModal({
   };
 
   return (
-    <Modal open={open} onCancel={onClose} onOk={submit} confirmLoading={saving} okText={building ? 'Save' : 'Create'} title={building ? `Edit building ${building.name}` : 'New building'} width={760} destroyOnHidden>
+    <ResponsiveModal open={open} onCancel={onClose} onOk={submit} confirmLoading={saving} okText={building ? 'Save' : 'Create'} title={building ? `Edit building ${building.name}` : 'New building'} width={760} destroyOnHidden>
       <Form form={form} layout="vertical" requiredMark="optional">
         <Row gutter={16}>
           <Col xs={24} md={10}>
@@ -284,7 +285,7 @@ export function BuildingFormModal({
           </Col>
         </Row>
       </Form>
-    </Modal>
+    </ResponsiveModal>
   );
 }
 
@@ -333,7 +334,7 @@ export function FloorFormModal({
   };
 
   return (
-    <Modal open={open} onCancel={onClose} onOk={submit} confirmLoading={saving} okText={floor ? 'Save' : 'Create'} title={floor ? `Edit floor ${floor.name}` : 'New floor'} width={420} destroyOnHidden>
+    <ResponsiveModal open={open} onCancel={onClose} onOk={submit} confirmLoading={saving} okText={floor ? 'Save' : 'Create'} title={floor ? `Edit floor ${floor.name}` : 'New floor'} width={420} destroyOnHidden>
       <Form form={form} layout="vertical" requiredMark="optional">
         <Form.Item name="name" label="Name" rules={[{ required: true, whitespace: true, max: 100 }]}>
           <Input placeholder="e.g. Ground floor, 1st floor, Hall level" />
@@ -342,6 +343,6 @@ export function FloorFormModal({
           <InputNumber min={-20} max={200} precision={0} style={{ width: 140 }} />
         </Form.Item>
       </Form>
-    </Modal>
+    </ResponsiveModal>
   );
 }

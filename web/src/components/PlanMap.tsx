@@ -253,7 +253,7 @@ export function PlanMap({ plan, height = 640 }: { plan: PlanDetail; height?: num
             key={plan.id}
             crs={L.CRS.Simple}
             bounds={bounds}
-            style={{ height: '100%', width: '100%', background: '#fff' }}
+            style={{ height: '100%', width: '100%', background: 'var(--cmdb-plan-bg)' }}
             zoomSnap={0.25}
             minZoom={-5}
             maxZoom={4}
@@ -282,7 +282,7 @@ export function PlanMap({ plan, height = 640 }: { plan: PlanDetail; height?: num
                           {m.asset_type && <AssetTypeTag type={m.asset_type} />}
                           {m.asset_status && <AssetStatusTag status={m.asset_status} />}
                         </div>
-                        <div className="muted" style={{ fontSize: 12 }}>
+                        <div className="caption">
                           {[m.asset_model, m.asset_ip].filter(Boolean).join(' · ') || '–'}
                         </div>
                       </>
@@ -320,7 +320,7 @@ export function PlanMap({ plan, height = 640 }: { plan: PlanDetail; height?: num
             ))}
           </MapContainer>
         </div>
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+        <Typography.Text type="secondary" className="fs-caption">
           Scroll to zoom, drag to pan. {canEdit ? 'Switch on “Edit” to move markers or add new ones.' : ''}
         </Typography.Text>
       </div>
@@ -344,7 +344,7 @@ export function PlanMap({ plan, height = 640 }: { plan: PlanDetail; height?: num
           />
           {kind === 'device' && (
             <>
-              <Typography.Paragraph type="secondary" style={{ fontSize: 12.5 }}>
+              <Typography.Paragraph type="secondary" className="fs-caption">
                 Choose an access point, switch, server … of this plant, then click on the picture.
               </Typography.Paragraph>
               <Select
@@ -367,7 +367,7 @@ export function PlanMap({ plan, height = 640 }: { plan: PlanDetail; height?: num
                       <Space size={6}>
                         <AssetTypeTag type={o.type} short />
                         {o.name}
-                        <span className="muted" style={{ fontSize: 12 }}>
+                        <span className="caption">
                           {dash(o.building_name)}
                         </span>
                       </Space>
@@ -378,7 +378,7 @@ export function PlanMap({ plan, height = 640 }: { plan: PlanDetail; height?: num
           )}
           {kind === 'rack' && (
             <>
-              <Typography.Paragraph type="secondary" style={{ fontSize: 12.5 }}>
+              <Typography.Paragraph type="secondary" className="fs-caption">
                 Place a whole rack, e.g. on a hall picture or floor plan. Clicking it opens the rack with all its devices.
               </Typography.Paragraph>
               <Select
@@ -401,7 +401,7 @@ export function PlanMap({ plan, height = 640 }: { plan: PlanDetail; height?: num
                     label: (
                       <Space size={6}>
                         <strong>{r.name}</strong>
-                        <span className="muted" style={{ fontSize: 12 }}>
+                        <span className="caption">
                           {[r.building_code ?? r.building_name, r.room].filter(Boolean).join(' · ')}
                         </span>
                       </Space>
@@ -412,7 +412,7 @@ export function PlanMap({ plan, height = 640 }: { plan: PlanDetail; height?: num
           )}
           {kind === 'building' && (
             <>
-              <Typography.Paragraph type="secondary" style={{ fontSize: 12.5 }}>
+              <Typography.Paragraph type="secondary" className="fs-caption">
                 Mark where a building is on a site plan or aerial photo. Clicking it opens the building.
               </Typography.Paragraph>
               <Select
@@ -429,7 +429,7 @@ export function PlanMap({ plan, height = 640 }: { plan: PlanDetail; height?: num
           )}
           {kind === 'label' && (
             <>
-              <Typography.Paragraph type="secondary" style={{ fontSize: 12.5 }}>
+              <Typography.Paragraph type="secondary" className="fs-caption">
                 Free text such as “Gate 2”, “Fibre entry”, “Outdoor cabinet”.
               </Typography.Paragraph>
               <Space.Compact style={{ width: '100%' }}>

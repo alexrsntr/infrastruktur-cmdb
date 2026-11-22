@@ -64,7 +64,7 @@ export function DeviceTypesTab() {
                   <TypeIcon type={t} />
                   <span>
                     <Typography.Text strong>{ASSET_TYPES[t].label}</Typography.Text>
-                    <div className="muted" style={{ fontSize: 12 }}>
+                    <div className="caption">
                       {ASSET_TYPES[t].hint}
                     </div>
                   </span>
@@ -77,7 +77,7 @@ export function DeviceTypesTab() {
               key: 'fields',
               render: (_, t) => (
                 <Space size={[4, 4]} wrap>
-                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                  <Typography.Text type="secondary" className="fs-caption">
                     {ASSET_TYPES[t].fields.length} built-in
                   </Typography.Text>
                   {(settings.customFields[t] ?? []).map((f) => (

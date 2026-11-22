@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { App, Col, Form, Input, InputNumber, Modal, Row, Segmented, Select, Space, Spin, Typography } from 'antd';
+import { App, Col, Form, Input, InputNumber, Row, Segmented, Select, Space, Spin, Typography } from 'antd';
+import { ResponsiveModal } from './ResponsiveModal';
 import { useQuery } from '@tanstack/react-query';
 import {
   ASSET_TYPES,
@@ -95,7 +96,7 @@ export function RackFormModal({
   };
 
   return (
-    <Modal open={open} onCancel={onClose} onOk={submit} confirmLoading={saving} title={rack ? `Edit rack ${rack.name}` : 'New rack'} okText={rack ? 'Save' : 'Create'} destroyOnHidden width={620}>
+    <ResponsiveModal open={open} onCancel={onClose} onOk={submit} confirmLoading={saving} title={rack ? `Edit rack ${rack.name}` : 'New rack'} okText={rack ? 'Save' : 'Create'} destroyOnHidden width={620}>
       <Form
         form={form}
         layout="vertical"
@@ -187,7 +188,7 @@ export function RackFormModal({
           </Col>
         </Row>
       </Form>
-    </Modal>
+    </ResponsiveModal>
   );
 }
 
@@ -292,7 +293,7 @@ export function MountModal({
   const title = asset ? `Move ${asset.name}` : item ? `Edit ${item.label}` : `Rack ${rack.name}: add`;
 
   return (
-    <Modal open={open} onCancel={onClose} onOk={submit} confirmLoading={saving} title={title} okText={editing ? 'Save' : mode === 'device' ? 'Mount' : 'Add'} destroyOnHidden width={560}>
+    <ResponsiveModal open={open} onCancel={onClose} onOk={submit} confirmLoading={saving} title={title} okText={editing ? 'Save' : mode === 'device' ? 'Mount' : 'Add'} destroyOnHidden width={560}>
       {!editing && (
         <Segmented
           block
@@ -324,7 +325,7 @@ export function MountModal({
                   <Space size={6}>
                     <AssetTypeTag type={o.type} short />
                     <strong>{o.name}</strong>
-                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    <Typography.Text type="secondary" className="fs-caption">
                       {o.rack_name ? `in ${o.rack_name}${o.rack_u ? ` U${formatRackUnits(o.rack_u, o.rack_height_u)}` : ''}` : o.building_name ?? 'not in a rack'}
                     </Typography.Text>
                   </Space>
@@ -377,6 +378,6 @@ export function MountModal({
           </div>
         )}
       </Form>
-    </Modal>
+    </ResponsiveModal>
   );
 }

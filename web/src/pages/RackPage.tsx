@@ -14,6 +14,7 @@ import { RackElevation, RackLegend, type RackSelection } from '../components/Rac
 import { MountModal, RackFormModal } from '../components/RackForms';
 import { StatusDot, TypeIcon } from '../components/Simple';
 import { tintBg, tintFg } from '../lib/palette';
+import { C } from '../theme';
 
 interface ContentRow {
   key: string;
@@ -165,7 +166,7 @@ export function RackPage() {
           )}
         </div>
       ) : (
-        <Typography.Text type="secondary" style={{ fontSize: 15 }}>
+        <Typography.Text type="secondary">
           Click a device or a panel in the rack to see it here.{canMount ? ' Click a free unit to mount something there.' : ''}
         </Typography.Text>
       )}
@@ -229,7 +230,7 @@ export function RackPage() {
         ]}
         title={`Rack ${r.name}`}
         icon={
-          <span className="stat-icon" style={{ background: tintBg('#5b6b7c'), color: tintFg('#5b6b7c'), width: 60, height: 60, fontSize: 28 }}>
+          <span className="stat-icon" style={{ background: tintBg(C.slate), color: tintFg(C.slate), width: 60, height: 60, fontSize: 28 }}>
             <HddOutlined />
           </span>
         }

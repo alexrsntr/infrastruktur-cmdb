@@ -9,6 +9,7 @@ import { download, exportUrl, MoreMenu } from '../components/PageParts';
 import { StatTile } from '../components/Simple';
 import { useBuildings, usePlants, useRacks } from '../lib/queries';
 import { useSession } from '../lib/session';
+import { C } from '../theme';
 
 export function RacksPage() {
   const { can } = useSession();
@@ -74,13 +75,13 @@ export function RacksPage() {
 
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={24} sm={8}>
-          <StatTile icon={<HddOutlined />} value={racks.isLoading ? '–' : totals.racks} label="Racks" color="#5b6b7c" />
+          <StatTile icon={<HddOutlined />} value={racks.isLoading ? '–' : totals.racks} label="Racks" color={C.slate} />
         </Col>
         <Col xs={12} sm={8}>
-          <StatTile icon={<VerticalAlignMiddleOutlined />} value={racks.isLoading ? '–' : `${totals.free} U`} label="Free space" color="#1e9e5a" />
+          <StatTile icon={<VerticalAlignMiddleOutlined />} value={racks.isLoading ? '–' : `${totals.free} U`} label="Free space" color={C.ok} />
         </Col>
         <Col xs={12} sm={8}>
-          <StatTile icon={<AppstoreOutlined />} value={racks.isLoading ? '–' : totals.devices} label="Devices in racks" color="#6b35b5" />
+          <StatTile icon={<AppstoreOutlined />} value={racks.isLoading ? '–' : totals.devices} label="Devices in racks" color={C.violet} />
         </Col>
       </Row>
 
@@ -126,7 +127,7 @@ export function RacksPage() {
                   <Link to={`/racks/${r.id}`} onClick={(e) => e.stopPropagation()} style={{ fontWeight: 700, fontSize: 15.5 }}>
                     {r.name}
                   </Link>
-                  <div className="muted" style={{ fontSize: 13 }}>
+                  <div className="caption">
                     {r.height_u} U{r.room ? ` · ${r.room}` : ''}
                   </div>
                 </div>
@@ -138,7 +139,7 @@ export function RacksPage() {
               render: (_, r) => (
                 <div>
                   <div>{r.building_name}</div>
-                  <div className="muted" style={{ fontSize: 13 }}>
+                  <div className="caption">
                     {r.plant_code} – {r.plant_name}
                   </div>
                 </div>

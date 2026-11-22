@@ -128,7 +128,7 @@ export function EntraDirectoryTab({ settings }: { settings?: EntraSettingsDto })
                       <Typography.Text strong>{u.displayName}</Typography.Text>
                       {u.accountEnabled === false && <Tag style={{ marginLeft: 6 }}>disabled</Tag>}
                       <div>
-                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                        <Typography.Text type="secondary" className="fs-caption">
                           {u.userPrincipalName}
                           {u.mail && u.mail !== u.userPrincipalName ? ` · ${u.mail}` : ''}
                         </Typography.Text>
@@ -177,7 +177,7 @@ export function EntraDirectoryTab({ settings }: { settings?: EntraSettingsDto })
                     <div>
                       <Typography.Text strong>{g.displayName}</Typography.Text>
                       <div>
-                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                        <Typography.Text type="secondary" className="fs-caption">
                           {g.description ?? g.mail ?? ''}
                         </Typography.Text>
                       </div>

@@ -1,16 +1,17 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
-import { App, Button, Card, Col, Dropdown, Empty, Result, Row, Skeleton, Tabs, Tag, Tooltip, Typography, type MenuProps } from 'antd';
+import { App, Button, Card, Col, Dropdown, Result, Row, Tabs, Tag, Tooltip, Typography } from 'antd';
 import {
   QrcodeOutlined,
   ArrowLeftOutlined,
   ArrowRightOutlined,
+  CameraOutlined,
   DeleteOutlined,
   DownloadOutlined,
   DownOutlined,
   EditOutlined,
+  FormOutlined,
   LinkOutlined,
-  MoreOutlined,
   SwapOutlined,
   UpOutlined,
 } from '@ant-design/icons';
@@ -27,21 +28,28 @@ import {
   type AssetDetail,
   type AssetRelation,
 } from '../../../shared/model';
-import { ApiError, buildUrl, errorText, http } from '../lib/api';
+import { api, ApiError, buildUrl, errorText, http } from '../lib/api';
 import { fmtDate, fmtDateTime, fromNow } from '../lib/format';
 import { useAsset, useAssetTypes, useInvalidate } from '../lib/queries';
 import { useSession } from '../lib/session';
-import { PageHeader } from '../components/PageHeader';
+import { DetailHeader, type Fact } from '../components/DetailHeader';
+import { MoreMenu, type MoreItem } from '../components/PageParts';
+import { EmptyState, LoadingState } from '../components/EmptyState';
+import { ASSET_TYPE_ICONS } from '../components/icons';
 import { AssetFormModal } from '../components/AssetFormModal';
 import { RelationFormModal } from '../components/RelationFormModal';
 import { FloorPlanPreview } from '../components/FloorPlanPreview';
-import { journalTabs } from '../components/Journal';
+import { ActivityLog } from '../components/ActivityLog';
+import { AttachmentsPanel } from '../components/AttachmentsPanel';
 import { PortsPanel, usePorts } from '../components/PortsPanel';
 import { ImpactCard } from '../components/ImpactCard';
 import { QualityBadge } from '../components/QualityBadge';
 import { ExternalRefsCard, MonitoringTag } from '../components/ExternalRefsCard';
 import { WarrantyDate } from '../components/Tags';
 import { StatusDot, TypeIcon } from '../components/Simple';
+
+/** Old tab names in links and bookmarks → the tabs of today */
+const TAB_ALIASES: Record<string, string> = { ports: 'connections' };
 
 /** label/value rows of the About card – only filled values unless `all` */
 function Facts({ rows }: { rows: [string, React.ReactNode][] }) {
@@ -77,8 +85,10 @@ export function AssetPage() {
   const [editing, setEditing] = useState(false);
   const [relating, setRelating] = useState(false);
   const [allFields, setAllFields] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const photoInput = useRef<HTMLInputElement>(null);
 
-  if (asset.isLoading) return <Skeleton active paragraph={{ rows: 14 }} />;
+  if (asset.isLoading) return <LoadingState rows={14} />;
   if (asset.error || !asset.data) {
     const status = asset.error instanceof ApiError ? asset.error.status : 500;
     return (
@@ -93,7 +103,45 @@ export function AssetPage() {
 
   const a: AssetDetail = asset.data;
   const typeDef = ASSET_TYPES[a.type];
-  const tab = params.get('tab') ?? 'log';
+  const rawTab = params.get('tab') ?? 'overview';
+  const tab = TAB_ALIASES[rawTab] ?? rawTab;
+  const setTab = (key: string) => {
+    const next = new URLSearchParams(params);
+    if (key === 'overview') next.delete('tab');
+    else next.set('tab', key);
+    setParams(next, { replace: true });
+  };
+
+  /** On site: write a note or log an activity – opens the activity log with the input box focused */
+  const writeNote = () => {
+    setTab('log');
+    setTimeout(() => {
+      const box = document.querySelector<HTMLTextAreaElement>('.activity-composer textarea');
+      box?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      box?.focus();
+    }, 80);
+  };
+
+  /** On site: take a photo with the phone camera (or pick a picture) and attach it to the device */
+  const uploadPhoto = async (file: File) => {
+    setUploadingPhoto(true);
+    try {
+      const fd = new FormData();
+      fd.append('entityType', 'asset');
+      fd.append('entityId', a.id);
+      fd.append('category', 'photo');
+      fd.append('isPlan', 'false');
+      fd.append('file', file);
+      await api('/api/attachments', { method: 'POST', formData: fd });
+      message.success('Photo added to the files');
+      await invalidate();
+    } catch (e) {
+      message.error(errorText(e));
+    } finally {
+      setUploadingPhoto(false);
+      if (photoInput.current) photoInput.current.value = '';
+    }
+  };
 
   const changeStatus = async (status: string) => {
     try {
@@ -138,42 +186,39 @@ export function AssetPage() {
       },
     });
 
-  const moreItems: MenuProps['items'] = [
-    ...(can('asset.status')
-      ? [
-          {
-            key: 'status',
-            icon: <SwapOutlined />,
-            label: 'Change status',
-            children: ASSET_STATUSES.map((s) => ({ key: `status:${s}`, label: <StatusDot status={s} />, disabled: s === a.status })),
-          },
-        ]
-      : []),
-    ...(can('asset.write') ? [{ key: 'relation', icon: <LinkOutlined />, label: 'Add connection' }] : []),
-    { key: 'label', icon: <QrcodeOutlined />, label: 'Print QR label' },
-    ...(can('export')
-      ? [
-          {
-            key: 'export',
-            icon: <DownloadOutlined />,
-            label: 'Export device',
-            children: [
-              { key: 'export:xlsx', label: 'Excel (.xlsx)' },
-              { key: 'export:json', label: 'JSON' },
-            ],
-          },
-        ]
-      : []),
-    ...(can('asset.delete') ? [{ type: 'divider' as const }, { key: 'delete', icon: <DeleteOutlined />, label: 'Delete device', danger: true }] : []),
+  const moreItems: MoreItem[] = [
+    { key: 'relation', icon: <LinkOutlined />, label: 'Add connection', onClick: () => setRelating(true), hidden: !can('asset.write') },
+    { key: 'label', icon: <QrcodeOutlined />, label: 'Print QR label', onClick: () => navigate(`/labels?ids=${a.id}&format=single`) },
+    {
+      key: 'export-xlsx',
+      icon: <DownloadOutlined />,
+      label: 'Export device (Excel)',
+      onClick: () => (window.location.href = buildUrl(`/api/export/asset/${a.id}`, { format: 'xlsx' })),
+      hidden: !can('export'),
+    },
+    {
+      key: 'export-json',
+      icon: <DownloadOutlined />,
+      label: 'Export device (JSON)',
+      onClick: () => (window.location.href = buildUrl(`/api/export/asset/${a.id}`, { format: 'json' })),
+      hidden: !can('export'),
+    },
+    { key: 'delete', icon: <DeleteOutlined />, label: 'Delete device', danger: true, divider: true, onClick: remove, hidden: !can('asset.delete') },
   ];
 
-  const onMore: MenuProps['onClick'] = ({ key }) => {
-    if (key.startsWith('status:')) void changeStatus(key.slice(7));
-    else if (key === 'relation') setRelating(true);
-    else if (key === 'label') navigate(`/labels?ids=${a.id}&format=single`);
-    else if (key.startsWith('export:')) window.location.href = buildUrl(`/api/export/asset/${a.id}`, { format: key.slice(7) });
-    else if (key === 'delete') remove();
-  };
+  const statusButton = can('asset.status') && (
+    <Dropdown
+      trigger={['click']}
+      menu={{
+        items: ASSET_STATUSES.map((st) => ({ key: st, label: <StatusDot status={st} />, disabled: st === a.status })),
+        onClick: ({ key }) => void changeStatus(key),
+      }}
+    >
+      <Button size="large" icon={<SwapOutlined />} aria-label={`Status: ${ASSET_STATUS_META[a.status].label} – change`}>
+        Status
+      </Button>
+    </Dropdown>
+  );
 
   // ---- About ----
   type FactRow = [string, unknown, React.ReactNode?];
@@ -233,10 +278,151 @@ export function AssetPage() {
       : []),
   ];
 
+  const location = [a.plant_code, a.building_name, a.room].filter(Boolean).join(' › ');
+  const facts: Fact[] = [
+    { label: 'Location', value: location || null, to: a.building_id ? `/buildings/${a.building_id}` : a.plant_id ? `/plants/${a.plant_id}` : undefined },
+    {
+      label: 'Rack',
+      value: a.rack_id ? `${a.rack_name}${a.rack_u ? ` · U${formatRackUnits(a.rack_u, a.rack_height_u)}` : ''}` : null,
+      to: a.rack_id ? `/racks/${a.rack_id}` : undefined,
+    },
+    { label: 'IP address', value: a.ip_address ? <span className="mono">{a.ip_address}</span> : null, copy: a.ip_address ?? undefined, hidden: passive },
+    { label: 'Serial number', value: a.serial_number ? <span className="mono">{a.serial_number}</span> : null, copy: a.serial_number ?? undefined, hidden: passive },
+    { label: 'Warranty', value: a.warranty_end ? <WarrantyDate value={a.warranty_end} warnDays={ATTENTION_DAYS.warranty} /> : null },
+    { label: 'Responsible', value: a.owner },
+  ];
+
+  const connections = (
+    <Card
+      title={`Connections (${a.relations.length})`}
+      extra={
+        can('asset.write') && (
+          <Button icon={<LinkOutlined />} onClick={() => setRelating(true)}>
+            Add
+          </Button>
+        )
+      }
+    >
+      {!a.relations.length ? (
+        <EmptyState description="No connections documented" />
+      ) : (
+        <div className="relation-list">
+          {a.relations.map((r) => (
+            <div key={r.id} className="relation-row">
+              <TypeIcon type={r.other_type} />
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div>
+                  <span className="muted">
+                    {r.direction === 'out' ? <ArrowRightOutlined /> : <ArrowLeftOutlined />} {r.direction === 'out' ? RELATION_TYPES[r.relation].label : RELATION_TYPES[r.relation].inverse}{' '}
+                  </span>
+                  <Link to={`/assets/${r.other_id}`} style={{ fontWeight: 600 }}>
+                    {r.other_name}
+                  </Link>
+                </div>
+                {(r.local_port || r.remote_port) && (
+                  <div className="mono muted fs-small">
+                    {r.local_port ?? '?'} ⇄ {r.remote_port ?? '?'}
+                  </div>
+                )}
+              </div>
+              {can('asset.write') && <Button type="text" danger icon={<DeleteOutlined />} aria-label="Remove connection" onClick={() => removeRelation(r)} />}
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+
+  const overview = (
+    <Row gutter={[20, 20]}>
+      <Col xs={24} xl={14}>
+        <div className="card-stack">
+          <Card title="About" extra={<QualityBadge assetId={a.id} />}>
+            {aboutRows.length ? (
+              <Facts rows={aboutRows} />
+            ) : (
+              <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                No details yet. {can('asset.edit') ? (passive ? 'Use “Edit” to add the A and B side, medium, length and more.' : 'Use “Edit” to add IP address, model, serial number and more.') : ''}
+              </Typography.Paragraph>
+            )}
+            <Button type="link" style={{ paddingInline: 0, marginTop: 10, display: 'flex' }} onClick={() => setAllFields((v) => !v)} icon={allFields ? <UpOutlined /> : <DownOutlined />}>
+              {allFields ? 'Show less' : 'Show all details'}
+            </Button>
+          </Card>
+          <ImpactCard assetId={a.id} assetName={a.name} />
+        </div>
+      </Col>
+      <Col xs={24} xl={10}>
+        <div className="card-stack">
+          <Card title="Location">
+            <Facts rows={locationRows} />
+            {a.floor_id && (
+              <div style={{ marginTop: 14 }}>
+                <FloorPlanPreview asset={a} />
+              </div>
+            )}
+            {!!onPlans.data?.length && (
+              <div style={{ marginTop: 12 }}>
+                <span className="muted">Shown on: </span>
+                {onPlans.data.map((pl) => (
+                  <Link key={pl.id} to={`/plans/${pl.id}`} style={{ marginRight: 12 }}>
+                    {pl.title}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </Card>
+          <ExternalRefsCard assetId={a.id} />
+        </div>
+      </Col>
+    </Row>
+  );
+
+  const hasPorts = typeDef.physical || (ports.data?.length ?? 0) > 0;
+  const tabs = [
+    { key: 'overview', label: 'Overview', children: overview },
+    {
+      key: 'connections',
+      label: `${hasPorts ? 'Connections & ports' : 'Connections'}${a.relations.length ? ` (${a.relations.length})` : ''}`,
+      children: (
+        <div className="card-stack">
+          {connections}
+          {hasPorts && (
+            <Card title={`Ports${ports.data?.length ? ` (${ports.data.length})` : ''}`}>
+              <PortsPanel assetId={a.id} assetName={a.name} />
+            </Card>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'log',
+      label: 'Activity log',
+      children: (
+        <Card>
+          <ActivityLog entityType="asset" entityId={a.id} />
+        </Card>
+      ),
+    },
+    {
+      key: 'files',
+      label: 'Files',
+      children: (
+        <Card>
+          <AttachmentsPanel entityType="asset" entityId={a.id} />
+        </Card>
+      ),
+    },
+  ];
+
+  const canNote = can('note.write') || can('activity.write');
+  const canPhoto = can('attachment.write');
+
   return (
-    <div>
-      <PageHeader
-        icon={<TypeIcon type={a.type} large />}
+    <div className="has-quick-actions">
+      <DetailHeader
+        icon={ASSET_TYPE_ICONS[a.type]}
+        color={typeDef.color}
         crumbs={[{ title: 'Devices', to: '/inventory' }, { title: typeDef.plural, to: `/inventory/${typeDef.slug}` }]}
         title={a.name}
         tags={
@@ -245,123 +431,49 @@ export function AssetPage() {
             <MonitoringTag status={a.monitoring_status} message={a.monitoring_message} source={a.monitoring_source} at={a.monitoring_checked_at} />
           </>
         }
-        subtitle={[typeDef.label, [a.manufacturer, a.model].filter(Boolean).join(' '), [a.plant_code, a.building_name, a.room].filter(Boolean).join(' › ')].filter(Boolean).join(' · ')}
-        extra={
+        subtitle={[typeDef.label, [a.manufacturer, a.model].filter(Boolean).join(' ')].filter(Boolean).join(' · ')}
+        facts={facts}
+        actions={
           <>
+            {statusButton && <span className="hide-on-phone">{statusButton}</span>}
             {can('asset.edit') && (
-              <Button size="large" icon={<EditOutlined />} onClick={() => setEditing(true)}>
+              <Button size="large" type="primary" icon={<EditOutlined />} onClick={() => setEditing(true)}>
                 Edit
               </Button>
             )}
-            {moreItems.length > 0 && (
-              <Dropdown menu={{ items: moreItems, onClick: onMore }} trigger={['click']}>
-                <Button size="large" icon={<MoreOutlined />}>
-                  More
-                </Button>
-              </Dropdown>
-            )}
+            <MoreMenu items={moreItems} />
           </>
         }
       />
 
-      <Row gutter={[20, 20]}>
-        <Col xs={24} xl={9}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            <Card title="About" extra={<QualityBadge assetId={a.id} />}>
-              {aboutRows.length ? (
-                <Facts rows={aboutRows} />
-              ) : (
-                <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
-                  No details yet. {can('asset.edit') ? (passive ? 'Use “Edit” to add the A and B side, medium, length and more.' : 'Use “Edit” to add IP address, model, serial number and more.') : ''}
-                </Typography.Paragraph>
-              )}
-              <Button type="link" style={{ paddingInline: 0, marginTop: 10, display: 'flex' }} onClick={() => setAllFields((v) => !v)} icon={allFields ? <UpOutlined /> : <DownOutlined />}>
-                {allFields ? 'Show less' : 'Show all details'}
-              </Button>
-            </Card>
+      <Tabs className="page-tabs" activeKey={tabs.some((t) => t.key === tab) ? tab : 'overview'} onChange={setTab} items={tabs} />
 
-            <Card title="Location">
-              <Facts rows={locationRows} />
-              {a.floor_id && (
-                <div style={{ marginTop: 14 }}>
-                  <FloorPlanPreview asset={a} />
-                </div>
-              )}
-              {!!onPlans.data?.length && (
-                <div style={{ marginTop: 12 }}>
-                  <span className="muted">Shown on: </span>
-                  {onPlans.data.map((pl) => (
-                    <Link key={pl.id} to={`/plans/${pl.id}`} style={{ marginRight: 12 }}>
-                      {pl.title}
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </Card>
-
-            <Card
-              title={`Connections (${a.relations.length})`}
-              extra={
-                can('asset.write') && (
-                  <Button icon={<LinkOutlined />} onClick={() => setRelating(true)}>
-                    Add
-                  </Button>
-                )
-              }
-            >
-              {!a.relations.length ? (
-                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No connections documented" style={{ margin: 0 }} />
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {a.relations.map((r) => (
-                    <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <TypeIcon type={r.other_type} />
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <div>
-                          <span className="muted">
-                            {r.direction === 'out' ? <ArrowRightOutlined /> : <ArrowLeftOutlined />} {r.direction === 'out' ? RELATION_TYPES[r.relation].label : RELATION_TYPES[r.relation].inverse}{' '}
-                          </span>
-                          <Link to={`/assets/${r.other_id}`} style={{ fontWeight: 600 }}>
-                            {r.other_name}
-                          </Link>
-                        </div>
-                        {(r.local_port || r.remote_port) && (
-                          <div className="mono muted" style={{ fontSize: 13 }}>
-                            {r.local_port ?? '?'} ⇄ {r.remote_port ?? '?'}
-                          </div>
-                        )}
-                      </div>
-                      {can('asset.write') && <Button type="text" danger icon={<DeleteOutlined />} aria-label="Remove connection" onClick={() => removeRelation(r)} />}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-            <ImpactCard assetId={a.id} assetName={a.name} />
-            <ExternalRefsCard assetId={a.id} />
-          </div>
-        </Col>
-
-        <Col xs={24} xl={15}>
-          <Card styles={{ body: { paddingTop: 4 } }}>
-            <Tabs
-              activeKey={tab}
-              onChange={(key) => {
-                const next = new URLSearchParams(params);
-                if (key === 'log') next.delete('tab');
-                else next.set('tab', key);
-                setParams(next, { replace: true });
-              }}
-              items={[
-                ...journalTabs('asset', a.id, a.name),
-                ...(typeDef.physical || (ports.data?.length ?? 0) > 0
-                  ? [{ key: 'ports', label: `Ports${ports.data?.length ? ` (${ports.data.length})` : ''}`, children: <PortsPanel assetId={a.id} assetName={a.name} /> }]
-                  : []),
-              ]}
-            />
-          </Card>
-        </Col>
-      </Row>
+      {(canNote || canPhoto) && (
+        <div className="quick-actions no-print" role="toolbar" aria-label="Quick actions">
+          {canNote && (
+            <Button size="large" icon={<FormOutlined />} onClick={writeNote}>
+              Note
+            </Button>
+          )}
+          {canPhoto && (
+            <Button size="large" icon={<CameraOutlined />} loading={uploadingPhoto} onClick={() => photoInput.current?.click()}>
+              Photo
+            </Button>
+          )}
+          {statusButton}
+        </div>
+      )}
+      <input
+        ref={photoInput}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void uploadPhoto(file);
+        }}
+      />
 
       <AssetFormModal open={editing} asset={a} onClose={() => setEditing(false)} />
       <RelationFormModal open={relating} asset={a} onClose={() => setRelating(false)} />

@@ -6,8 +6,9 @@ import enGB from 'antd/locale/en_GB';
 import { seesAllPlants, type AppConfig, type MeResponse, type Permission } from '../../shared/model';
 import { ApiError, http, setCsrfToken } from './lib/api';
 import { SessionContext, type SessionValue } from './lib/session';
-import { buildTheme } from './theme';
+import { buildTheme, DEFAULT_PRIMARY, readablePrimary } from './theme';
 import { ColorModeProvider, useColorModeState } from './lib/colorMode';
+import { DensityProvider, useDensityState } from './lib/density';
 import { AppLayout } from './layout/AppLayout';
 import { AddDeviceProvider } from './components/AddDeviceWizard';
 import { LoginPage } from './pages/LoginPage';
@@ -53,7 +54,20 @@ export function Root() {
   const { config, me } = useBootstrap();
   const location = useLocation();
   const colorMode = useColorModeState();
-  const theme = useMemo(() => buildTheme(config.data?.primaryColor ?? '#2563eb', colorMode.mode), [config.data?.primaryColor, colorMode.mode]);
+  const density = useDensityState(config.data?.density ?? 'comfortable');
+  const primary = config.data?.primaryColor ?? DEFAULT_PRIMARY;
+  const theme = useMemo(() => buildTheme(primary, colorMode.mode, density.density), [primary, colorMode.mode, density.density]);
+  const headerStyle = config.data?.headerStyle ?? 'dark';
+
+  // navigation bar style for styles.css (:root[data-header=…])
+  useEffect(() => {
+    document.documentElement.dataset.header = headerStyle;
+  }, [headerStyle]);
+
+  // the same primary colour for our own CSS (styles.css uses var(--cmdb-primary))
+  useEffect(() => {
+    document.documentElement.style.setProperty('--cmdb-primary', readablePrimary(primary, colorMode.mode));
+  }, [primary, colorMode.mode]);
 
   useEffect(() => {
     if (config.data) document.title = `${config.data.appName} · ${config.data.brandName}`;
@@ -134,9 +148,11 @@ export function Root() {
 
   return (
     <ColorModeProvider value={colorMode}>
-      <ConfigProvider theme={theme} locale={enGB}>
-        <AntApp>{content}</AntApp>
-      </ConfigProvider>
+      <DensityProvider value={density}>
+        <ConfigProvider theme={theme} locale={enGB}>
+          <AntApp>{content}</AntApp>
+        </ConfigProvider>
+      </DensityProvider>
     </ColorModeProvider>
   );
 }

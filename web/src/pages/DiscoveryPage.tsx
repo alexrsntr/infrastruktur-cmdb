@@ -49,6 +49,7 @@ import { useAssetTypes, useBuildings, useInvalidate, usePlants } from '../lib/qu
 import { useSession } from '../lib/session';
 import { PageHeader } from '../components/PageHeader';
 import { TypeIcon } from '../components/Simple';
+import { C } from '../theme';
 
 /** Auto-discovery: inbox of discovered devices and (for administrators) the sources */
 export function DiscoveryPage() {
@@ -108,7 +109,7 @@ function Inbox() {
           value={state}
           onChange={(v) => setState(v as DiscoveryState)}
           options={[
-            { value: 'new', label: <span>New {counts ? <Badge count={counts.new} showZero color={counts.new ? '#2563eb' : '#bbb'} /> : null}</span> },
+            { value: 'new', label: <span>New {counts ? <Badge count={counts.new} showZero color={counts.new ? C.primary : C.idle} /> : null}</span> },
             { value: 'linked', label: `Linked${counts ? ` (${counts.linked})` : ''}` },
             { value: 'ignored', label: `Ignored${counts ? ` (${counts.ignored})` : ''}` },
           ]}
@@ -139,7 +140,7 @@ function Inbox() {
                 <TypeIcon type={i.data.type} />
                 <span>
                   <div style={{ fontWeight: 650 }}>{i.data.name ?? i.data.ip}</div>
-                  <div className="muted" style={{ fontSize: 12.5 }}>
+                  <div className="caption">
                     {[ASSET_TYPES[i.data.type]?.label, i.data.manufacturer, i.data.model].filter(Boolean).join(' · ')}
                   </div>
                 </span>
@@ -164,7 +165,7 @@ function Inbox() {
             render: (_, i) => (
               <div>
                 {i.source_name}
-                <div className="muted" style={{ fontSize: 12.5 }}>
+                <div className="caption">
                   seen {fromNow(i.last_seen)}
                 </div>
               </div>
@@ -347,7 +348,7 @@ function CreateModal({ item, onClose }: { item: DiscoveryItem | null; onClose: (
             </Form.Item>
           </Col>
         </Row>
-        <Typography.Text type="secondary" style={{ fontSize: 12.5 }}>
+        <Typography.Text type="secondary" className="fs-caption">
           Serial number, model, firmware, ports and LLDP neighbours are taken over. Place it in a rack or on a plan afterwards.
         </Typography.Text>
       </Form>
@@ -481,8 +482,8 @@ function Sources() {
             render: (_, s) =>
               s.last_run_at ? (
                 <div>
-                  <span style={{ color: s.last_status?.startsWith('Failed') ? '#cf1322' : undefined }}>{s.last_status}</span>
-                  <div className="muted" style={{ fontSize: 12 }}>
+                  <span style={{ color: s.last_status?.startsWith('Failed') ? C.badText : undefined }}>{s.last_status}</span>
+                  <div className="caption">
                     {fromNow(s.last_run_at)}
                   </div>
                 </div>
@@ -490,7 +491,7 @@ function Sources() {
                 <span className="muted">never</span>
               ),
           },
-          { title: 'New', key: 'new', width: 70, render: (_, s) => (s.new_items ? <Badge count={s.new_items} color="#2563eb" /> : <span className="muted">0</span>) },
+          { title: 'New', key: 'new', width: 70, render: (_, s) => (s.new_items ? <Badge count={s.new_items} color={C.primary} /> : <span className="muted">0</span>) },
           {
             title: '',
             key: 'x',
@@ -528,7 +529,7 @@ function Sources() {
                 r.status === 'running' ? (
                   <Tag color="processing">running</Tag>
                 ) : r.status === 'error' ? (
-                  <span style={{ color: '#cf1322' }}>{r.error}</span>
+                  <span style={{ color: C.badText }}>{r.error}</span>
                 ) : (
                   `${r.scanned} checked · ${r.found} found · ${r.new_items} new · ${r.updated_assets} updated`
                 ),

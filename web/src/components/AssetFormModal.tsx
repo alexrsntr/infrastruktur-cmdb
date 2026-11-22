@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { App, Col, DatePicker, Divider, Form, Input, InputNumber, Modal, Row, Select, Space, Typography } from 'antd';
+import { App, Col, DatePicker, Divider, Form, Input, InputNumber, Row, Select, Space, Typography } from 'antd';
+import { ResponsiveModal } from './ResponsiveModal';
 import dayjs from 'dayjs';
 import {
   ASSET_STATUSES,
@@ -109,7 +110,7 @@ export function AssetFormModal({
   const typeDef = type ? ASSET_TYPES[type] : undefined;
 
   return (
-    <Modal
+    <ResponsiveModal
       open={open}
       onCancel={onClose}
       onOk={submit}
@@ -359,10 +360,10 @@ export function AssetFormModal({
             </Form.Item>
           </Col>
         </Row>
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+        <Typography.Text type="secondary" className="fs-caption">
           All changes are recorded in the change history.
         </Typography.Text>
       </Form>
-    </Modal>
+    </ResponsiveModal>
   );
 }

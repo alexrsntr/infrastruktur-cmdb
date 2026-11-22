@@ -12,12 +12,13 @@ import {
 } from '../../../../shared/dbStorage';
 import { errorText, http } from '../../lib/api';
 import { fmtDateTime, fromNow } from '../../lib/format';
+import { C, STATUS } from '../../theme';
 
-const LEVEL_META: Record<DbStorageLevel | 'off', { label: string; color: string; tag: string }> = {
-  ok: { label: 'OK', color: '#389e0d', tag: 'success' },
-  warning: { label: 'Warning', color: '#d48806', tag: 'warning' },
-  critical: { label: 'Critical', color: '#cf1322', tag: 'error' },
-  off: { label: 'Not monitored', color: '#8c8c8c', tag: 'default' },
+const LEVEL_META: Record<DbStorageLevel | 'off', { label: string; color: string; text: string; tag: string }> = {
+  ok: { label: 'OK', color: STATUS.ok, text: C.okText, tag: 'success' },
+  warning: { label: 'Warning', color: STATUS.warn, text: C.warnText, tag: 'warning' },
+  critical: { label: 'Critical', color: STATUS.bad, text: C.badText, tag: 'error' },
+  off: { label: 'Not monitored', color: STATUS.idle, text: C.muted, tag: 'default' },
 };
 
 /** Settings → Database storage: fill level of the PostgreSQL server and the warning thresholds */
@@ -95,7 +96,7 @@ export function DbStorageTab() {
             {d && (
               <Space orientation="vertical" size={12} style={{ width: '100%' }}>
                 <Space align="center" size={12} wrap>
-                  <Typography.Text style={{ fontSize: 26, fontWeight: 700, color: meta.color }}>{d.percent == null ? '–' : `${d.percent} %`}</Typography.Text>
+                  <Typography.Text style={{ fontSize: 26, fontWeight: 700, color: meta.text }}>{d.percent == null ? '–' : `${d.percent} %`}</Typography.Text>
                   <Tag color={meta.tag}>{meta.label}</Tag>
                   <Typography.Text type="secondary">
                     {formatStorage(d.usedBytes)} of {d.limitBytes ? formatStorage(d.limitBytes) : 'unknown size'}
@@ -129,7 +130,7 @@ export function DbStorageTab() {
                     },
                   ]}
                 />
-                <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+                <Typography.Text type="secondary" className="fs-small">
                   Checked every hour. Administrators see a banner from the warning level on; at {READ_ONLY_PERCENT} % Azure switches the database to read-only and
                   nothing can be saved anymore (not even a sign-in).
                 </Typography.Text>

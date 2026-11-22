@@ -12,6 +12,7 @@ import { useSession } from '../lib/session';
 import { AttachmentsPanel } from '../components/AttachmentsPanel';
 import { PageHeader } from '../components/PageHeader';
 import { StatusDot, TypeIcon } from '../components/Simple';
+import { C } from '../theme';
 
 const useApplications = () => useQuery({ queryKey: ['applications'], queryFn: () => http.get<Application[]>('/api/applications') });
 
@@ -283,7 +284,7 @@ export function ApplicationPage() {
     <div>
       <PageHeader
         icon={
-          <span className="type-icon lg" style={{ background: '#2563eb' }}>
+          <span className="type-icon lg" style={{ background: C.primary }}>
             <BlockOutlined />
           </span>
         }
@@ -343,7 +344,7 @@ export function ApplicationPage() {
                         <Link to={`/assets/${d.asset_id}`} style={{ fontWeight: 600 }}>
                           {d.name}
                         </Link>
-                        <div className="muted" style={{ fontSize: 12.5 }}>
+                        <div className="caption">
                           {[d.role, d.plant_code, d.ip_address].filter(Boolean).join(' · ')}
                         </div>
                       </span>
@@ -412,7 +413,7 @@ export function ApplicationPage() {
                   children: (
                     <div>
                       <div>{historyText(h)}</div>
-                      <div className="muted" style={{ fontSize: 12.5 }}>
+                      <div className="caption">
                         {fmtDateTime(h.at)}
                         {h.user_name ? ` · ${h.user_name}` : ''}
                       </div>

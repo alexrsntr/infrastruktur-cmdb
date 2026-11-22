@@ -14,6 +14,7 @@ import { StatTile } from '../components/Simple';
 import { ASSET_TYPE_ICONS } from '../components/icons';
 import { EntityLink, RecentActivityFeed } from '../components/ActivityLog';
 import { tintBg, tintFg } from '../lib/palette';
+import { C } from '../theme';
 
 function greeting() {
   const h = dayjs().hour();
@@ -45,11 +46,11 @@ export function DashboardPage() {
             {types.shown(byType as Partial<Record<AssetType, number>>).map((t) => (
               <StatTile key={t} to={`/inventory/${ASSET_TYPES[t].slug}`} icon={ASSET_TYPE_ICONS[t]} color={ASSET_TYPES[t].color} value={byType[t] ?? 0} label={ASSET_TYPES[t].plural} />
             ))}
-            <StatTile to="/activities" icon={<ScheduleOutlined />} color="#b26a00" value={data.totals.openActivities} label="Open activities" />
+            <StatTile to="/activities" icon={<ScheduleOutlined />} color={C.amber} value={data.totals.openActivities} label="Open activities" />
             <StatTile
               to={attentionLink()}
               icon={<SafetyCertificateOutlined />}
-              color={attention.data?.total ? '#c4262e' : '#1e9e5a'}
+              color={attention.data?.total ? C.bad : C.ok}
               value={attention.data?.total ?? '–'}
               label="Devices need attention"
             />
@@ -57,7 +58,7 @@ export function DashboardPage() {
               <StatTile
                 to="/certificates?due=soon"
                 icon={<FileProtectOutlined />}
-                color={certsDue ? '#c4262e' : '#1e9e5a'}
+                color={certsDue ? C.bad : C.ok}
                 value={certsDue}
                 label={`Certificates expired or expiring within ${CERT_DAYS.warning} days`}
               />
@@ -86,10 +87,10 @@ export function DashboardPage() {
                             </Tag>
                             <div style={{ minWidth: 0, flex: 1 }}>
                               <div style={{ fontWeight: 600 }}>{act.title}</div>
-                              <div className="muted" style={{ fontSize: 13.5 }}>
+                              <div className="muted fs-small">
                                 {act.entity_label && <EntityLink type={act.entity_type} id={act.entity_id} label={act.entity_label} />}
                                 {act.due_date && (
-                                  <span style={{ color: d !== null && d < 0 ? '#c4262e' : undefined, fontWeight: d !== null && d < 0 ? 600 : undefined }}>
+                                  <span style={{ color: d !== null && d < 0 ? C.badText : undefined, fontWeight: d !== null && d < 0 ? 600 : undefined }}>
                                     {' '}
                                     · {d !== null && d < 0 ? `overdue since ${fmtDate(act.due_date)}` : `due ${fmtDate(act.due_date)}`}
                                   </span>
@@ -108,7 +109,7 @@ export function DashboardPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     {data.byPlant.slice(0, 8).map((p) => (
                       <Link key={p.plant_id} to={`/plants/${p.plant_id}`} className="plant-row">
-                        <span className="stat-icon" style={{ width: 40, height: 40, fontSize: 18, background: tintBg('#2563eb'), color: tintFg('#2563eb') }}>
+                        <span className="stat-icon" style={{ width: 40, height: 40, fontSize: 18, background: tintBg(C.primary), color: tintFg(C.primary) }}>
                           <BankOutlined />
                         </span>
                         <span style={{ flex: 1, minWidth: 0 }}>

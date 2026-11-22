@@ -7,6 +7,7 @@ import { ROLES, ROLE_META } from '../../../../shared/model';
 import { errorText, http } from '../../lib/api';
 import { fmtDateTime, fromNow } from '../../lib/format';
 import { usePlants } from '../../lib/queries';
+import { C } from '../../theme';
 
 /** API tokens for scripts and other systems, and webhooks that report changes to other systems. */
 export function IntegrationsTab() {
@@ -107,7 +108,7 @@ function TokensCard() {
               ) : (
                 <span>
                   <Tag color="green">Active</Tag>
-                  {t.expires_at && <span className="muted" style={{ fontSize: 12 }}>until {fmtDateTime(t.expires_at).slice(0, 10)}</span>}
+                  {t.expires_at && <span className="caption">until {fmtDateTime(t.expires_at).slice(0, 10)}</span>}
                 </span>
               ),
           },
@@ -164,7 +165,7 @@ function TokensCard() {
               <Select mode="multiple" allowClear placeholder="All plants" options={(plants.data ?? []).map((p) => ({ value: p.id, label: `${p.code} – ${p.name}` }))} />
             </Form.Item>
           )}
-          <Typography.Text type="secondary" style={{ fontSize: 12.5 }}>
+          <Typography.Text type="secondary" className="fs-caption">
             {ROLE_META[(role ?? 'viewer') as keyof typeof ROLE_META].description}
           </Typography.Text>
         </Form>
@@ -174,7 +175,7 @@ function TokensCard() {
         <Typography.Paragraph copyable className="mono" style={{ wordBreak: 'break-all', background: 'var(--cmdb-surface-2, #f5f5f5)', padding: 10, borderRadius: 6 }}>
           {created?.token}
         </Typography.Paragraph>
-        <Typography.Text type="secondary" style={{ fontSize: 12.5 }}>
+        <Typography.Text type="secondary" className="fs-caption">
           Example: <span className="mono">curl -H "Authorization: Bearer {created?.token_prefix}…" {window.location.origin}/api/assets</span>
         </Typography.Text>
       </Modal>
@@ -271,8 +272,8 @@ function WebhooksCard() {
               <div>
                 {h.last_delivery_at ? (
                   <>
-                    <span style={{ color: h.last_status?.startsWith('HTTP 2') ? undefined : '#cf1322' }}>{h.last_status}</span>
-                    <div className="muted" style={{ fontSize: 12 }}>
+                    <span style={{ color: h.last_status?.startsWith('HTTP 2') ? undefined : C.badText }}>{h.last_status}</span>
+                    <div className="caption">
                       {fromNow(h.last_delivery_at)}
                     </div>
                   </>
@@ -390,11 +391,11 @@ function DeliveriesDrawer({ hook, onClose }: { hook: WebhookDto | null; onClose:
             render: (_, d) => (
               <div>
                 <Tag color={d.status === 'ok' ? 'green' : d.status === 'failed' ? 'red' : 'blue'}>{d.status}</Tag>
-                <span className="muted" style={{ fontSize: 12 }}>
+                <span className="caption">
                   {d.attempts} attempt{d.attempts === 1 ? '' : 's'}
                 </span>
-                {d.last_error && <div style={{ fontSize: 12, color: '#cf1322' }}>{d.last_error}</div>}
-                {d.status === 'pending' && d.attempts > 0 && <div className="muted" style={{ fontSize: 12 }}>next try {fromNow(d.next_attempt_at)}</div>}
+                {d.last_error && <div className="caption" style={{ color: C.badText }}>{d.last_error}</div>}
+                {d.status === 'pending' && d.attempts > 0 && <div className="caption">next try {fromNow(d.next_attempt_at)}</div>}
               </div>
             ),
           },

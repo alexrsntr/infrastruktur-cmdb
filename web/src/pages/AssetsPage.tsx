@@ -31,7 +31,7 @@ export function AssetsPage() {
         title={type ? ASSET_TYPES[type].plural : 'Devices'}
         subtitle="All network, server, power, production and other devices of your plants. Click a device to see its details and activity log."
       />
-      <div className="tile-grid" style={{ marginBottom: 20 }}>
+      <div className="tile-grid swipe-row" style={{ marginBottom: 20 }}>
         <StatTile to={`/inventory${qs}`} active={!type} icon={<AppstoreOutlined />} value={total ?? '–'} label="All devices" />
         {[...types.shown(counts as Partial<Record<AssetType, number>>), ...(type && !types.shown(counts as Partial<Record<AssetType, number>>).includes(type) ? [type] : [])].map((t) => (
           <StatTile

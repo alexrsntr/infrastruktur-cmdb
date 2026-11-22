@@ -19,6 +19,8 @@ export function LoginPage({ config }: { config?: AppConfig }) {
   const params = new URLSearchParams(window.location.search);
   const returnTo = params.get('returnTo') ?? (window.location.pathname === '/login' ? '/' : window.location.pathname + window.location.search);
   const rt = encodeURIComponent(returnTo);
+  // the card is light in the light scheme: logo for light backgrounds first
+  const logo = config?.logoUrl?.light ?? config?.logoUrl?.dark ?? null;
 
   return (
     <div
@@ -26,17 +28,19 @@ export function LoginPage({ config }: { config?: AppConfig }) {
         minHeight: '100vh',
         display: 'grid',
         placeItems: 'center',
-        background: `linear-gradient(135deg, ${HEADER_BG} 0%, #134a7c 55%, var(--cmdb-bg) 55.1%)`,
+        background: `linear-gradient(135deg, ${HEADER_BG} 0%, color-mix(in srgb, var(--cmdb-primary) 45%, ${HEADER_BG}) 55%, var(--cmdb-bg) 55.1%)`,
         padding: 24,
       }}
     >
-      <Card style={{ width: 420, boxShadow: '0 12px 40px rgba(11,42,74,.25)' }} styles={{ body: { padding: 32 } }}>
+      <Card style={{ width: 420, maxWidth: '100%', boxShadow: '0 12px 40px rgba(11,42,74,.25)' }} styles={{ body: { padding: 32 } }}>
         <Space align="center" size={12} style={{ marginBottom: 24 }}>
-          <BrandMark size={40} />
+          {logo ? <img src={logo} alt={config?.brandName} className="login-logo" /> : <BrandMark size={40} />}
           <div>
-            <Typography.Text type="secondary" style={{ fontSize: 12, letterSpacing: 1, textTransform: 'uppercase' }}>
-              {config?.brandName ?? 'Infrastruktur'}
-            </Typography.Text>
+            {!logo && (
+              <Typography.Text type="secondary" style={{ fontSize: 12, letterSpacing: 1, textTransform: 'uppercase' }}>
+                {config?.brandName ?? 'Infrastruktur'}
+              </Typography.Text>
+            )}
             <Typography.Title level={4} style={{ margin: 0 }}>
               {config?.appName ?? 'IT Infrastructure'}
             </Typography.Title>

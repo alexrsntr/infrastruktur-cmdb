@@ -187,7 +187,7 @@ export function SiteMap({ plant, buildings, height = 260 }: { plant: Plant; buil
                 </Tooltip>
                 <Popup>
                   <Typography.Text strong>{b.name}</Typography.Text>
-                  <div className="muted" style={{ fontSize: 12 }}>
+                  <div className="caption">
                     {b.asset_count ?? 0} assets · {b.floor_count ?? 0} floors
                   </div>
                   <Link to={`/buildings/${b.id}`}>Open building →</Link>

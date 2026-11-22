@@ -62,6 +62,7 @@ import { useSession } from '../lib/session';
 import { PageHeader } from '../components/PageHeader';
 import { StatTile } from '../components/Simple';
 import { DateStringInput } from '../components/DateStringInput';
+import { C } from '../theme';
 
 type Due = 'all' | 'soon' | 'expired' | 'no_responsible';
 
@@ -127,10 +128,10 @@ export function CertificatesPage() {
       />
 
       <div className="tile-grid" style={{ marginBottom: 20 }}>
-        <StatTile icon={<ExclamationCircleOutlined />} color="#c4262e" value={counts?.expired ?? '–'} label="Expired" onClick={() => setDue('expired')} active={due === 'expired'} />
-        <StatTile icon={<ClockCircleOutlined />} color="#d4380d" value={counts?.critical ?? '–'} label={`Expire within ${CERT_DAYS.critical} days`} onClick={() => setDue('soon')} />
-        <StatTile icon={<ClockCircleOutlined />} color="#b26a00" value={counts?.warning ?? '–'} label={`Expire within ${CERT_DAYS.warning} days`} onClick={() => setDue('soon')} />
-        <StatTile icon={<UserOutlined />} color="#6b35b5" value={counts?.no_responsible ?? '–'} label="Without responsible e-mail" onClick={() => setDue('no_responsible')} active={due === 'no_responsible'} />
+        <StatTile icon={<ExclamationCircleOutlined />} color={C.bad} value={counts?.expired ?? '–'} label="Expired" onClick={() => setDue('expired')} active={due === 'expired'} />
+        <StatTile icon={<ClockCircleOutlined />} color={C.warn} value={counts?.critical ?? '–'} label={`Expire within ${CERT_DAYS.critical} days`} onClick={() => setDue('soon')} />
+        <StatTile icon={<ClockCircleOutlined />} color={C.amber} value={counts?.warning ?? '–'} label={`Expire within ${CERT_DAYS.warning} days`} onClick={() => setDue('soon')} />
+        <StatTile icon={<UserOutlined />} color={C.violet} value={counts?.no_responsible ?? '–'} label="Without responsible e-mail" onClick={() => setDue('no_responsible')} active={due === 'no_responsible'} />
         <StatTile icon={<FileProtectOutlined />} value={counts?.total ?? '–'} label="Certificates" onClick={() => setDue('all')} active={due === 'all'} />
       </div>
 
@@ -191,7 +192,7 @@ export function CertificatesPage() {
               render: (_, c) => (
                 <div>
                   <div style={{ fontWeight: 650, fontSize: 15 }}>{c.name}</div>
-                  <Typography.Text type="secondary" style={{ fontSize: 12.5 }}>
+                  <Typography.Text type="secondary" className="fs-caption">
                     {[c.common_name && c.common_name !== c.name ? c.common_name : null, CERT_KIND_META[c.kind].label, c.issuer].filter(Boolean).join(' · ')}
                   </Typography.Text>
                 </div>
@@ -220,14 +221,14 @@ export function CertificatesPage() {
                       <div key={i} style={{ marginBottom: 2 }}>
                         <div>{r.name ?? r.email}</div>
                         {r.name && r.email && (
-                          <Typography.Text type="secondary" style={{ fontSize: 12.5 }}>
+                          <Typography.Text type="secondary" className="fs-caption">
                             {r.email}
                           </Typography.Text>
                         )}
                       </div>
                     ))}
                     {c.responsibles.length > 2 && (
-                      <Typography.Text type="secondary" style={{ fontSize: 12.5 }} title={c.responsibles.slice(2).map((r) => r.name ?? r.email).join(', ')}>
+                      <Typography.Text type="secondary" className="fs-caption" title={c.responsibles.slice(2).map((r) => r.name ?? r.email).join(', ')}>
                         +{c.responsibles.length - 2} more
                       </Typography.Text>
                     )}
@@ -257,7 +258,7 @@ export function CertificatesPage() {
               render: (_, c) => (
                 <Space orientation="vertical" size={2}>
                   <Tag color={CERT_STATUS_META[c.status].color}>{CERT_STATUS_META[c.status].label}</Tag>
-                  {c.auto_renew && <Typography.Text type="secondary" style={{ fontSize: 12 }}>auto-renewed</Typography.Text>}
+                  {c.auto_renew && <Typography.Text type="secondary" className="fs-caption">auto-renewed</Typography.Text>}
                 </Space>
               ),
             },
@@ -364,7 +365,7 @@ function CertificateDrawer({ id, onClose, onEdit }: { id: string | null; onClose
                   content: (
                     <span>
                       {fmtDateTime(r.sent_at)} – {r.threshold_days ? `${r.threshold_days} days before` : 'after expiry'} ({fmtDate(r.expires_on)})
-                      <div className="muted" style={{ fontSize: 12.5 }}>
+                      <div className="caption">
                         {r.recipients.join(', ')}
                       </div>
                     </span>
@@ -384,7 +385,7 @@ function CertificateDrawer({ id, onClose, onEdit }: { id: string | null; onClose
                     <span>
                       <strong>{h.user_name ?? 'System'}</strong> {h.action === 'create' ? 'added the certificate' : h.action === 'update' ? 'changed' : h.action} · {fmtDateTime(h.at)}
                       {h.action === 'update' && h.changes && (
-                        <div className="muted" style={{ fontSize: 12.5 }}>
+                        <div className="caption">
                           {Object.entries(h.changes)
                             .map(([k, v]) => `${k}: ${String((v as { from: unknown }).from ?? '–')} → ${String((v as { to: unknown }).to ?? '–')}`)
                             .join(' · ')}
@@ -596,7 +597,7 @@ function CertificateFormModal({ state, onClose, onSaved }: { state: { open: bool
           </Col>
         </Row>
         {!can('asset.write') && (
-          <Typography.Text type="secondary" style={{ fontSize: 12.5 }}>
+          <Typography.Text type="secondary" className="fs-caption">
             As local administrator you can change certificates of your plants – adding new ones is done by the central IT.
           </Typography.Text>
         )}

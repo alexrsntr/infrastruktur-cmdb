@@ -40,6 +40,7 @@ import { ActivityKindTag, ActivityStatusTag, DueDate } from './Tags';
 import { ExportMenu } from './ExportMenu';
 import { AttachmentsPanel } from './AttachmentsPanel';
 import { ActivityLog } from './ActivityLog';
+import { C } from '../theme';
 
 // ---------------------------------------------------------------------------
 // Notes
@@ -105,7 +106,7 @@ export function NotesPanel({ entityType, entityId }: { entityType: EntityType; e
             }}
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            <Typography.Text type="secondary" className="fs-caption">
               Ctrl + Enter to save
             </Typography.Text>
             <Button type="primary" icon={<PlusOutlined />} onClick={add} loading={saving} disabled={!draft.trim()}>
@@ -124,14 +125,14 @@ export function NotesPanel({ entityType, entityId }: { entityType: EntityType; e
         renderItem={(n) => (
           <Card size="small" style={{ marginBottom: 10, borderLeft: n.pinned ? '3px solid #faad14' : undefined }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              <Typography.Text type="secondary" className="fs-caption">
                 <strong>{n.created_by_name ?? 'Unknown'}</strong> · <Tooltip title={fmtDateTime(n.created_at)}>{fromNow(n.created_at)}</Tooltip>
                 {n.updated_at !== n.created_at && <span> · edited</span>}
               </Typography.Text>
               {mayChange(n) && (
                 <Space size={0}>
                   <Tooltip title={n.pinned ? 'Unpin' : 'Pin to top'}>
-                    <Button size="small" type="text" icon={n.pinned ? <PushpinFilled style={{ color: '#faad14' }} /> : <PushpinOutlined />} onClick={() => update(n, { pinned: !n.pinned })} />
+                    <Button size="small" type="text" icon={n.pinned ? <PushpinFilled style={{ color: C.warn }} /> : <PushpinOutlined />} onClick={() => update(n, { pinned: !n.pinned })} />
                   </Tooltip>
                   <Button size="small" type="text" icon={<EditOutlined />} onClick={() => { setEditing(n); setEditText(n.body); }} />
                   <Popconfirm title="Delete this note?" onConfirm={() => remove(n)} okButtonProps={{ danger: true }}>

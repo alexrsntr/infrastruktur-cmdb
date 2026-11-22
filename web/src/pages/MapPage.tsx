@@ -68,7 +68,7 @@ export function MapPage() {
                       }
                       title={<span style={{ fontWeight: 500 }}>{p.name}</span>}
                       description={
-                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                        <Typography.Text type="secondary" className="fs-caption">
                           {[p.city, p.country].filter(Boolean).join(', ') || '–'} · {p.asset_count ?? 0} assets
                           {(p.latitude === null || p.longitude === null) && <Tag style={{ marginLeft: 6 }}>no coordinates</Tag>}
                         </Typography.Text>

@@ -190,7 +190,7 @@ export function FloorPlanMap({
           {canManagePlan && (
             <Space direction="vertical" align="center">
               {uploadButton('Upload floor plan', true)}
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              <Typography.Text type="secondary" className="fs-caption">
                 PNG, JPEG or WebP · max. 15 MB · export PDF/CAD plans as image first
               </Typography.Text>
             </Space>
@@ -384,7 +384,7 @@ export function FloorPlanMap({
                       <AssetTypeTag type={a.type} short />
                       <span style={{ minWidth: 0 }}>
                         <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</div>
-                        <div className="muted" style={{ fontSize: 11 }}>
+                        <div className="caption">
                           {a.floor_id ? 'on this floor' : 'no floor assigned'}
                           {a.ip_address ? ` · ${a.ip_address}` : ''}
                         </div>

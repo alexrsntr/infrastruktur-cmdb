@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { App, Button, Col, DatePicker, Form, Input, InputNumber, Modal, Row, Select, Steps, Typography } from 'antd';
+import { App, Button, Col, DatePicker, Form, Input, InputNumber, Row, Select, Steps, Typography } from 'antd';
+import { ResponsiveModal } from './ResponsiveModal';
 import { ArrowLeftOutlined, ArrowRightOutlined, CheckOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -175,7 +176,7 @@ function AddDeviceWizard({ open, defaults, onClose }: { open: boolean; defaults:
   );
 
   return (
-    <Modal
+    <ResponsiveModal
       open={open}
       onCancel={onClose}
       title={step > 0 && passive ? 'Add cabling' : 'Add a device'}
@@ -383,7 +384,7 @@ function AddDeviceWizard({ open, defaults, onClose }: { open: boolean; defaults:
           </Row>
         )}
       </Form>
-    </Modal>
+    </ResponsiveModal>
   );
 }
 

@@ -370,7 +370,7 @@ export function AttachmentsPanel({ entityType, entityId, embedded = false, readO
                     <a href={fileUrl(a)} target="_blank" rel="noopener noreferrer">
                       {a.title ?? a.file_name}
                     </a>
-                    {a.title && <Typography.Text type="secondary" style={{ fontSize: 12 }}>{a.file_name}</Typography.Text>}
+                    {a.title && <Typography.Text type="secondary" className="fs-caption">{a.file_name}</Typography.Text>}
                   </Space>
                 ),
               },

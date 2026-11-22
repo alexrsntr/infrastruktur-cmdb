@@ -12,6 +12,7 @@ import { download, exportUrl, MoreMenu } from '../components/PageParts';
 import { StatTile } from '../components/Simple';
 import { ActivitiesTable, ActivityFormModal } from '../components/Journal';
 import { AssetTypeTag } from '../components/Tags';
+import { C } from '../theme';
 
 interface AssetOption {
   id: string;
@@ -77,7 +78,7 @@ function NewActivityDialog({ open, onClose }: { open: boolean; onClose: () => vo
               <Space size={6}>
                 <AssetTypeTag type={a.type} short />
                 <strong>{a.name}</strong>
-                <span className="muted" style={{ fontSize: 12 }}>
+                <span className="caption">
                   {[ASSET_TYPES[a.type]?.label, a.ip_address, a.plant_code].filter(Boolean).join(' · ')}
                 </span>
               </Space>
@@ -213,16 +214,16 @@ export function ActivitiesPage() {
 
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={12} lg={6}>
-          <StatTile icon={<ClockCircleOutlined />} value={kpiOpen.data?.total ?? '–'} label="Open" color="#1a5fb4" active={view === 'open'} onClick={() => setView('open')} />
+          <StatTile icon={<ClockCircleOutlined />} value={kpiOpen.data?.total ?? '–'} label="Open" color={C.primary} active={view === 'open'} onClick={() => setView('open')} />
         </Col>
         <Col xs={12} lg={6}>
-          <StatTile icon={<ExclamationCircleOutlined />} value={kpiOverdue.data?.total ?? '–'} label="Overdue" color="#d9363e" active={view === 'overdue'} onClick={() => setView('overdue')} />
+          <StatTile icon={<ExclamationCircleOutlined />} value={kpiOverdue.data?.total ?? '–'} label="Overdue" color={C.bad} active={view === 'overdue'} onClick={() => setView('overdue')} />
         </Col>
         <Col xs={12} lg={6}>
-          <StatTile icon={<SyncOutlined />} value={kpiProgress.data?.total ?? '–'} label="In progress" color="#d98a00" active={view === 'in_progress'} onClick={() => setView('in_progress')} />
+          <StatTile icon={<SyncOutlined />} value={kpiProgress.data?.total ?? '–'} label="In progress" color={C.warn} active={view === 'in_progress'} onClick={() => setView('in_progress')} />
         </Col>
         <Col xs={12} lg={6}>
-          <StatTile icon={<CheckCircleOutlined />} value={kpiDone.data?.total ?? '–'} label="Done" color="#1e9e5a" active={view === 'done'} onClick={() => setView('done')} />
+          <StatTile icon={<CheckCircleOutlined />} value={kpiDone.data?.total ?? '–'} label="Done" color={C.ok} active={view === 'done'} onClick={() => setView('done')} />
         </Col>
       </Row>
 

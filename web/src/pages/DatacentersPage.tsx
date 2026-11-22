@@ -10,6 +10,7 @@ import { useSession } from '../lib/session';
 import { PageHeader } from '../components/PageHeader';
 import { ExportMenu } from '../components/ExportMenu';
 import { DatacenterFormModal } from '../components/DatacenterForms';
+import { C } from '../theme';
 
 export function useDatacenters(plantId?: string) {
   return useQuery({ queryKey: ['datacenters', plantId ?? 'all'], queryFn: () => http.get<DatacenterSummary[]>('/api/datacenters', { plantId }) });
@@ -71,13 +72,13 @@ export function DatacentersPage() {
       ) : !list.data?.length ? (
         <Card>
           <Empty
-            image={<ApartmentOutlined style={{ fontSize: 56, color: '#9aa7b4' }} />}
+            image={<ApartmentOutlined style={{ fontSize: 56, color: C.idle }} />}
             description={
               <div style={{ maxWidth: 560, margin: '0 auto' }}>
                 <Typography.Title level={4} style={{ marginTop: 8 }}>
                   No server room or data center documented yet
                 </Typography.Title>
-                <Typography.Paragraph type="secondary" style={{ fontSize: 15 }}>
+                <Typography.Paragraph type="secondary">
                   Document the server room of a plant – its racks are assigned automatically. A data center groups server rooms. If it is <strong>stretched</strong> across two buildings – for example a cluster with hosts in both rooms – both rooms are drawn side by side with
                   their racks, the fibre links between them and the connections of the core switches.
                 </Typography.Paragraph>
@@ -150,7 +151,6 @@ export function DatacentersPage() {
 
       <DatacenterFormModal open={creating} onClose={() => setCreating(false)} defaultPlantId={plantId} onSaved={(dc) => navigate(`/datacenters/${dc.id}`)} />
       <style>{`
-        .page-icon { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; font-size: 26px; background: var(--cmdb-primary-soft); color: var(--ant-color-primary, #2563eb); flex: 0 0 auto; }
         .dc-card-site { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 15px; padding: 8px 10px; background: var(--cmdb-surface-2); border-radius: 8px; }
         .dc-card-counts { display: flex; gap: 22px; flex-wrap: wrap; font-size: 14.5px; color: var(--cmdb-text-2); border-top: 1px solid var(--cmdb-border-soft); padding-top: 12px; }
         .dc-card-counts strong { color: var(--cmdb-text); font-size: 17px; }
