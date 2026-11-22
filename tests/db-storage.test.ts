@@ -7,6 +7,7 @@ import type { Pool } from 'pg';
 import type { Config } from '../server/config';
 import { login, setupTestApp, type Session } from './helpers';
 import { checkAndRunDbStorage } from '../server/services/scheduler';
+import { LOCKS } from '../server/lib/locks';
 import type { DbStorageCheckResult, DbStorageDetails, DbStorageSettings, DbStorageStatus } from '../shared/dbStorage';
 
 /** The app warns its administrators (banner + e-mail) before the PostgreSQL server runs out of space. */
@@ -155,5 +156,17 @@ describe('database storage', () => {
     expect(await checkAndRunDbStorage(pool, config)).toBe('ran');
     const audit = await admin.get('/api/audit?entityType=settings').expect(200);
     expect(JSON.stringify(audit.body)).toMatch(/Database storage/);
+  });
+
+  it('is not blocked by the webhook dispatcher (every background job has its own lock)', async () => {
+    const other = await pool.connect();
+    try {
+      // another instance is delivering webhooks right now
+      await other.query('SELECT pg_advisory_lock($1)', [LOCKS.webhooks]);
+      expect(await checkAndRunDbStorage(pool, config)).toBe('ran');
+    } finally {
+      await other.query('SELECT pg_advisory_unlock($1)', [LOCKS.webhooks]);
+      other.release();
+    }
   });
 });

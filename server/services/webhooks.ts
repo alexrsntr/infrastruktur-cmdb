@@ -4,6 +4,7 @@ import { eventMatches } from '../../shared/integrations';
 import type { Config } from '../config';
 import { decryptSecret } from '../lib/secrets';
 import { log } from '../lib/log';
+import { LOCKS } from '../lib/locks';
 
 /**
  * Webhook dispatcher. Events are written to event_outbox together with the audit entry (same transaction);
@@ -18,7 +19,6 @@ import { log } from '../lib/log';
 
 export type FetchLike = (url: string, init: { method: string; headers: Record<string, string>; body: string; signal?: AbortSignal }) => Promise<{ status: number; text: () => Promise<string> }>;
 
-const LOCK_ID = 727_004;
 export const MAX_ATTEMPTS = 6;
 const TIMEOUT_MS = 10_000;
 const BATCH = 25;
@@ -152,7 +152,7 @@ async function deliverDue(pool: Pool, config: Config, fetchImpl: FetchLike, now:
 export async function dispatchWebhooks(pool: Pool, config: Config, fetchImpl: FetchLike = fetch as unknown as FetchLike, now = new Date()): Promise<DispatchResult | 'locked'> {
   const lock = await pool.connect();
   try {
-    const { rows } = await lock.query<{ ok: boolean }>('SELECT pg_try_advisory_lock($1) AS ok', [LOCK_ID]);
+    const { rows } = await lock.query<{ ok: boolean }>('SELECT pg_try_advisory_lock($1) AS ok', [LOCKS.webhooks]);
     if (!rows[0].ok) return 'locked';
     try {
       const fannedOut = await fanOut(pool, now);
@@ -161,7 +161,7 @@ export async function dispatchWebhooks(pool: Pool, config: Config, fetchImpl: Fe
       await pool.query(`DELETE FROM event_outbox WHERE fanned_out AND created_at < now() - interval '14 days'`);
       return { fannedOut, ...res };
     } finally {
-      await lock.query('SELECT pg_advisory_unlock($1)', [LOCK_ID]).catch(() => undefined);
+      await lock.query('SELECT pg_advisory_unlock($1)', [LOCKS.webhooks]).catch(() => undefined);
     }
   } finally {
     lock.release();

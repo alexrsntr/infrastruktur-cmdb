@@ -6,6 +6,7 @@ import { withTransaction, type DbClient } from '../db/pool';
 import { audit } from '../lib/audit';
 import { decryptSecret } from '../lib/secrets';
 import { log } from '../lib/log';
+import { LOCKS } from '../lib/locks';
 import { collectAd, type LdapFactory } from './ad';
 import { openSession, sweep } from './snmp';
 
@@ -265,13 +266,11 @@ export async function runDiscovery(pool: Pool, config: Config, sourceId: string,
 
 // ---------------------------------------------------------------------------- schedule
 
-const LOCK_ID = 727_005;
-
 /** Runs every source whose interval has passed. Only one instance does this at a time. */
 export async function runDueSources(pool: Pool, config: Config, deps: DiscoveryDeps = {}): Promise<number> {
   const lock = await pool.connect();
   try {
-    const { rows } = await lock.query<{ ok: boolean }>('SELECT pg_try_advisory_lock($1) AS ok', [LOCK_ID]);
+    const { rows } = await lock.query<{ ok: boolean }>('SELECT pg_try_advisory_lock($1) AS ok', [LOCKS.discovery]);
     if (!rows[0].ok) return 0;
     try {
       // runs that never finished (instance restarted)
@@ -286,7 +285,7 @@ export async function runDueSources(pool: Pool, config: Config, deps: DiscoveryD
       for (const s of due) await runDiscovery(pool, config, s.id, 'schedule', deps);
       return due.length;
     } finally {
-      await lock.query('SELECT pg_advisory_unlock($1)', [LOCK_ID]).catch(() => undefined);
+      await lock.query('SELECT pg_advisory_unlock($1)', [LOCKS.discovery]).catch(() => undefined);
     }
   } finally {
     lock.release();

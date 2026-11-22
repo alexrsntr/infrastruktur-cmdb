@@ -1,15 +1,14 @@
 import type pg from 'pg';
 import { migrations } from './migrations';
 import { log } from '../lib/log';
-
-const LOCK_ID = 727_001; // arbitrary, app specific advisory lock id
+import { LOCKS } from '../lib/locks';
 
 export async function migrate(pool: pg.Pool): Promise<string[]> {
   const client = await pool.connect();
   const applied: string[] = [];
   try {
     // Serialise migrations across multiple app instances (App Service scale-out)
-    await client.query('SELECT pg_advisory_lock($1)', [LOCK_ID]);
+    await client.query('SELECT pg_advisory_lock($1)', [LOCKS.migrate]);
     await client.query(`
       CREATE TABLE IF NOT EXISTS schema_migration (
         id          text PRIMARY KEY,
@@ -33,7 +32,7 @@ export async function migrate(pool: pg.Pool): Promise<string[]> {
       }
     }
   } finally {
-    await client.query('SELECT pg_advisory_unlock($1)', [LOCK_ID]).catch(() => undefined);
+    await client.query('SELECT pg_advisory_unlock($1)', [LOCKS.migrate]).catch(() => undefined);
     client.release();
   }
   return applied;

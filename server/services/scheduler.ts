@@ -1,6 +1,7 @@
 import type { Pool } from 'pg';
 import type { Config } from '../config';
 import { log } from '../lib/log';
+import { LOCKS } from '../lib/locks';
 import { loadWarrantySettings, localParts, runWarrantyJob } from './warrantyNotifications';
 import { loadCertificateSettings, runCertificateJob } from './certificateNotifications';
 import { checkDbStorage } from './dbStorage';
@@ -13,7 +14,6 @@ import { checkDbStorage } from './dbStorage';
  * notification_log rows are claimed with ON CONFLICT DO NOTHING.
  */
 
-const LOCK_ID = 727_002;
 const CHECK_INTERVAL_MS = 10 * 60 * 1000;
 const FIRST_CHECK_MS = 30 * 1000;
 const MAX_ATTEMPTS_PER_DAY = 3;
@@ -21,7 +21,7 @@ const MAX_ATTEMPTS_PER_DAY = 3;
 export async function checkAndRun(pool: Pool, config: Config, now: Date = new Date()): Promise<'ran' | 'not-due' | 'locked' | 'disabled'> {
   const client = await pool.connect();
   try {
-    const { rows } = await client.query<{ locked: boolean }>('SELECT pg_try_advisory_lock($1) AS locked', [LOCK_ID]);
+    const { rows } = await client.query<{ locked: boolean }>('SELECT pg_try_advisory_lock($1) AS locked', [LOCKS.warrantyNotifications]);
     if (!rows[0].locked) return 'locked';
     try {
       const { settings } = await loadWarrantySettings(client);
@@ -37,20 +37,18 @@ export async function checkAndRun(pool: Pool, config: Config, now: Date = new Da
       await runWarrantyJob(pool, config, { trigger: 'schedule', now });
       return 'ran';
     } finally {
-      await client.query('SELECT pg_advisory_unlock($1)', [LOCK_ID]).catch(() => undefined);
+      await client.query('SELECT pg_advisory_unlock($1)', [LOCKS.warrantyNotifications]).catch(() => undefined);
     }
   } finally {
     client.release();
   }
 }
 
-const CERT_LOCK_ID = 727_003;
-
 /** Daily certificate reminders (and the weekly overview) – same rules as the warranty digest. */
 export async function checkAndRunCertificates(pool: Pool, config: Config, now: Date = new Date()): Promise<'ran' | 'not-due' | 'locked' | 'disabled'> {
   const client = await pool.connect();
   try {
-    const { rows } = await client.query<{ locked: boolean }>('SELECT pg_try_advisory_lock($1) AS locked', [CERT_LOCK_ID]);
+    const { rows } = await client.query<{ locked: boolean }>('SELECT pg_try_advisory_lock($1) AS locked', [LOCKS.certificateNotifications]);
     if (!rows[0].locked) return 'locked';
     try {
       const { settings } = await loadCertificateSettings(client);
@@ -66,27 +64,26 @@ export async function checkAndRunCertificates(pool: Pool, config: Config, now: D
       await runCertificateJob(pool, config, { trigger: 'schedule', now });
       return 'ran';
     } finally {
-      await client.query('SELECT pg_advisory_unlock($1)', [CERT_LOCK_ID]).catch(() => undefined);
+      await client.query('SELECT pg_advisory_unlock($1)', [LOCKS.certificateNotifications]).catch(() => undefined);
     }
   } finally {
     client.release();
   }
 }
 
-const STORAGE_LOCK_ID = 727_004;
 const STORAGE_INTERVAL_MS = 60 * 60 * 1000;
 
 /** Hourly database storage check – e-mails the administrators when a threshold is reached (once per level). */
 export async function checkAndRunDbStorage(pool: Pool, config: Config, now: Date = new Date()): Promise<'ran' | 'locked'> {
   const client = await pool.connect();
   try {
-    const { rows } = await client.query<{ locked: boolean }>('SELECT pg_try_advisory_lock($1) AS locked', [STORAGE_LOCK_ID]);
+    const { rows } = await client.query<{ locked: boolean }>('SELECT pg_try_advisory_lock($1) AS locked', [LOCKS.dbStorage]);
     if (!rows[0].locked) return 'locked';
     try {
       await checkDbStorage(pool, config, now);
       return 'ran';
     } finally {
-      await client.query('SELECT pg_advisory_unlock($1)', [STORAGE_LOCK_ID]).catch(() => undefined);
+      await client.query('SELECT pg_advisory_unlock($1)', [LOCKS.dbStorage]).catch(() => undefined);
     }
   } finally {
     client.release();
@@ -111,8 +108,9 @@ export function startScheduler(pool: Pool, config: Config): () => void {
     }
     try {
       if (Date.now() - lastStorageCheck >= STORAGE_INTERVAL_MS) {
-        lastStorageCheck = Date.now();
-        await checkAndRunDbStorage(pool, config);
+        // only a check that really ran counts – if another instance held the lock or the check failed, it is
+        // tried again at the next tick instead of an hour later
+        if ((await checkAndRunDbStorage(pool, config)) === 'ran') lastStorageCheck = Date.now();
       }
     } catch (err) {
       log.error('scheduler: database storage check failed', { error: (err as Error).message });
