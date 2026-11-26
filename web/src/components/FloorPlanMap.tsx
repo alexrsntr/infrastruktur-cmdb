@@ -10,7 +10,7 @@ import { dash } from '../lib/format';
 import { useAssets, useInvalidate, useRacks } from '../lib/queries';
 import { useSession } from '../lib/session';
 import { AssetStatusTag, AssetTypeTag } from './Tags';
-import { RACK_MARKER_COLOR, rackMarkerHtml } from './rackMarker';
+import { RACK_MARKER_COLOR, RACK_MARKER_SIZE, rackMarkerHtml } from './rackMarker';
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
@@ -41,18 +41,19 @@ function assetIcon(a: Asset, highlighted: boolean) {
   return icon;
 }
 
-/** Racks are drawn as a labelled box centred on their position (the wrapper is 0×0, CSS centres the label). */
-function rackIcon(r: Rack, highlighted: boolean) {
-  const key = `rack|${r.name}|${highlighted}`;
+/** Racks are a square icon centred exactly on their position; the name is shown in the tooltip. */
+function rackIcon(highlighted: boolean) {
+  const key = `rack|${highlighted}`;
   const cached = iconCache.get(key);
   if (cached) return cached;
+  const half = RACK_MARKER_SIZE / 2;
   const icon = L.divIcon({
     className: '',
-    html: rackMarkerHtml(r.name, highlighted),
-    iconSize: [0, 0],
-    iconAnchor: [0, 0],
-    popupAnchor: [0, -12],
-    tooltipAnchor: [0, -12],
+    html: rackMarkerHtml(highlighted),
+    iconSize: [RACK_MARKER_SIZE, RACK_MARKER_SIZE],
+    iconAnchor: [half, half],
+    popupAnchor: [0, -half - 2],
+    tooltipAnchor: [0, -half - 2],
   });
   iconCache.set(key, icon);
   return icon;
@@ -407,7 +408,7 @@ export function FloorPlanMap({
               <Marker
                 key={`rack-${r.id}`}
                 position={toLatLng(r)}
-                icon={rackIcon(r, r.id === highlightRackId)}
+                icon={rackIcon(r.id === highlightRackId)}
                 draggable={canPlaceRacks && editMode}
                 // below the device markers, so devices placed on top of a rack stay clickable
                 zIndexOffset={r.id === highlightRackId ? 1000 : -500}

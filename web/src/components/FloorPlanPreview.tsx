@@ -79,9 +79,11 @@ export function RackFloorPlanPreview({ rack }: { rack: Rack }) {
       tooltip={`Rack ${rack.name} – open floor plan`}
       marker={
         placed && (
-          <span className="rack-marker selected" style={{ left: `${rack.map_x! * 100}%`, top: `${rack.map_y! * 100}%` }}>
+          <span
+            className="rack-marker selected"
+            style={{ position: 'absolute', left: `${rack.map_x! * 100}%`, top: `${rack.map_y! * 100}%`, transform: 'translate(-50%, -50%)' }}
+          >
             <RackGlyph />
-            <span>{rack.name}</span>
           </span>
         )
       }
