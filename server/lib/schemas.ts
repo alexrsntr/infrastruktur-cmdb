@@ -226,6 +226,15 @@ export const rackSchema = z.object({
   description: optText(4000),
 });
 
+/** Position of a rack on the floor plan of a floor of its building; empty map_x/map_y removes it from the plan. */
+export const rackPositionSchema = z
+  .object({
+    floor_id: z.string().uuid(),
+    map_x: optNumber(0, 1),
+    map_y: optNumber(0, 1),
+  })
+  .refine((v) => (v.map_x === null) === (v.map_y === null), 'map_x and map_y must both be set or both be empty');
+
 export const rackItemSchema = z.object({
   kind: z.enum(RACK_ITEM_KINDS),
   label: reqText(100),

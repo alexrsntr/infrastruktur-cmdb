@@ -83,7 +83,7 @@ export function BuildingPage() {
   };
 
   const plans = !floors.length ? (
-    <Empty description="This building has no floors yet. Add a floor, then upload its floor plan to place access points and other devices on it." style={{ padding: '40px 0' }}>
+    <Empty description="This building has no floors yet. Add a floor, then upload its floor plan to place racks, access points and other devices on it." style={{ padding: '40px 0' }}>
       {can('location.write') && (
         <Button type="primary" size="large" icon={<PlusOutlined />} onClick={() => setFloorModal({ open: true })}>
           Add floor
@@ -136,7 +136,7 @@ export function BuildingPage() {
           <Typography.Title level={5} className="print-only-title" style={{ marginTop: 0 }}>
             {b.name} – {floor.name}
           </Typography.Title>
-          <FloorPlanMap floor={floor} buildingId={b.id} height={620} />
+          <FloorPlanMap floor={floor} buildingId={b.id} height={620} highlightRackId={params.get('rack') ?? undefined} />
         </>
       )}
     </div>

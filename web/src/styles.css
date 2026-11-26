@@ -503,6 +503,43 @@ button.stat-tile:focus-visible {
   transform: scale(1.15);
 }
 
+/* Rack on a floor plan: labelled box centred on its position (Leaflet wrapper is 0×0) */
+.rack-marker {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  max-width: 150px;
+  padding: 0 7px;
+  border-radius: 4px;
+  background: #3f4b59;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+}
+
+.rack-marker > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rack-marker > svg {
+  flex: none;
+}
+
+.rack-marker.selected {
+  outline: 3px solid #36cfc9;
+  transform: translate(-50%, -50%) scale(1.1);
+}
+
 .plant-marker {
   display: flex;
   align-items: center;

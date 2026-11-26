@@ -31,6 +31,11 @@ function pointIn(room: Room, rand: () => number, W = 1600, H = 1000) {
   return { map_x: +(x / W).toFixed(4), map_y: +(y / H).toFixed(4) };
 }
 
+/** Fixed point inside a room (fx/fy = 0..1 of the room), without consuming random numbers */
+function fixedPoint(room: Room, fx: number, fy: number, W = 1600, H = 1000) {
+  return { map_x: +((room.x + fx * room.w) / W).toFixed(4), map_y: +((room.y + fy * room.h) / H).toFixed(4) };
+}
+
 function dateOffset(days: number) {
   const d = new Date();
   d.setUTCDate(d.getUTCDate() + Math.round(days));
@@ -99,10 +104,10 @@ export async function seed(pool: Pool, opts: { force?: boolean } = {}) {
       const dcFloor = floors.find((f) => f.buildingCode === 'DC')!;
 
       // ---- racks
-      const createRack = async (floor: (typeof floors)[number], name: string, room: string, height: number, model: string) => {
+      const createRack = async (floor: (typeof floors)[number], name: string, room: string, height: number, model: string, pos: { map_x: number; map_y: number }) => {
         const r = await one(client,
-          `INSERT INTO rack (building_id, floor_id, name, room, height_u, manufacturer, model) VALUES ($1,$2,$3,$4,$5,'Rittal',$6) RETURNING id`,
-          [floor.buildingId, floor.id, name, room, height, model],
+          `INSERT INTO rack (building_id, floor_id, name, room, height_u, manufacturer, model, map_x, map_y) VALUES ($1,$2,$3,$4,$5,'Rittal',$6,$7,$8) RETURNING id`,
+          [floor.buildingId, floor.id, name, room, height, model, pos.map_x, pos.map_y],
         );
         counts.racks++;
         return r.id as string;
@@ -110,13 +115,13 @@ export async function seed(pool: Pool, opts: { force?: boolean } = {}) {
       const addItem = async (rackId: string, kind: string, label: string, u: number, h = 1) => {
         await client.query('INSERT INTO rack_item (rack_id, kind, label, position_u, height_u) VALUES ($1,$2,$3,$4,$5)', [rackId, kind, label, u, h]);
       };
-      const rackNet = await createRack(dcFloor, 'R01', 'Server room', 42, 'VX IT 800x1000');
+      const rackNet = await createRack(dcFloor, 'R01', 'Server room', 42, 'VX IT 800x1000', fixedPoint(DATACENTER_LAYOUT[0], 0.25, 0.15));
       await addItem(rackNet, 'patch_panel', 'LWL panel to buildings (24× LC duplex)', 42);
       await addItem(rackNet, 'patch_panel', 'Copper panel DC (24× RJ45)', 41);
       await addItem(rackNet, 'cable_management', 'Cable management', 40);
       await addItem(rackNet, 'cable_management', 'Cable management', 37);
       await addItem(rackNet, 'pdu', 'PDU A/B (switched)', 1, 2);
-      const rackSrv = await createRack(dcFloor, 'R02', 'Server room', 42, 'VX IT 800x1200');
+      const rackSrv = await createRack(dcFloor, 'R02', 'Server room', 42, 'VX IT 800x1200', fixedPoint(DATACENTER_LAYOUT[0], 0.4, 0.15));
       await addItem(rackSrv, 'patch_panel', 'Copper panel servers (24× RJ45)', 42);
       await addItem(rackSrv, 'cable_management', 'Cable management', 41);
       await addItem(rackSrv, 'shelf', 'KVM console', 30);
@@ -158,7 +163,10 @@ export async function seed(pool: Pool, opts: { force?: boolean } = {}) {
       let apIndex = 1;
       for (const floor of floors.filter((f) => f.buildingCode !== 'DC')) {
         const isHall = floor.buildingCode.startsWith('H');
-        const fdRack = await createRack(floor, `FD-${floorShort(floor.name)}`, isHall ? 'IT cabinet hall' : 'Floor distributor', isHall ? 15 : 24, isHall ? 'AX wall cabinet IP55' : 'FlatBox 24U');
+        const fdRack = await createRack(
+          floor, `FD-${floorShort(floor.name)}`, isHall ? 'IT cabinet hall' : 'Floor distributor', isHall ? 15 : 24, isHall ? 'AX wall cabinet IP55' : 'FlatBox 24U',
+          fixedPoint(floor.layout[floor.layout.length - 1], 0.1, 0.2),
+        );
         if (isHall) {
           await addItem(fdRack, 'patch_panel', 'Industrial panel (12× M12/RJ45)', 13);
           await addItem(fdRack, 'cable_management', 'Cable management', 12);

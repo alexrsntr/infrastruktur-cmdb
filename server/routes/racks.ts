@@ -5,7 +5,7 @@ import { requirePermission } from '../auth/context';
 import { withTransaction, type DbClient } from '../db/pool';
 import { audit, diff, snapshot } from '../lib/audit';
 import { badRequest, notFound, parse, queryString, requireUuid, SqlBuilder } from '../lib/http';
-import { rackItemSchema, rackMountSchema, rackSchema } from '../lib/schemas';
+import { rackItemSchema, rackMountSchema, rackPositionSchema, rackSchema } from '../lib/schemas';
 import { applyScope, assertPlantAccess } from '../lib/scope';
 import { assertRackSlot } from '../services/racks';
 import { deleteAttachmentsFor, purgeBlobs } from '../services/attachments';
@@ -14,6 +14,7 @@ import { resolveAssetLocation } from '../services/assets';
 export const RACK_SELECT = `
   r.id, r.building_id, b.name AS building_name, b.code AS building_code, b.plant_id, p.code AS plant_code, p.name AS plant_name,
   r.floor_id, f.name AS floor_name, r.name, r.room, r.height_u, r.numbering, r.manufacturer, r.model, r.description,
+  r.map_x, r.map_y, (f.plan_image IS NOT NULL) AS floor_has_plan, f.plan_updated_at AS floor_plan_updated_at,
   r.created_at, r.updated_at,
   (SELECT COALESCE(sum(a.rack_height_u), 0) FROM asset a WHERE a.rack_id = r.id AND a.rack_u IS NOT NULL)
     + (SELECT COALESCE(sum(i.height_u), 0) FROM rack_item i WHERE i.rack_id = r.id) AS used_u,
@@ -123,7 +124,10 @@ export function racksRouter(pool: Pool): Router {
       if (top.rows[0].top && top.rows[0].top > input.height_u)
         throw badRequest(`The rack content reaches up to U${top.rows[0].top}; the height cannot be reduced below that.`);
       const { rows } = await db.query(
+        // the floor plan position belongs to the floor (right-hand floor_id is the previous value)
         `UPDATE rack SET floor_id=$2, name=$3, room=$4, height_u=$5, numbering=$6, manufacturer=$7, model=$8, description=$9,
+           map_x = CASE WHEN floor_id IS NOT DISTINCT FROM $2::uuid THEN map_x END,
+           map_y = CASE WHEN floor_id IS NOT DISTINCT FROM $2::uuid THEN map_y END,
            updated_by=$10, updated_at=now() WHERE id=$1 RETURNING *`,
         [id, input.floor_id, input.name, input.room, input.height_u, input.numbering, input.manufacturer, input.model, input.description, req.user!.id],
       );
@@ -137,6 +141,34 @@ export function racksRouter(pool: Pool): Router {
       const changes = diff(before, rows[0]);
       if (Object.keys(changes).length)
         await audit(db, req, { action: 'update', entityType: 'rack', entityId: id, entityLabel: `${before.building_name} / ${input.name}`, plantId: before.plant_id, changes });
+      return loadRack(db, id);
+    });
+    res.json(rack);
+  });
+
+  /** Place, move or remove a rack on the floor plan (building overview). Placing it on another floor moves its devices along. */
+  r.patch('/racks/:id/position', requirePermission('location.edit'), async (req, res) => {
+    const id = requireUuid(req.params.id);
+    const input = parse(rackPositionSchema, req.body);
+    const rack = await withTransaction(pool, async (db) => {
+      const { rows: locked } = await db.query('SELECT * FROM rack WHERE id = $1 FOR UPDATE', [id]);
+      if (!locked[0]) throw notFound('Rack');
+      const before = await rackForWrite(db, id, req.user!);
+      await checkFloor(db, input.floor_id, before.building_id);
+      const { rows } = await db.query(
+        'UPDATE rack SET floor_id=$2, map_x=$3, map_y=$4, updated_by=$5, updated_at=now() WHERE id=$1 RETURNING *',
+        [id, input.floor_id, input.map_x, input.map_y, req.user!.id],
+      );
+      if (input.floor_id !== locked[0].floor_id) {
+        // devices in the rack move with it
+        await db.query(
+          'UPDATE asset SET floor_id = $2, map_x = NULL, map_y = NULL, updated_at = now() WHERE rack_id = $1 AND floor_id IS DISTINCT FROM $2',
+          [id, input.floor_id],
+        );
+      }
+      const changes = diff(locked[0], rows[0]);
+      if (Object.keys(changes).length)
+        await audit(db, req, { action: 'update', entityType: 'rack', entityId: id, entityLabel: `${before.building_name} / ${before.name}`, plantId: before.plant_id, changes });
       return loadRack(db, id);
     });
     res.json(rack);

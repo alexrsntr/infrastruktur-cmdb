@@ -195,3 +195,95 @@ describe('racks', () => {
     expect(items.map((r) => r.status).sort()).toEqual([201, 409, 409]);
   });
 });
+
+describe('racks on floor plans', () => {
+  let local: Session;
+  beforeAll(async () => {
+    local = await login(app, 'local');
+  });
+
+  it('places seeded racks on the floor plans and leaves others for manual placement', async () => {
+    const dcRacks = (await viewer.get(`/api/racks?buildingId=${dc.id}`).expect(200)).body;
+    for (const r of dcRacks) {
+      expect(r.floor_id).toBe(dc.floors[0].id);
+      expect(r.map_x).toBeGreaterThan(0);
+      expect(r.map_y).toBeGreaterThan(0);
+      expect(r).toMatchObject({ floor_has_plan: true, floor_plan_updated_at: expect.any(String) });
+    }
+    const b01Racks = (await viewer.get(`/api/racks?buildingId=${b01.id}`).expect(200)).body;
+    const r11 = b01Racks.find((r: { name: string }) => r.name === 'R11');
+    expect(r11).toMatchObject({ map_x: null, map_y: null });
+  });
+
+  it('places, moves and removes a rack on the floor plan', async () => {
+    const [ground, first] = b01.floors;
+    const rack = (await editor.post('/api/racks', { building_id: b01.id, name: 'R-PLAN', height_u: 24 }).expect(201)).body;
+    expect(rack).toMatchObject({ floor_id: null, map_x: null, map_y: null });
+    const sw = (await editor.post('/api/assets', { type: 'switch', name: 'muc-plan-rack-sw', building_id: b01.id }).expect(201)).body;
+    await editor.patch(`/api/assets/${sw.id}/rack`, { rack_id: rack.id, rack_u: 3 }).expect(200);
+
+    // placing a rack without floor assigns the floor – its devices move along
+    const placed = await local.patch(`/api/racks/${rack.id}/position`, { floor_id: ground.id, map_x: 0.25, map_y: 0.75 }).expect(200);
+    expect(placed.body).toMatchObject({ floor_id: ground.id, floor_name: ground.name, map_x: 0.25, map_y: 0.75 });
+    let device = (await viewer.get(`/api/assets/${sw.id}`).expect(200)).body;
+    expect(device).toMatchObject({ floor_id: ground.id, rack_id: rack.id });
+
+    // dragging on the same floor only changes the position
+    await editor.patch(`/api/assets/${sw.id}/position`, { floor_id: ground.id, map_x: 0.3, map_y: 0.7 }).expect(200);
+    await editor.patch(`/api/racks/${rack.id}/position`, { floor_id: ground.id, map_x: 0.5, map_y: 0.5 }).expect(200);
+    device = (await viewer.get(`/api/assets/${sw.id}`).expect(200)).body;
+    expect(device).toMatchObject({ floor_id: ground.id, map_x: 0.3, map_y: 0.7 });
+
+    // placing it on another floor moves the devices to that floor (their old position does not fit there)
+    await editor.patch(`/api/racks/${rack.id}/position`, { floor_id: first.id, map_x: 0.1, map_y: 0.2 }).expect(200);
+    device = (await viewer.get(`/api/assets/${sw.id}`).expect(200)).body;
+    expect(device).toMatchObject({ floor_id: first.id, map_x: null, map_y: null });
+
+    // remove from plan: the rack stays on its floor
+    const removed = await editor.patch(`/api/racks/${rack.id}/position`, { floor_id: first.id, map_x: null, map_y: null }).expect(200);
+    expect(removed.body).toMatchObject({ floor_id: first.id, map_x: null, map_y: null });
+
+    const history = (await viewer.get(`/api/history?entityType=rack&entityId=${rack.id}`).expect(200)).body;
+    const moves = history.filter((h: { action: string; changes: Record<string, unknown> | null }) => h.action === 'update' && h.changes && 'map_x' in h.changes);
+    expect(moves.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('validates positions and permissions', async () => {
+    const rack = (await editor.post('/api/racks', { building_id: b01.id, floor_id: b01.floors[0].id, name: 'R-PLAN-VAL' }).expect(201)).body;
+    const url = `/api/racks/${rack.id}/position`;
+    const ok = { floor_id: b01.floors[0].id, map_x: 0.5, map_y: 0.5 };
+    await viewer.patch(url, ok).expect(403);
+    await operator.patch(url, ok).expect(403);
+    await editor.patch(url, { ...ok, map_y: null }).expect(400);
+    await editor.patch(url, { ...ok, map_x: 1.5 }).expect(400);
+    await editor.patch(url, { map_x: 0.5, map_y: 0.5 }).expect(400);
+    await editor.patch(url, { ...ok, floor_id: dc.floors[0].id }).expect(400); // floor of another building
+    await editor.patch('/api/racks/00000000-0000-4000-8000-000000000000/position', ok).expect(404);
+
+    // plant scope: the local administrator of MUC cannot move racks in Hamburg
+    const hamRack = (await admin.get(`/api/racks?plantId=${ham.id}`).expect(200)).body.find((r: { floor_id: string | null }) => r.floor_id);
+    await local.patch(`/api/racks/${hamRack.id}/position`, { floor_id: hamRack.floor_id, map_x: 0.5, map_y: 0.5 }).expect(403);
+  });
+
+  it('forgets the position when the floor changes or is deleted', async () => {
+    const [ground, first] = b01.floors;
+    const rack = (await editor.post('/api/racks', { building_id: b01.id, floor_id: ground.id, name: 'R-PLAN-FLOOR', height_u: 12 }).expect(201)).body;
+    await editor.patch(`/api/racks/${rack.id}/position`, { floor_id: ground.id, map_x: 0.4, map_y: 0.6 }).expect(200);
+    const body = { building_id: b01.id, floor_id: ground.id, name: 'R-PLAN-FLOOR', height_u: 12 };
+
+    // editing other fields keeps the position
+    const same = await editor.put(`/api/racks/${rack.id}`, { ...body, room: 'E.01' }).expect(200);
+    expect(same.body).toMatchObject({ room: 'E.01', map_x: 0.4, map_y: 0.6 });
+
+    // another floor: the position belonged to the old plan
+    const moved = await editor.put(`/api/racks/${rack.id}`, { ...body, floor_id: first.id }).expect(200);
+    expect(moved.body).toMatchObject({ floor_id: first.id, map_x: null, map_y: null });
+
+    // deleting the floor removes floor and position
+    const floor = (await editor.post('/api/floors', { building_id: b01.id, name: 'Basement', level: -1 }).expect(201)).body;
+    await editor.patch(`/api/racks/${rack.id}/position`, { floor_id: floor.id, map_x: 0.2, map_y: 0.2 }).expect(200);
+    await editor.del(`/api/floors/${floor.id}`).expect(204);
+    const after = (await viewer.get(`/api/racks/${rack.id}`).expect(200)).body;
+    expect(after).toMatchObject({ floor_id: null, map_x: null, map_y: null });
+  });
+});

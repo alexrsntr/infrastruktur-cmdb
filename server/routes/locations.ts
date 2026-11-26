@@ -281,6 +281,7 @@ export function locationsRouter(pool: Pool): Router {
     await withTransaction(pool, async (db) => {
       keys.push(...(await deleteAttachments(db, 'floor', [id])));
       await db.query('UPDATE asset SET floor_id = NULL, map_x = NULL, map_y = NULL, updated_at = now() WHERE floor_id = $1', [id]);
+      await db.query('UPDATE rack SET floor_id = NULL, map_x = NULL, map_y = NULL, updated_at = now() WHERE floor_id = $1', [id]);
       await db.query('DELETE FROM floor WHERE id = $1', [id]);
       await audit(db, req, { action: 'delete', entityType: 'floor', entityId: id, entityLabel: `${floor.building_name} / ${floor.name}`, plantId: floor.plant_id });
     });

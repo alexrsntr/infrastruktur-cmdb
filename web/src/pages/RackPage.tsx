@@ -9,6 +9,7 @@ import { useInvalidate, useRack } from '../lib/queries';
 import { useSession } from '../lib/session';
 import { PageHeader } from '../components/PageHeader';
 import { AboutCard, download, exportUrl, MoreMenu } from '../components/PageParts';
+import { RackFloorPlanPreview } from '../components/FloorPlanPreview';
 import { journalTabs } from '../components/Journal';
 import { RackElevation, RackLegend, type RackSelection } from '../components/RackElevation';
 import { MountModal, RackFormModal } from '../components/RackForms';
@@ -283,6 +284,20 @@ export function RackPage() {
               <RackLegend types={[...new Set(r.assets.map((x) => x.type))]} />
             </div>
           </Card>
+          {r.floor_id && r.floor_has_plan && (
+            <Card
+              title="Floor plan"
+              style={{ marginTop: 24 }}
+              extra={<Link to={`/buildings/${r.building_id}?floor=${r.floor_id}${r.map_x !== null ? `&rack=${r.id}` : ''}`}>Open {r.floor_name}</Link>}
+            >
+              <RackFloorPlanPreview rack={r} />
+              {r.map_x === null && (
+                <Typography.Paragraph type="secondary" style={{ margin: '10px 0 0' }}>
+                  Not placed on the floor plan yet. Open the floor plan, switch on “Edit positions” and select the rack in the list.
+                </Typography.Paragraph>
+              )}
+            </Card>
+          )}
         </Col>
         <Col xs={24} lg={14} xl={16}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>

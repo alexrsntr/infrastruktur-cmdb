@@ -948,6 +948,11 @@ export interface Rack {
   manufacturer: string | null;
   model: string | null;
   description: string | null;
+  /** Position on the floor plan of its floor (normalised 0..1, origin top-left) */
+  map_x: number | null;
+  map_y: number | null;
+  floor_has_plan?: boolean;
+  floor_plan_updated_at?: string | null;
   created_at: string;
   updated_at: string;
   used_u?: number;

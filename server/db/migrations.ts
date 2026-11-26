@@ -23,6 +23,7 @@ import { certificatesMigration } from './migrations/020_certificates';
 import { wifiNamingMigration } from './migrations/021_wifi_naming';
 import { certificateResponsiblesMigration } from './migrations/022_certificate_responsibles';
 import { applicationAttachmentsMigration } from './migrations/023_application_attachments';
+import { rackFloorPositionMigration } from './migrations/024_rack_floor_position';
 
 export interface Migration {
   id: string;
@@ -236,4 +237,5 @@ export const migrations: Migration[] = [
   wifiNamingMigration,
   certificateResponsiblesMigration,
   applicationAttachmentsMigration,
+  rackFloorPositionMigration,
 ];
