@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { AutoComplete, Input, Space, Typography } from 'antd';
-import { BankOutlined, ClusterOutlined, SearchOutlined } from '@ant-design/icons';
+import { BankOutlined, ClusterOutlined, SearchOutlined, TagOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import type { SearchResult } from '../../../shared/model';
 import { http } from '../lib/api';
@@ -16,7 +16,9 @@ function useDebounced<T>(value: T, ms = 250): T {
   return v;
 }
 
-const routeFor = (r: SearchResult) => (r.kind === 'plant' ? `/plants/${r.id}` : r.kind === 'building' ? `/buildings/${r.id}` : `/assets/${r.id}`);
+const routeFor = (r: SearchResult) =>
+  r.kind === 'plant' ? `/plants/${r.id}` : r.kind === 'building' ? `/buildings/${r.id}` : r.kind === 'tag' ? `/inventory?tag=${encodeURIComponent(r.title)}` : `/assets/${r.id}`;
+const ICONS: Record<SearchResult['kind'], React.ReactNode> = { plant: <BankOutlined />, building: <ClusterOutlined />, tag: <TagOutlined />, asset: null };
 
 export function GlobalSearch() {
   const navigate = useNavigate();
@@ -37,7 +39,7 @@ export function GlobalSearch() {
         value: `${r.kind}:${r.id}`,
         label: (
           <Space size={8}>
-            {r.kind === 'asset' && r.assetType ? <AssetTypeTag type={r.assetType} short /> : r.kind === 'plant' ? <BankOutlined /> : <ClusterOutlined />}
+            {r.kind === 'asset' && r.assetType ? <AssetTypeTag type={r.assetType} short /> : ICONS[r.kind]}
             <span>
               <strong>{r.title}</strong>
               {r.subtitle && <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{r.subtitle}</span>}
@@ -48,7 +50,8 @@ export function GlobalSearch() {
     };
   };
 
-  const options = [group('asset', 'Assets'), group('plant', 'Plants'), group('building', 'Buildings')].filter(Boolean) as { label: React.ReactNode; options: { value: string; label: React.ReactNode }[] }[];
+  // a tag stands for many devices – show it first, it is easily missed below a dozen device hits
+  const options = [group('tag', 'Tags'), group('asset', 'Assets'), group('plant', 'Plants'), group('building', 'Buildings')].filter(Boolean) as { label: React.ReactNode; options: { value: string; label: React.ReactNode }[] }[];
 
   return (
     <AutoComplete
@@ -57,7 +60,10 @@ export function GlobalSearch() {
       style={{ width: '100%', maxWidth: 560 }}
       onChange={setText}
       onSelect={(value: string) => {
-        const [kind, id] = value.split(':');
+        // tags may contain ':' – split at the first one only
+        const cut = value.indexOf(':');
+        const kind = value.slice(0, cut);
+        const id = value.slice(cut + 1);
         const r = data.find((x) => x.kind === kind && x.id === id);
         setText('');
         if (r) navigate(routeFor(r));
@@ -66,7 +72,7 @@ export function GlobalSearch() {
     >
       <Input
         prefix={<SearchOutlined className="muted" />}
-        placeholder="Search devices, IP, serial number, plant…"
+        placeholder="Search devices, IP, serial number, tag, plant…"
         allowClear
         onPressEnter={() => {
           if (text.trim().length >= 2) {

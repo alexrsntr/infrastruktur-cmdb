@@ -214,7 +214,15 @@ export function AssetPage() {
     ['Support contract', a.support_contract],
     ['Last seen on the network', a.last_seen_at, <Tooltip title={fmtDateTime(a.last_seen_at)}>{fromNow(a.last_seen_at)}</Tooltip>],
     ['Purchase date', a.purchase_date, fmtDate(a.purchase_date)],
-    ['Tags', a.tags, a.tags.map((t) => <Tag key={t}>{t}</Tag>)],
+    [
+      'Tags',
+      a.tags,
+      a.tags.map((t) => (
+        <Link key={t} to={`/inventory?tag=${encodeURIComponent(t)}`} title={`All devices tagged ${t}`}>
+          <Tag style={{ cursor: 'pointer' }}>{t}</Tag>
+        </Link>
+      )),
+    ],
     ['Description', a.description, <span className="note-body">{a.description}</span>],
     ['Added', a.created_at, `${fmtDateTime(a.created_at)}${a.created_by_name ? ` · ${a.created_by_name}` : ''}`],
     ['Last change', a.updated_at, `${fmtDateTime(a.updated_at)}${a.updated_by_name ? ` · ${a.updated_by_name}` : ''}`],

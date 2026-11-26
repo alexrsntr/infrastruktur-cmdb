@@ -14,6 +14,7 @@ import type {
   Asset,
   Rack,
   RackDetail,
+  TagCount,
 } from '../../../shared/model';
 import type { Attachment, PlanDetail } from '../../../shared/attachments';
 import { http, type Query } from './api';
@@ -59,6 +60,9 @@ export const useHistory = (type: EntityType, id: string) =>
   useQuery({ queryKey: keys.history(type, id), queryFn: () => http.get<AuditEntry[]>('/api/history', { entityType: type, entityId: id }) });
 export const useDashboard = () => useQuery({ queryKey: keys.dashboard, queryFn: () => http.get<DashboardData>('/api/dashboard') });
 export const useUsers = (enabled = true) => useQuery({ queryKey: keys.users, queryFn: () => http.get<AppUser[]>('/api/users'), enabled });
+
+/** Device tags in use (within the user's plants) – suggestions and filters */
+export const useTags = () => useQuery({ queryKey: ['tags'], queryFn: () => http.get<TagCount[]>('/api/tags'), staleTime: 60_000 });
 
 export const useRacks = (q: Query, enabled = true) =>
   useQuery({ queryKey: keys.racks(q), queryFn: () => http.get<Rack[]>('/api/racks', q), enabled });

@@ -6,6 +6,7 @@ import {
   ASSET_TYPE_KEYS,
   CRITICALITIES,
   ENTITY_TYPES,
+  normalizeTags,
   RACK_ITEM_KINDS,
   RELATION_TYPE_KEYS,
   PLANT_BOUND_ROLES,
@@ -129,7 +130,7 @@ export const assetSchema = z
       .array(z.string().trim().min(1).max(50))
       .max(30)
       .nullish()
-      .transform((v) => [...new Set(v ?? [])]),
+      .transform((v) => normalizeTags(v ?? [])),
     attributes: z.record(z.string(), z.unknown()).nullish().transform((v) => v ?? {}),
   });
 /** Attributes are cleaned per type afterwards (cleanAttributes in services/assetTypes, which knows the administrator fields). */

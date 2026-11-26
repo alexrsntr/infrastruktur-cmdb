@@ -17,6 +17,7 @@ import { errorText, http } from '../lib/api';
 import { DATE_FORMAT } from '../lib/format';
 import { useAssetTypes, useBuilding, useBuildings, useInvalidate, usePlants, useRacks } from '../lib/queries';
 import { AttributeInput } from './AttributeInput';
+import { TagSelect } from './TagSelect';
 import { ASSET_TYPE_ICONS } from './icons';
 
 const DATE_FIELDS = ['purchase_date', 'warranty_end', 'support_end', 'end_of_life'] as const;
@@ -168,7 +169,7 @@ export function AssetFormModal({
           </Col>
           <Col xs={24} md={8}>
             <Form.Item name="tags" label="Tags">
-              <Select mode="tags" tokenSeparators={[',']} placeholder="Add tags" />
+              <TagSelect />
             </Form.Item>
           </Col>
         </Row>

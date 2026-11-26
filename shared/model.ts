@@ -858,7 +858,8 @@ export interface Paged<T> {
 }
 
 export interface SearchResult {
-  kind: 'plant' | 'building' | 'asset';
+  /** for 'tag', id and title are the tag itself */
+  kind: 'plant' | 'building' | 'asset' | 'tag';
   id: string;
   title: string;
   subtitle: string | null;
@@ -913,6 +914,35 @@ export interface ImportReport {
   updated: number;
   skipped: number;
   errors: { row: number; message: string }[];
+}
+
+// ---------------------------------------------------------------------------
+// Tags
+// ---------------------------------------------------------------------------
+
+/** A device tag in use, with the number of devices carrying it */
+export interface TagCount {
+  tag: string;
+  count: number;
+}
+
+/**
+ * Trims tags, drops empty ones and case-insensitive duplicates (the first spelling wins) and
+ * replaces a tag by a known spelling ("server" -> "Server") so tags stay reusable.
+ */
+export function normalizeTags(values: readonly string[], known: readonly string[] = []): string[] {
+  const spelling = new Map<string, string>();
+  for (const k of known) if (!spelling.has(k.toLowerCase())) spelling.set(k.toLowerCase(), k);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of values) {
+    const t = raw.trim();
+    const key = t.toLowerCase();
+    if (!t || seen.has(key)) continue;
+    seen.add(key);
+    out.push(spelling.get(key) ?? t);
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------

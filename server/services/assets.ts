@@ -1,5 +1,5 @@
 import type { CurrentUser } from '../../shared/model';
-import { ASSET_STATUSES, ASSET_TYPES, ASSET_TYPE_KEYS, ATTENTION_DAYS, ATTENTION_KINDS, CRITICALITIES, type AssetType, type AttentionKind } from '../../shared/model';
+import { ASSET_STATUSES, ASSET_TYPES, ASSET_TYPE_KEYS, ATTENTION_DAYS, ATTENTION_KINDS, CRITICALITIES, normalizeTags, type AssetType, type AttentionKind } from '../../shared/model';
 import type { DbClient } from '../db/pool';
 import { badRequest, isUuid, likePattern, queryList, queryString, SqlBuilder } from '../lib/http';
 import { applyScope } from '../lib/scope';
@@ -143,7 +143,7 @@ export function buildAssetQuery(user: CurrentUser, f: AssetFilters): { sql: SqlB
   if (f.plantId) sql.and(`a.plant_id = ${sql.p(f.plantId)}`);
   if (f.buildingId) sql.and(`a.building_id = ${sql.p(f.buildingId)}`);
   if (f.floorId) sql.and(`a.floor_id = ${sql.p(f.floorId)}`);
-  if (f.tag) sql.and(`${sql.p(f.tag)} = ANY(a.tags)`);
+  if (f.tag) sql.and(`EXISTS (SELECT 1 FROM unnest(a.tags) t WHERE lower(t) = lower(${sql.p(f.tag)}))`);
   if (f.warrantyBefore) sql.and(`a.warranty_end IS NOT NULL AND a.warranty_end <= ${sql.p(f.warrantyBefore)}`);
   if (f.placed === 'yes') sql.and('a.map_x IS NOT NULL');
   if (f.placed === 'no') sql.and('a.map_x IS NULL');
@@ -255,7 +255,24 @@ export function assetValues(input: AssetInput, loc: ResolvedLocation): unknown[]
   return ASSET_WRITE_COLUMNS.map((c) => (c === 'tags' ? (merged.tags ?? []) : (merged[c] ?? null)));
 }
 
+/**
+ * Existing spelling of tags, so "server" becomes "Server" when other devices already use that (the most used
+ * spelling wins). The device being changed does not count, so the spelling of a tag only it uses can be changed.
+ */
+export async function canonicalTags(db: DbClient, tags: string[], exceptAssetId?: string): Promise<string[]> {
+  if (!tags.length) return tags;
+  const { rows } = await db.query<{ tag: string }>(
+    `SELECT DISTINCT ON (lower(tag)) tag FROM (
+       SELECT t AS tag, count(*) AS n FROM asset a CROSS JOIN LATERAL unnest(a.tags) t
+       WHERE lower(t) = ANY($1::text[]) AND a.id IS DISTINCT FROM $2::uuid GROUP BY t
+     ) x ORDER BY lower(tag), n DESC, tag`,
+    [tags.map((t) => t.toLowerCase()), exceptAssetId ?? null],
+  );
+  return normalizeTags(tags, rows.map((r) => r.tag));
+}
+
 export async function insertAsset(db: DbClient, input: AssetInput, loc: ResolvedLocation, userId: string) {
+  input = { ...input, tags: await canonicalTags(db, input.tags) };
   const values = assetValues(input, loc);
   const cols = [...ASSET_WRITE_COLUMNS, 'created_by', 'updated_by'];
   const placeholders = cols.map((_, i) => `$${i + 1}`);
@@ -267,6 +284,7 @@ export async function insertAsset(db: DbClient, input: AssetInput, loc: Resolved
 }
 
 export async function updateAsset(db: DbClient, id: string, input: AssetInput, loc: ResolvedLocation, userId: string) {
+  input = { ...input, tags: await canonicalTags(db, input.tags, id) };
   const values = assetValues(input, loc);
   const sets = ASSET_WRITE_COLUMNS.map((c, i) => `${c} = $${i + 2}`);
   const { rows } = await db.query(

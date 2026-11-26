@@ -12,6 +12,7 @@ import { useSession } from '../lib/session';
 import { useAddDevice } from './AddDeviceWizard';
 import { ExportMenu } from './ExportMenu';
 import { StatusDot, TypeIcon } from './Simple';
+import { TagFilter } from './TagSelect';
 import { WarrantyDate } from './Tags';
 
 export interface AssetTableProps {
@@ -76,6 +77,7 @@ export function AssetTable({ fixed = {}, createDefaults, syncUrl = false, pageSi
     status: get('status') || undefined,
     attention: get('attention') || undefined,
     issue: get('issue') || undefined,
+    tag: get('tag') || undefined,
     q: get('q') || undefined,
     sort: get('sort') || 'name',
     order: get('order') || 'asc',
@@ -189,7 +191,7 @@ export function AssetTable({ fixed = {}, createDefaults, syncUrl = false, pageSi
         <Input
           allowClear
           prefix={<SearchOutlined className="muted" />}
-          placeholder="Search name, IP, serial number, model…"
+          placeholder="Search name, IP, serial number, model, tag…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{ width: 340 }}
@@ -223,6 +225,7 @@ export function AssetTable({ fixed = {}, createDefaults, syncUrl = false, pageSi
           onChange={(v: string[]) => set({ attention: v.length ? v.join(',') : undefined })}
           options={ATTENTION_KINDS.map((k) => ({ value: k, label: ATTENTION_META[k].label, title: ATTENTION_META[k].description }))}
         />
+        <TagFilter value={get('tag') || undefined} onChange={(v) => set({ tag: v })} />
         {showPlant && (plants.data?.length ?? 0) > 1 && (
           <Select
             allowClear
@@ -282,7 +285,7 @@ export function AssetTable({ fixed = {}, createDefaults, syncUrl = false, pageSi
           emptyText: (
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description={query.q || query.status ? 'No devices match your search' : 'No devices yet'}
+              description={query.q || query.status || query.tag ? 'No devices match your search' : 'No devices yet'}
               style={{ margin: '24px 0' }}
             >
               {can('asset.write') && !query.q && (

@@ -87,14 +87,28 @@ export function overviewRouter(pool: Pool, config: Config, entra: EntraService):
               concat_ws(' · ', a.ip_address, a.model, p.code, b.name) AS subtitle
        FROM asset a LEFT JOIN plant p ON p.id = a.plant_id LEFT JOIN building b ON b.id = a.building_id
        WHERE (a.name ILIKE ${alike} OR a.ip_address ILIKE ${alike} OR a.serial_number ILIKE ${alike} OR a.asset_tag ILIKE ${alike}
-              OR a.mac_address ILIKE ${alike} OR a.fqdn ILIKE ${alike} OR a.model ILIKE ${alike})
+              OR a.mac_address ILIKE ${alike} OR a.fqdn ILIKE ${alike} OR a.model ILIKE ${alike}
+              OR EXISTS (SELECT 1 FROM unnest(a.tags) t WHERE t ILIKE ${alike}))
              ${as.where.length ? 'AND ' + as.where.join(' AND ') : ''}
        ORDER BY (lower(a.name) = lower(${as.p(q)})) DESC, a.name LIMIT 12`,
       as.params,
     );
 
-    const [p, b, a] = await Promise.all([plants, buildings, assets]);
-    res.json([...p.rows, ...b.rows, ...a.rows]);
+    // tags: open the device list filtered by the tag
+    const ts = new SqlBuilder();
+    const tlike = ts.p(likePattern(q));
+    applyScope(ts, user, 'a.plant_id');
+    ts.and(`t ILIKE ${tlike}`);
+    const tags = pool.query(
+      `SELECT 'tag' AS kind, mode() WITHIN GROUP (ORDER BY t) AS id, mode() WITHIN GROUP (ORDER BY t) AS title,
+              count(DISTINCT a.id) || CASE WHEN count(DISTINCT a.id) = 1 THEN ' device' ELSE ' devices' END AS subtitle
+       FROM asset a CROSS JOIN LATERAL unnest(a.tags) t ${ts.whereSql()}
+       GROUP BY lower(t) ORDER BY (lower(t) = lower(${ts.p(q)})) DESC, count(DISTINCT a.id) DESC, lower(t) LIMIT 5`,
+      ts.params,
+    );
+
+    const [p, b, a, t] = await Promise.all([plants, buildings, assets, tags]);
+    res.json([...p.rows, ...b.rows, ...a.rows, ...t.rows]);
   });
 
   /** "Needs attention": warranty, vendor support, end of life and devices not seen lately */

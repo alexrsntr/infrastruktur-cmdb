@@ -3,7 +3,7 @@ import type { Pool } from 'pg';
 import { requirePermission } from '../auth/context';
 import { withTransaction } from '../db/pool';
 import { audit, diff, snapshot } from '../lib/audit';
-import { badRequest, clampInt, notFound, parse, requireUuid, SqlBuilder } from '../lib/http';
+import { badRequest, clampInt, likePattern, notFound, parse, queryString, requireUuid, SqlBuilder } from '../lib/http';
 import { assetSchema, assetStatusSchema, positionSchema, relationSchema } from '../lib/schemas';
 import { applyScope, assertPlantAccess } from '../lib/scope';
 import {
@@ -34,6 +34,21 @@ export function assetsRouter(pool: Pool): Router {
       pool.query(`SELECT count(*) AS n FROM asset a LEFT JOIN plant p ON p.id = a.plant_id ${sql.whereSql()}`, sql.params),
     ]);
     res.json({ items: items.rows, total: total.rows[0].n });
+  });
+
+  /** Tags in use (in the user's plants) with the number of devices – suggestions in forms and the tag filter */
+  r.get('/tags', async (req, res) => {
+    const sql = new SqlBuilder();
+    applyScope(sql, req.user!, 'a.plant_id');
+    const q = queryString(req.query.q);
+    if (q) sql.and(`t ILIKE ${sql.p(likePattern(q))}`);
+    const { rows } = await pool.query(
+      `SELECT mode() WITHIN GROUP (ORDER BY t) AS tag, count(DISTINCT a.id)::int AS count
+       FROM asset a CROSS JOIN LATERAL unnest(a.tags) t ${sql.whereSql()}
+       GROUP BY lower(t) ORDER BY lower(t) LIMIT 2000`,
+      sql.params,
+    );
+    res.json(rows);
   });
 
   /** Lightweight list for pickers (relations, placement) */
